@@ -1,0 +1,41 @@
+# 艾莲手机版 · 创作版仓库忽略规则
+# 仓库根 = E:\ailian\艾莲手机版\创作版
+# 只收「能动手改的东西」：_phone-sync\（注入层）、_patch_phone_*.py（锚点补丁）、
+#   _dev_*.py|ps1（解包/回包/签名流水线）、规范与验收清单。
+# 下列全是可再生产物或大件，一律不入库。
+
+# ── APK 解包基线（780 MB，python _dev_extract.py --clean 可重建）──
+work/
+work_*/
+_dup*/
+
+# ── 打包中间产物 ──
+_build/
+*.apk
+*.idsig
+
+# ── 0.1.8 时期遗留的前端 dist 与拆包残留 ──
+web/
+web_out/
+web_out.bak/
+web_out.bak_uuid/
+package/
+dexwork/
+dexcheck/
+test-main.js
+esbuild.tgz
+
+# ── 备份与快照 ──
+_backup_mem/
+_b12/
+*.bak
+*.bak-*
+*.zip
+*.7z
+
+# ── 临时与缓存 ──
+__pycache__/
+_临时/
+*.log
+Thumbs.db
+desktop.ini
