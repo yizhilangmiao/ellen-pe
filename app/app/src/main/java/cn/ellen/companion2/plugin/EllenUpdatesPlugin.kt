@@ -57,15 +57,54 @@ class EllenUpdatesPlugin : Plugin() {
 
     private fun manifestUrl(): String = prefs().getString("manifest", "") ?: ""
 
+    /**
+     * 只有这三个相位才允许带 received/total。
+     *
+     * 别把上一轮的进度跟着状态一起吐出去：实测 phase 已经是 unpublished，
+     * received/total 还停在 100123802，界面会拿它画一条「满格」的假进度条。
+     */
+    private val progressPhases = setOf("downloading", "verifying", "ready")
+
+    /** 白名单式输出：状态里能出现的字段由相位决定，磁盘上残留的脏字段一律丢掉。 */
+    private fun sanitize(raw: JSONObject): JSObject {
+        val phase = raw.optString("phase").ifBlank { "idle" }
+        val out = JSObject()
+        out.put("supported", true)
+        out.put("phase", phase)
+        out.put("message", raw.optString("message"))
+        out.put("sequence", raw.optLong("sequence", 0L))
+        out.put("canInstall", raw.optBoolean("canInstall", false))
+        out.put("current", raw.optJSONObject("current") ?: JSObject())
+        if (phase in progressPhases) {
+            out.put("received", raw.optLong("received", 0L))
+            out.put("total", raw.optLong("total", 0L))
+        }
+        // lastError 只属于 error：旧版本把它写进 state 后一直挂在 unpublished 上
+        if (phase == "error") {
+            val err = raw.optString("lastError").ifBlank { raw.optString("message") }
+            out.put("lastError", err)
+        }
+        val latest = raw.optJSONObject("latest")
+        // 没有清单地址就没有「最新版本」这回事
+        if (latest != null && phase != "unpublished") out.put("latest", latest)
+        return out
+    }
+
+    private fun persist(state: JSObject) {
+        prefs().edit()
+            .putString("state", state.toString())
+            .putLong("sequence", state.optLong("sequence", 0L))
+            .apply()
+    }
+
     private fun publish(phase: String, message: String, extra: JSObject? = null): JSObject {
         val (version, code) = currentVersion()
-        val state = JSObject()
-        state.put("supported", true)
-        state.put("phase", phase)
-        state.put("message", message)
-        state.put("sequence", prefs().getLong("sequence", 0L) + 1)
-        state.put("canInstall", context.packageManager.canRequestPackageInstalls())
-        state.put("current", JSObject().apply {
+        val raw = JSONObject()
+        raw.put("phase", phase)
+        raw.put("message", message)
+        raw.put("sequence", prefs().getLong("sequence", 0L) + 1)
+        raw.put("canInstall", context.packageManager.canRequestPackageInstalls())
+        raw.put("current", JSObject().apply {
             put("version", version)
             put("versionCode", code)
         })
@@ -73,13 +112,11 @@ class EllenUpdatesPlugin : Plugin() {
             val keys = e.keys()
             while (keys.hasNext()) {
                 val k = keys.next()
-                state.put(k, e.opt(k))
+                raw.put(k, e.opt(k))
             }
         }
-        prefs().edit()
-            .putString("state", state.toString())
-            .putLong("sequence", state.optLong("sequence", 0L))
-            .apply()
+        val state = sanitize(raw)
+        persist(state)
         notifyListeners("updateState", state)
         return state
     }
@@ -88,18 +125,21 @@ class EllenUpdatesPlugin : Plugin() {
     fun state(call: PluginCall) {
         val saved = readState()
         if (saved.length() == 0) {
-            call.resolve(publish("idle", ""))
+            val empty = manifestUrl().isEmpty()
+            call.resolve(
+                publish(
+                    if (empty) "unpublished" else "idle",
+                    if (empty) "还没有配更新地址。" else "",
+                )
+            )
             return
         }
-        val out = JSObject()
-        val keys = saved.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
-            out.put(k, saved.opt(k))
-        }
+        val out = sanitize(saved)
         val (version, code) = currentVersion()
         out.put("current", JSObject().apply { put("version", version); put("versionCode", code) })
         out.put("supported", true)
+        // 顺手把脏字段落盘清掉，否则下次读出来还是那条假进度
+        persist(out)
         call.resolve(out)
     }
 
@@ -108,8 +148,15 @@ class EllenUpdatesPlugin : Plugin() {
         val manifest = call.getString("manifest").orEmpty().trim()
         prefs().edit().putString("manifest", manifest).apply()
         if (manifest.isEmpty()) {
+            // 地址撤掉时，上一轮的最新版本/进度/错误一起清空
+            prefs().edit().putString("state", JSONObject().toString()).apply()
             call.resolve(publish("unpublished", "还没有配更新地址。"))
         } else {
+            val kept = readState()
+            kept.remove("received")
+            kept.remove("total")
+            kept.remove("lastError")
+            if (kept.optString("phase") == "unpublished") kept.put("phase", "idle")
             call.resolve(publish("idle", ""))
         }
     }

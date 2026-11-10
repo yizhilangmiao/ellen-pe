@@ -53,3 +53,6 @@ desktop.ini
 # ── 备份快照 ──
 /_backup_mem/
 /_b12/
+
+# ── 事故抢救物（APK 反编译源，192 MB，定稿后可删）──
+/_recover-app/

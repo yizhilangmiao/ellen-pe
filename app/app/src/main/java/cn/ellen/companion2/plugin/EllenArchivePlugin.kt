@@ -34,6 +34,8 @@ class EllenArchivePlugin : Plugin() {
 
     private val magic = "ELLENPK1\n".toByteArray(Charsets.US_ASCII)
     private val backupNamePattern = Regex("艾莲备份-[0-9]{8}-[0-9]{6}\\.ellenpack")
+    /** 附件 sha256 的合法形状（与 import.js 的 HEX64 一致）。 */
+    private val hex64 = Regex("[a-f0-9]{64}")
 
     private var exportCall: PluginCall? = null
     private var importCall: PluginCall? = null
@@ -174,12 +176,16 @@ class EllenArchivePlugin : Plugin() {
 
     // —— 自动备份 ——
 
-    private class Writer(val uri: Uri, val name: String) {
+    private class Writer(val uri: Uri, val name: String, val files: JSONArray) {
         var out: OutputStream? = null
         var sha = MessageDigest.getInstance("SHA-256")
         var bytes = 0L
-        val files = JSONArray()
+        /** 附件区已写字节（不含 magic/长度/manifest）。 */
         var offset = 0L
+        /** 正在写的附件下标；等于 files.length() 表示附件全部落完。 */
+        var fileIndex = 0
+        var fileSha = MessageDigest.getInstance("SHA-256")
+        var fileWritten = 0L
     }
 
     private var backupWriter: Writer? = null
@@ -229,7 +235,15 @@ class EllenArchivePlugin : Plugin() {
         out.put("lastName", json.optString("lastName"))
         out.put("lastBytes", json.optLong("lastBytes", 0L))
         out.put("lastError", json.optString("lastError"))
-        out.put("writing", backupWriter != null)
+        val writer = backupWriter
+        out.put("writing", writer != null)
+        // 进度给界面用：写到第几个附件、附件区已写多少字节
+        if (writer != null) {
+            out.put("writingName", writer.name)
+            out.put("writingFiles", writer.files.length())
+            out.put("writingDone", writer.fileIndex)
+            out.put("writingBytes", writer.offset)
+        }
         out.put("groups", groupsJson(json))
         return out
     }
@@ -382,6 +396,31 @@ class EllenArchivePlugin : Plugin() {
             return
         }
 
+        // 清单里声明的附件清单：附件区字节必须按这个顺序、按这些 sha256 落盘。
+        // 先校验清单再建文件，免得建出一个注定要删的空壳。
+        val declared = JSONArray()
+        try {
+            val manifest = JSONObject(manifestText)
+            val arr = manifest.optJSONArray("files") ?: JSONArray()
+            for (i in 0 until arr.length()) {
+                val f = arr.optJSONObject(i) ?: throw IllegalStateException("files[$i] 不是对象")
+                val id = f.optString("id")
+                val sha = f.optString("sha256").lowercase()
+                val size = f.optLong("sizeBytes", 0L)
+                if (id.isEmpty()) throw IllegalStateException("files[$i] 缺 id")
+                if (!hex64.matches(sha)) throw IllegalStateException("files[$i] 的 sha256 不合法")
+                if (size <= 0L) throw IllegalStateException("files[$i] 的 sizeBytes 不合法")
+                declared.put(JSONObject().apply {
+                    put("id", id)
+                    put("sha256", sha)
+                    put("sizeBytes", size)
+                })
+            }
+        } catch (e: Exception) {
+            call.reject("备份清单读不出来：${e.message ?: e.javaClass.simpleName}", "ARCHIVE_MANIFEST_INVALID")
+            return
+        }
+
         backupWriter?.let {
             // 上一份没收尾：先当失败处理，免得两份写同一个文件
             backupAbortSilently()
@@ -399,7 +438,7 @@ class EllenArchivePlugin : Plugin() {
                 name,
             ) ?: throw IllegalStateException("createDocument 返回 null")
 
-            val writer = Writer(docUri, name)
+            val writer = Writer(docUri, name, declared)
             val stream = context.contentResolver.openOutputStream(docUri, "wt")
                 ?: throw IllegalStateException("openOutputStream 返回 null")
             writer.out = stream
@@ -416,6 +455,7 @@ class EllenArchivePlugin : Plugin() {
             out.put("handle", name)
             out.put("name", name)
             out.put("bytes", writer.bytes)
+            out.put("files", declared.length())
             call.resolve(out)
         } catch (e: Exception) {
             call.reject("备份没开起来：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
@@ -440,14 +480,51 @@ class EllenArchivePlugin : Plugin() {
         }
         try {
             val bytes = Base64.decode(b64, Base64.DEFAULT)
-            writer.out?.write(bytes)
+            if (bytes.isEmpty()) {
+                call.reject("这一块是空的。", "BACKUP_EMPTY_CHUNK")
+                return
+            }
+            val stream = writer.out ?: throw IllegalStateException("输出流已经关了")
+            stream.write(bytes)
             writer.sha.update(bytes)
             writer.bytes += bytes.size
             writer.offset += bytes.size
+
+            // 附件区按 manifest.files 的顺序落字节：一个文件写满立刻校 sha256，
+            // 不符就把这份半成品删掉（ARCHIVE_FILE_MISMATCH），别等 commit 才发现包里是坏字节。
+            var at = 0
+            while (at < bytes.size) {
+                if (writer.fileIndex >= writer.files.length()) {
+                    throw FileMismatch("附件字节比清单多：${writer.files.length()} 个文件已写完，还有多余字节。")
+                }
+                val file = writer.files.getJSONObject(writer.fileIndex)
+                val size = file.optLong("sizeBytes", 0L)
+                val need = size - writer.fileWritten
+                val take = minOf(need, (bytes.size - at).toLong()).toInt()
+                writer.fileSha.update(bytes, at, take)
+                writer.fileWritten += take
+                at += take
+                if (writer.fileWritten >= size) {
+                    val actual = hexOf(writer.fileSha.digest())
+                    val expected = file.optString("sha256")
+                    if (!actual.equals(expected, ignoreCase = true)) {
+                        throw FileMismatch("附件 ${file.optString("id")} 的 sha256 不符（期望 ${expected.take(12)}…，实际 ${actual.take(12)}…）。")
+                    }
+                    writer.fileIndex++
+                    writer.fileSha = MessageDigest.getInstance("SHA-256")
+                    writer.fileWritten = 0L
+                }
+            }
+
             val out = JSObject()
             out.put("offset", writer.offset)
             out.put("bytes", writer.bytes)
+            out.put("fileIndex", writer.fileIndex)
+            out.put("fileBytes", writer.fileWritten)
             call.resolve(out)
+        } catch (e: FileMismatch) {
+            failWriter(writer, e.message ?: "附件校验失败")
+            call.reject(e.message ?: "附件校验失败。", "ARCHIVE_FILE_MISMATCH")
         } catch (e: Exception) {
             call.reject("写备份失败：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
         }
@@ -457,6 +534,13 @@ class EllenArchivePlugin : Plugin() {
         val writer = backupWriter
         if (writer == null) {
             call.reject("没有正在进行的备份。", "BACKUP_NOT_STARTED")
+            return
+        }
+        // 清单声明了附件就必须全部落完再收尾，否则容器里 manifest 说有 N 个文件、实际一个都没有
+        if (writer.fileIndex < writer.files.length()) {
+            val left = writer.files.length() - writer.fileIndex
+            failWriter(writer, "还有 $left 个附件没写完，这份备份已清掉。")
+            call.reject("还有 $left 个附件没写完。", "ARCHIVE_FILE_MISSING")
             return
         }
         backupWriter = null
@@ -550,6 +634,34 @@ class EllenArchivePlugin : Plugin() {
     }
 
     // —— 小工具 ——
+
+    /** 附件 sha256 不符：单独一类，好和「磁盘写不进去」区分开。 */
+    private class FileMismatch(message: String) : Exception(message)
+
+    private fun hexOf(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+
+    /** 写坏了：关流 + 删掉半成品，再把错误记进 state。 */
+    private fun failWriter(writer: Writer, message: String) {
+        backupWriter = null
+        try {
+            writer.out?.flush()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        try {
+            writer.out?.close()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        try {
+            DocumentsContract.deleteDocument(context.contentResolver, writer.uri)
+        } catch (_: Exception) {
+            /* 删不掉就留着，下次会被当成坏包 */
+        }
+        val json = withDefaults(readState())
+        json.put("lastError", message)
+        writeState(json)
+    }
 
     private fun writeInt(out: OutputStream, value: Int) {
         out.write((value shr 24) and 0xff)

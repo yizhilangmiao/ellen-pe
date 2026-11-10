@@ -241,14 +241,25 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
     } catch (err) {
       const code = err && err.code;
       const aborted = ctl.aborted || code === 'CANCELLED';
-      const explained = aborted ? '（已停止）' : describeNativeError(code, err);
-      state.updateMessage(reply.id, {
-        text: explained,
-        detail: aborted ? '' : code || '',
-        pending: false,
-        failed: !aborted,
-      });
-      if (!aborted) state.setError(err);
+      if (aborted) {
+        // 停止时已经流出来的正文要留着（实测过：直接写「（已停止）」会把用户看到的那半截吃掉）。
+        // 正文原样落库，停止标记只挂在细节行；一个字都还没出来时才把「（已停止）」放进正文。
+        const cur = String((state.getMessages().find((m) => m.id === reply.id) || {}).text || '');
+        state.updateMessage(reply.id, {
+          text: cur || '（已停止）',
+          detail: cur ? '（已停止）' : '',
+          pending: false,
+          failed: false,
+        });
+      } else {
+        state.updateMessage(reply.id, {
+          text: describeNativeError(code, err),
+          detail: code || '',
+          pending: false,
+          failed: true,
+        });
+        state.setError(err);
+      }
     } finally {
       if (inflight === ctl) inflight = null;
       state.setBusy(false);

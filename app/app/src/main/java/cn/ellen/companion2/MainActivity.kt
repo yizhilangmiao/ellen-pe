@@ -15,6 +15,7 @@ import cn.ellen.companion2.plugin.EllenLocalSpeechPlugin
 import cn.ellen.companion2.plugin.EllenSpeechPlugin
 import cn.ellen.companion2.plugin.EllenFeedbackPlugin
 import cn.ellen.companion2.plugin.EllenUpdatesPlugin
+import cn.ellen.companion2.plugin.EllenDocumentsPlugin
 
 /**
  * 唯一 Activity。插件必须在 super.onCreate() 之前注册 —— Capacitor 8 会在 super.onCreate
@@ -36,6 +37,7 @@ class MainActivity : BridgeActivity() {
         registerPlugin(EllenSpeechPlugin::class.java)
         registerPlugin(EllenFeedbackPlugin::class.java)
         registerPlugin(EllenUpdatesPlugin::class.java)
+        registerPlugin(EllenDocumentsPlugin::class.java)
         super.onCreate(savedInstanceState)
     }
 

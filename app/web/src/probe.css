@@ -3,7 +3,8 @@
   color-scheme: light;
   --bg: #fff8f9;
   --ink: #3a2b31;
-  --brand: #d6a0b4;
+  /* 诊断页也别用旧的 #d6a0b4（老 bug ⑨）：跟主界面同一支品牌粉 */
+  --brand: #e4b8cd;
 }
 
 * {
