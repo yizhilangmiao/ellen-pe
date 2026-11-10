@@ -43,7 +43,7 @@
   width: 100%;
   min-height: calc(150 * var(--u));
   padding: calc(12 * var(--u));
-  border: 0.8px solid var(--el-line);
+  border: 1px solid var(--el-line);
   border-radius: calc(14 * var(--u));
   background: var(--el-surface);
   color: var(--el-text);

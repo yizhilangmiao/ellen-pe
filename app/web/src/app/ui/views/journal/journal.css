@@ -47,7 +47,7 @@
   padding: calc(12 * var(--u)) calc(14 * var(--u));
   border-radius: calc(12 * var(--u));
   background: rgba(240, 212, 225, 0.45);
-  border: 0.8px solid var(--jr-line);
+  border: 1px solid var(--jr-line);
 }
 
 .el-journal-aside-label {
@@ -75,7 +75,7 @@
   flex: 1 1 0;
   padding: calc(9 * var(--u)) 0;
   border-radius: calc(10 * var(--u));
-  border: 0.8px solid var(--jr-line);
+  border: 1px solid var(--jr-line);
   background: transparent;
   color: var(--jr-rose);
   font-size: calc(13 * var(--u));
@@ -85,4 +85,34 @@
 
 .el-journal-pager-btn[disabled] {
   opacity: 0.38;
+}
+
+/* 绝区零皮肤（批 5 · B 档）：纸面卡 + 硬影，页脚/日期保留暖灰。 */
+.ellen-app[data-skin='zzz'] .el-journal-page {
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-detail-title {
+  font-family: var(--z-font-display);
+  font-size: calc(19 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-aside {
+  border-radius: var(--z-r-1);
+  border: 1px solid var(--z-line-hair);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-aside-label {
+  font-size: clamp(10px, calc(10.5 * var(--u)), 11.5px);
+  letter-spacing: calc(1.2 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-pager-btn {
+  border-radius: var(--z-r-2);
+  border: 1px solid var(--z-line-strong);
+  color: var(--z-ink-2);
 }

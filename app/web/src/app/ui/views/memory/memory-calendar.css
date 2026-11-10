@@ -128,3 +128,36 @@
   font-size: calc(12 * var(--u));
   font-family: inherit;
 }
+
+/* 绝区零皮肤（批 5 · B 档）：日历表头网点 + 今天用荧光描边。 */
+.ellen-app[data-skin='zzz'] .el-journal-cal-head,
+.ellen-app[data-skin='zzz'] .el-journal-week {
+  background-image: radial-gradient(#ffffff 1px, transparent 1px);
+  background-size: calc(9 * var(--u)) calc(9 * var(--u));
+  background-blend-mode: overlay;
+  border-radius: var(--z-r-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-cal-title {
+  font-family: var(--z-font-display);
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-week-cell {
+  font-size: clamp(9.5px, calc(10 * var(--u)), 11px);
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-day-cell {
+  border-radius: var(--z-r-3);
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-day-cell.has-entry {
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-day-cell.is-today {
+  box-shadow: inset 0 0 0 1px var(--z-signal);
+  color: var(--z-signal);
+}

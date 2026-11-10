@@ -200,3 +200,96 @@
   line-height: 1.7;
   color: var(--el-muted);
 }
+
+/* ============================================================
+ * 绝区零皮肤（批 5 · B 档）：纸面卡 + 硬影 + 网点只给空态。
+ * ============================================================ */
+.ellen-app[data-skin='zzz'] .el-memory-card,
+.ellen-app[data-skin='zzz'] .el-journal-card {
+  background: var(--z-paper-card);
+  border-radius: var(--z-r-1);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+  padding: calc(16 * var(--u)) calc(16 * var(--u)) calc(12 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-title,
+.ellen-app[data-skin='zzz'] .el-journal-title {
+  font-family: var(--z-font-display);
+  font-size: calc(16 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-more {
+  color: var(--z-ink-paper);
+  opacity: 1;
+}
+
+.ellen-app[data-skin='zzz'] .el-segments {
+  /* 选中条本身已经是线下标，容器再画一条 1px 会变成「双下划线」 */
+  border-bottom: 0;
+  gap: calc(6 * var(--u));
+  padding-bottom: calc(6 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-segment {
+  border-radius: var(--z-r-2);
+  font-family: var(--z-font-display);
+  font-size: calc(13 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-segment.is-active {
+  /* 评审 r2：胶囊底下再漂一根荧光条，和底栏的线下标撞语法（同屏两种「选中」长相）。
+     改成只靠深底 + 荧光字，线下标只留给底栏。 */
+  background: #1b1f22;
+  color: var(--z-signal);
+  box-shadow: none;
+}
+
+.ellen-app[data-skin='zzz'] .el-recall-group {
+  border-radius: var(--z-r-2);
+  border: 1px solid var(--z-line-hair);
+  background: var(--z-card);
+  color: var(--z-ink-2);
+  font-size: calc(12 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-recall-group.is-active {
+  background: var(--z-signal);
+  border-color: transparent;
+  color: var(--z-signal-ink);
+}
+
+/* 网点空态（B 档唯一允许纹理的地方） */
+.ellen-app[data-skin='zzz'] .el-memory-empty,
+.ellen-app[data-skin='zzz'] .el-memory-loading {
+  background-color: var(--z-panel);
+  background-image: radial-gradient(#ffffff9c 1px, transparent 1px);
+  background-size: calc(8 * var(--u)) calc(8 * var(--u));
+  background-blend-mode: overlay;
+  border-radius: var(--z-r-1);
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-empty-title {
+  font-family: var(--z-font-display);
+  font-size: calc(18 * var(--u));
+  color: var(--z-ink);
+  opacity: 1;
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-empty-sub {
+  color: var(--z-ink-3);
+}
+
+/* 修正（批 5 复看）：一屏荧光不许超过 3 处。记忆页已有底栏选中 + 分段选中，
+   胶囊选中就不能再整块铺荧光 —— 改深底 + 荧光字，层级靠字色不靠面积。 */
+.ellen-app[data-skin='zzz'] .el-recall-group.is-active {
+  background: #1b1f22;
+  border-color: var(--z-signal);
+  color: var(--z-signal);
+}
+
+/* 旧包的「✓」前缀是模板件（评审两轮都点了它），zzz 层直接关掉 */
+.ellen-app[data-skin='zzz'] .el-recall-group.is-active::before {
+  content: none;
+}

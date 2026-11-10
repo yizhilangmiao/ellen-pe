@@ -195,15 +195,14 @@ select {
   opacity: 0.85;
 }
 
-/* —— 底栏 —— */
+/* —— 底栏 ——
+ * 旧 .el-nav / .el-nav-item / 未读圆点 / 图标字号 已整体退役（批 1 起搬到
+ * styles/zz-frame.css 的皮肤段，不再叠加）。这里只留 4 行无皮肤兜底：
+ * 删掉 .ellen-app 上的 data-skin 属性时，底栏仍是能用的四格横条。 */
 .el-nav {
   flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  align-items: center;
-  gap: calc(2 * var(--u));
-  padding: calc(6 * var(--u)) calc(8 * var(--u));
-  padding-bottom: calc(6 * var(--u) + var(--el-safe-bottom));
   border-top: 1px solid var(--el-line);
   background: var(--el-bg);
 }
@@ -213,38 +212,14 @@ select {
   flex-direction: column;
   align-items: center;
   gap: calc(3 * var(--u));
-  padding: calc(4 * var(--u)) 0;
+  padding: calc(6 * var(--u)) 0;
   font-size: calc(11 * var(--u));
   line-height: calc(16 * var(--u));
   color: var(--el-muted);
-  opacity: 0.8;
 }
 
 .el-nav-item.is-active {
-  color: var(--el-pink);
-  opacity: 1;
-}
-
-/* 未读小圆点：她主动说话、你没停在聊天页时亮 */
-.el-nav-item .el-nav-icon {
-  position: relative;
-}
-
-.el-nav-item.has-unread .el-nav-icon::after {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--u));
-  right: calc(-2 * var(--u));
-  width: calc(6 * var(--u));
-  height: calc(6 * var(--u));
-  border-radius: 50%;
-  background: var(--el-pink);
-  box-shadow: 0 0 0 calc(1.6 * var(--u)) var(--el-bg);
-}
-
-.el-nav-item .el-nav-icon {
-  font-size: calc(20 * var(--u));
-  line-height: calc(22 * var(--u));
+  color: var(--el-text);
 }
 
 /* —— 图标（旧包同款线框 SVG：viewBox 24 / stroke=currentColor / width 1.6）—— */

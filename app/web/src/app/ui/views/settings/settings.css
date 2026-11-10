@@ -200,3 +200,116 @@
 .el-settings-btn:disabled {
   opacity: 0.5;
 }
+
+/* ============================================================
+ * 绝区零皮肤（批 5 · B 档）：分区线 + 编号感 + 荧光选中，禁暗紫。
+ * 颜色全部走 --el-current-*（已由 zz-tokens 收回主灰阶），这里只补
+ * 结构与硬度：1px 分区线、硬影、6u/18u 圆角、选中态荧光底条。
+ * ============================================================ */
+.ellen-app[data-skin='zzz'] .el-settings-group-title {
+  padding-left: calc(10 * var(--u));
+  position: relative;
+  font-size: clamp(10px, calc(10.5 * var(--u)), 11.5px);
+  letter-spacing: calc(1.4 * var(--u));
+  color: var(--z-ink-3);
+  border-bottom: 1px solid var(--z-line-hair);
+  padding-bottom: calc(7 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-group-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: calc(1 * var(--u));
+  bottom: calc(8 * var(--u));
+  width: calc(2 * var(--u));
+  background: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-card {
+  background: var(--z-card);
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-1);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-row {
+  border-bottom: 1px solid var(--z-line-hair);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-row:last-child {
+  border-bottom: 0;
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-segment,
+.ellen-app[data-skin='zzz'] .el-settings-chip {
+  border-radius: var(--z-r-3);
+  border: 1px solid var(--z-line-hair);
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-segment.is-active,
+.ellen-app[data-skin='zzz'] .el-settings-chip.is-active {
+  background: var(--z-signal);
+  border-color: transparent;
+  color: var(--z-signal-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-btn {
+  border-radius: var(--z-r-2);
+  border: 1px solid var(--z-line-strong);
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-btn:not(.is-ghost) {
+  background: var(--z-signal);
+  border-color: transparent;
+  color: var(--z-signal-ink);
+  box-shadow: var(--z-hard-s);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-card-title {
+  font-family: var(--z-font-display);
+  font-size: calc(14 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-page-title {
+  font-family: var(--z-font-display);
+  /* 中文大标题加字距会读成一格一格；字距只留给全大写小标签 */
+  letter-spacing: normal;
+  color: var(--z-ink);
+}
+
+/* 修正（批 5 复看）：accent 预算 —— 一屏只留 3 处荧光（LIVE / 底栏选中 / 主按钮），
+   信息类文字与未选中项全部回灰；标签字号在 360 宽屏上 9u 只有 7.6px，给 10px 下限。 */
+.ellen-app[data-skin='zzz'] .el-settings-status {
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-chip,
+.ellen-app[data-skin='zzz'] .el-settings-chip:not(.is-active) {
+  background: transparent;
+  border: 1px solid var(--z-line-hair);
+  color: var(--z-ink-3);
+  font-size: clamp(10px, calc(9.5 * var(--u)), 11px);
+  padding: calc(3 * var(--u)) calc(7 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-chip.is-active {
+  background: #1b1f22;
+  border-color: var(--z-signal);
+  color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-note,
+.ellen-app[data-skin='zzz'] .el-settings-card-hint,
+.ellen-app[data-skin='zzz'] .el-settings-label {
+  color: var(--z-ink-3);
+  opacity: 1;
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-card-head {
+  border-bottom: 1px solid var(--z-line-hair);
+  padding-bottom: calc(8 * var(--u));
+}

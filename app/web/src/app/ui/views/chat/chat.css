@@ -291,3 +291,56 @@
 .el-composer-mic.is-recording { color: var(--el-pink); }
 .el-composer-mic.is-recording .el-icon svg { animation: el-mic-pulse 1.1s ease-in-out infinite; }
 @keyframes el-mic-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+
+/* ============================================================
+ * 绝区零皮肤（批 5 · C 档）：本页只补细节，版式/气泡/输入条在
+ * styles/zz-parts.css，骨架在 styles/zz-frame.css，壁纸在 styles/zz-wall.css。
+ * C 档 = 无纹理、无位移、无网点，这里也不许加。
+ * ============================================================ */
+.ellen-app[data-skin='zzz'] .el-chat-page {
+  background: transparent;
+}
+
+/* 等待态的竖条本身是荧光块，不要再被 pending 的 .62 压暗 */
+.ellen-app[data-skin='zzz'] .el-msg[data-pending='1'] .el-msg-body:empty {
+  opacity: 1;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg-detail {
+  padding-left: calc(2 * var(--u));
+  font-size: clamp(10px, calc(10.5 * var(--u)), 11.5px);
+  /* 这行灰字直接压在壁纸上（窗外亮部曾整行读不出）→ 提一档亮度 + 一圈暗描边 */
+  color: var(--z-ink-2);
+  text-shadow:
+    0 0 calc(3 * var(--u)) var(--z-bg),
+    0 0 calc(6 * var(--u)) var(--z-bg);
+  opacity: 1;
+}
+
+/* 纸气泡里的强调与 code：粉在纸上偏浅，改深一档；code 用纸的墨 */
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body strong {
+  color: #b3244b;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body code,
+.ellen-app[data-skin='zzz'] .el-msg[data-role='user'] .el-msg-body code {
+  border-radius: var(--z-r-3);
+  background: #12100f14;
+  color: inherit;
+}
+
+.ellen-app[data-skin='zzz'] .el-chat-empty {
+  justify-content: center;
+  padding: calc(24 * var(--u)) calc(20 * var(--u)) calc(48 * var(--u));
+  gap: calc(8 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-chat-empty-actions {
+  margin-top: calc(10 * var(--u));
+}
+
+/* 录音中：荧光不用粉，粉全屏只给最新一条我方消息 */
+.ellen-app[data-skin='zzz'] .el-composer-mic.is-recording {
+  color: var(--z-signal);
+  border-color: var(--z-signal);
+}

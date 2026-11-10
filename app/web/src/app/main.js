@@ -6,9 +6,14 @@
 //   - 视图本身不碰插件、不发请求，只通过 props 回调往上报
 import './styles/tokens.css';
 // 批 0：绝区零令牌层。只在 .ellen-app 带 data-skin="zzz" 时生效，
-// 不挂属性 = 下面一个字节都不参与计算。验证：URL 加 ?skin=zzz
+// 不挂属性 = 下面一个字节都不参与计算。
 import './styles/zz-tokens.css';
 import './styles/base.css';
+// 批 1 / 批 2 / 批 2.5：骨架层、器件层、壁纸层（同上，全靠 data-skin 开关）。
+// 顺序：令牌 → base 兜底 → 皮肤层压在上面（同级选择器时皮肤赢）。
+import './styles/zz-frame.css';
+import './styles/zz-parts.css';
+import './styles/zz-wall.css';
 
 import { s } from './strings.zh.js';
 import { iconEl } from './ui/icons.js';
@@ -144,12 +149,20 @@ async function main() {
   const root = document.getElementById('app');
   if (!root) throw new Error('缺少 #app 容器');
 
-  // 批 0 开关：?skin=zzz 才挂新皮肤，不挂就是原来那套。
-  // 等批 2 组件改完再把它提升成默认（或接进设置页）。
+  // 皮肤开关（批 1 起默认开）：不挂 data-skin 就是旧外观。
+  //   - 默认：挂 data-skin="zzz" → 绝区零骨架/器件/壁纸
+  //   - 回退：?skin=legacy 或手动删掉 .ellen-app 上的 data-skin 属性
+  //   - 时段（--z-status 状态词 + 壁纸档）：CSS 算不出钟点，这里补一行
+  //     root.dataset.slot = hour < 11 ? 'morning' : hour < 18 ? 'tram' : 'night'
   try {
-    if (new URLSearchParams(location.search).get('skin') === 'zzz') root.dataset.skin = 'zzz';
+    const want = new URLSearchParams(location.search).get('skin');
+    if (want !== 'legacy') root.dataset.skin = 'zzz';
+    // 时段：早晨 / 傍晚 / 深夜三档，CSS 里 --z-* 已经为三档写好壁纸与状态词，
+    // 只有钟点这种运行时事实必须在这里算。跨档时不刷新页面就不变（够用，别为它加定时器）。
+    const hour = new Date().getHours();
+    root.dataset.slot = hour < 11 ? 'morning' : hour < 18 ? 'tram' : 'night';
   } catch {
-    /* 忽略 */
+    root.dataset.skin = 'zzz';
   }
 
   const shell = buildShell(root);

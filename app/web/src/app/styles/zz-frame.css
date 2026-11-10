@@ -1,0 +1,299 @@
+/* ============================================================
+ * 绝区零 · 手机版骨架层（批 1）
+ * 出处：md笔记\手机版UI重构方案-绝区零.md §三 骨架 / §四·0 收编
+ *
+ * 只有骨架三件：顶栏 46u、底栏斜切宽条 58u、横屏左竖条 88u。
+ * 令牌不在这里定义，全部 var(--z-*) 取自 zz-tokens.css。
+ *
+ * 铁律：
+ *   - 只在 .ellen-app[data-skin='zzz'] 下生效 → 删 data-skin 即回旧骨架。
+ *   - 骨架件切角一律右下（底栏 / LIVE / 发送钮）；器件层不切角（见 zz-parts.css）。
+ *   - 单一 gutter = 16u：消息区 / 输入条 / 底栏内边距全收在同一条竖线。
+ *   - 尺寸只用 calc(N * var(--u))，1px 细线除外。
+ * ============================================================ */
+
+/* —— 顶栏：46u 硬底 + 1px 底线 —— */
+.ellen-app[data-skin='zzz'] .el-chat-header {
+  flex: none;
+  min-height: calc(46 * var(--u) + var(--el-safe-top));
+  padding: 0 var(--z-gutter);
+  padding-top: var(--el-safe-top);
+  gap: calc(6 * var(--u));
+  background: var(--z-bg);
+  border-bottom: 1px solid var(--z-line-hair);
+  position: relative;
+  z-index: 3;
+  /* 状态词：CSS 算不出钟点，默认只报「在线」；
+     JS 补一行 root.dataset.slot = 'morning|tram|night' 就自动带时段。 */
+  --z-status: '在线';
+}
+
+.ellen-app[data-skin='zzz'][data-slot='morning'] { --z-status: '在线 · 上午'; }
+.ellen-app[data-skin='zzz'][data-slot='tram'] { --z-status: '在线 · 傍晚'; }
+.ellen-app[data-skin='zzz'][data-slot='night'] { --z-status: '在线 · 深夜'; }
+
+/* 品牌 20u 快乐体 + LIVE 荧光标签（右下缺角） */
+.ellen-app[data-skin='zzz'] .el-brand {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--z-font-display);
+  font-size: calc(20 * var(--u));
+  line-height: calc(24 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  color: var(--z-ink);
+  opacity: 1;
+}
+
+.ellen-app[data-skin='zzz'] .el-brand:not(.is-back)::after {
+  content: 'LIVE';
+  margin-left: calc(6 * var(--u));
+  padding: calc(2 * var(--u)) calc(5 * var(--u)) calc(1.5 * var(--u));
+  font-family: var(--z-font-display);
+  font-size: calc(9 * var(--u));
+  line-height: calc(11 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--z-signal-ink);
+  background: var(--z-signal);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 3 * var(--u)),
+    calc(100% - 3 * var(--u)) 100%,
+    0 100%
+  );
+}
+
+/* 压栈时左上角回到「返回」圆钮，标签不跟着出现 */
+.ellen-app[data-skin='zzz'] .el-brand.is-back {
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  border-radius: var(--z-r-2);
+  border: 1px solid var(--z-line-strong);
+  background: transparent;
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-brand.is-back .el-icon svg {
+  width: calc(17 * var(--u));
+  height: calc(17 * var(--u));
+}
+
+/* 状态微标签：中文、10u、clamp 兜底 */
+.ellen-app[data-skin='zzz'] .el-header-tools {
+  gap: calc(6 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-header-tools::before {
+  content: var(--z-status);
+  margin-right: calc(2 * var(--u));
+  font-family: var(--z-font-text);
+  font-size: clamp(10px, calc(10 * var(--u)), 11px);
+  line-height: 1;
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--z-ink-3);
+  white-space: nowrap;
+}
+
+/* 工具钮 30u 方 + 6u 圆角（操作件），图标 16u 线框 */
+.ellen-app[data-skin='zzz'] .el-round {
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  border: 1px solid var(--z-line-strong);
+  border-radius: var(--z-r-2);
+  color: var(--z-ink-2);
+  opacity: 1;
+  font-size: 0;
+  gap: 0;
+}
+
+.ellen-app[data-skin='zzz'] .el-round .el-icon svg {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-round:active {
+  background: #ffffff12;
+  color: var(--z-signal);
+}
+
+/* —— 底栏：58u 斜切宽条，右下缺角 6u —— */
+.ellen-app[data-skin='zzz'] .el-nav {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: calc(58 * var(--u));
+  align-items: stretch;
+  padding: 0 calc(9 * var(--u)) max(calc(12 * var(--u)), env(safe-area-inset-bottom));
+  background: var(--z-panel);
+  border-top: 1px solid var(--z-line-hair);
+  /* 网点纹理（B 档，透明度极低，只在底栏这一条上） */
+  background-image: radial-gradient(#ffffff 1px, transparent 1px);
+  background-size: calc(9 * var(--u)) calc(9 * var(--u));
+  background-position: 0 0;
+  background-blend-mode: overlay;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--z-cut-s)),
+    calc(100% - var(--z-cut-s)) 100%,
+    0 100%
+  );
+}
+
+.ellen-app[data-skin='zzz'] .el-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(2 * var(--u));
+  margin: calc(7 * var(--u)) calc(7 * var(--u)) 0;
+  border-radius: var(--z-r-3);
+  font-family: var(--z-font-display);
+  font-size: clamp(10px, calc(10.5 * var(--u)), 11.5px);
+  line-height: 1;
+  color: var(--z-ink-3);
+  opacity: 1;
+  transition:
+    background-color var(--z-t-micro) linear,
+    color var(--z-t-micro) linear;
+}
+
+.ellen-app[data-skin='zzz'] .el-nav-item .el-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+}
+
+.ellen-app[data-skin='zzz'] .el-nav-item .el-nav-icon svg {
+  width: calc(19 * var(--u));
+  height: calc(19 * var(--u));
+}
+
+/* 选中：深底块 + 荧光字 + 3u 荧光底条（不位移） */
+.ellen-app[data-skin='zzz'] .el-nav-item.is-active {
+  background: #1b1f22;
+  color: var(--z-signal);
+  box-shadow: inset 0 calc(-3 * var(--u)) 0 var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-nav-item.is-active .el-nav-icon svg {
+  stroke-width: 1.8;
+}
+
+/* 未读：5u 荧光方点（不是圆点） */
+.ellen-app[data-skin='zzz'] .el-nav-item .el-nav-icon {
+  position: relative;
+}
+
+.ellen-app[data-skin='zzz'] .el-nav-item.has-unread .el-nav-icon::after {
+  content: '';
+  position: absolute;
+  top: calc(-2 * var(--u));
+  right: calc(-4 * var(--u));
+  width: calc(5 * var(--u));
+  height: calc(5 * var(--u));
+  border-radius: var(--z-r-3);
+  background: var(--z-pink);
+  box-shadow: 0 0 0 calc(1.5 * var(--u)) var(--z-bg);
+}
+
+/* ============================================================
+ * 横屏：底栏 → 左侧 88u 竖条；标题 / 消息列 / 输入条同一条竖线
+ * 方向只靠媒体查询，不判 JS（--u 的 vmin 已把横屏压到上限 1.16）。
+ * ============================================================ */
+@media (orientation: landscape) and (min-width: 560px) {
+  .ellen-app[data-skin='zzz'] {
+    display: grid;
+    grid-template-columns: calc(88 * var(--u)) 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .ellen-app[data-skin='zzz'] .el-chat-header {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .ellen-app[data-skin='zzz'] .el-pages {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .ellen-app[data-skin='zzz'] .el-nav {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    grid-template-columns: none;
+    grid-template-rows: repeat(4, 1fr);
+    grid-auto-rows: auto;
+    padding: calc(10 * var(--u)) calc(6 * var(--u));
+    border-top: 0;
+    border-right: 1px solid var(--z-line-hair);
+    /* 竖条右上角缺角 14u */
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--z-cut)) 0,
+      100% var(--z-cut),
+      100% 100%,
+      0 100%
+    );
+  }
+
+  .ellen-app[data-skin='zzz'] .el-nav-item {
+    margin: calc(3 * var(--u)) calc(4 * var(--u));
+    gap: calc(3 * var(--u));
+  }
+
+  /* 列宽上限 560u 居中。顶栏已经在右列里了（left 已让开 rail），
+     所以三段用同一个算式：(100% - 560u)/2 —— 100% 都是各自的容器宽。 */
+  .ellen-app[data-skin='zzz'] .el-chat-header {
+    padding-left: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+    padding-right: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+  }
+
+  /* 全屏长页（设置 / 回忆）也收在同一条列宽里 */
+  .ellen-app[data-skin='zzz'] .el-page.el-scroll-page {
+    padding-left: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+    padding-right: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+  }
+
+  /* 气泡别超过列宽 */
+  .ellen-app[data-skin='zzz'] .el-msg {
+    max-width: calc(560 * var(--u));
+  }
+}
+
+/* ============================================================
+ * 批 5 复看（空上下文评审 r1 中属于 CSS 层的必修项）
+ * 1) 滚动页内容贴到导航边缘像被切掉 → 底部留白 + 渐隐，让「还能滚」看得出来
+ * 2) 顶栏工具钮视觉 30u，在 360 宽屏上命中区只有 25px → 伪元素把可点范围撑到 40u
+ * 3) 底栏网点在 0.84 缩放下会出摩尔纹 → 降不透明度
+ * ============================================================ */
+.ellen-app[data-skin='zzz'] .el-page.el-scroll-page {
+  padding-top: calc(16 * var(--u));
+  padding-bottom: calc(28 * var(--u) + env(safe-area-inset-bottom));
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0,
+    #000 calc(100% - calc(10 * var(--u))),
+    transparent 100%
+  );
+}
+
+.ellen-app[data-skin='zzz'] .el-header-tool {
+  position: relative;
+}
+
+.ellen-app[data-skin='zzz'] .el-header-tool::after {
+  content: '';
+  position: absolute;
+  inset: calc(-5 * var(--u));
+  border-radius: var(--z-r-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-nav {
+  background-image: radial-gradient(#ffffff8a 1px, transparent 1px);
+}

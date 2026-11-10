@@ -1,0 +1,437 @@
+/* ============================================================
+ * 绝区零 · 手机版器件层（批 2）
+ * 出处：md笔记\手机版UI重构方案-绝区零.md §四 器件表 / §4.0.1 影子与圆角
+ *
+ * 铁律（和骨架层相反）：器件层**一律圆角、不切角**。
+ *   圆角只 3 档：--z-r-1(18u) 内容件 / --z-r-2(6u) 操作件 / --z-r-3(3u) 标识件
+ *   硬影只 3 档：--z-hard(4u) 气泡·输入条 / --z-hard-s(3u) 头像·tile·发送
+ *                --z-hard-pink(3u 粉) 只给「最新一条我方消息」
+ * 只在 .ellen-app[data-skin='zzz'] 下生效。
+ * ============================================================ */
+
+/* —— 聊天流：gutter 16u / 顶部 26u 渐隐（防 justify-content:flex-end 切断首条）—— */
+.ellen-app[data-skin='zzz'] .el-chat-stream {
+  padding: calc(10 * var(--u)) var(--z-gutter) calc(12 * var(--u));
+  gap: calc(10 * var(--u));
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #0000 0,
+    #000 calc(32 * var(--u)),
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #0000 0,
+    #000 calc(32 * var(--u)),
+    #000 100%
+  );
+}
+
+.ellen-app[data-skin='zzz'] .el-msg {
+  max-width: 84%;
+  gap: calc(2 * var(--u));
+}
+
+/* —— 气泡：她 = 纸（4u 硬影） / 我 = 墨（3u 硬影）—— */
+.ellen-app[data-skin='zzz'] .el-msg-body {
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  font-family: var(--z-font-text);
+  font-size: calc(14.5 * var(--u));
+  line-height: calc(23 * var(--u));
+  border-radius: var(--z-r-1);
+  word-break: break-word;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body {
+  background: var(--z-paper-bub);
+  color: var(--z-ink-paper);
+  border-radius: var(--z-r-1) var(--z-r-1) var(--z-r-1) var(--z-r-2);
+  box-shadow: var(--z-hard), var(--z-hard-edge);
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='user'] .el-msg-body {
+  background: var(--z-self);
+  color: var(--z-ink);
+  border: 1px solid var(--z-self-line);
+  border-radius: var(--z-r-1) var(--z-r-1) var(--z-r-2) var(--z-r-1);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+}
+
+/* 全屏唯一 1 处粉色：只给最新一条我方消息 */
+.ellen-app[data-skin='zzz'] .el-msg[data-role='user']:last-child .el-msg-body {
+  box-shadow: var(--z-hard-pink), var(--z-hard-edge);
+}
+
+/* 她回过之后，他的最后一句就不再是 :last-child 了 —— 用 :has() 兜住。
+   Chromium 支持 :has() 时这条覆盖上面那条；不支持则退回上面那条（不报错）。 */
+.ellen-app[data-skin='zzz']
+  .el-msg[data-role='user']:not(:has(~ .el-msg[data-role='user']))
+  .el-msg-body {
+  box-shadow: var(--z-hard-pink), var(--z-hard-edge);
+}
+
+/* —— 头像：32u 方片（grid 占第一列，连发时第二条 visibility:hidden）—— */
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] {
+  display: grid;
+  grid-template-columns: calc(32 * var(--u)) minmax(0, 1fr);
+  column-gap: calc(8 * var(--u));
+  align-items: start;
+  max-width: 92%;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant']::before {
+  content: '艾';
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  align-self: start;
+  margin-top: calc(2 * var(--u));
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--z-r-3);
+  background: var(--z-card);
+  color: var(--z-ink-2);
+  font-family: var(--z-font-display);
+  font-size: calc(15 * var(--u));
+  line-height: 1;
+  box-shadow: var(--z-hard-s);
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-body {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-speak {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: start;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-detail {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+/* 连发只留第一个头像 */
+.ellen-app[data-skin='zzz']
+  .el-msg[data-role='assistant']
+  + .el-msg[data-role='assistant']::before {
+  visibility: hidden;
+}
+
+/* —— 等待态：3 根 4u×11u 荧光竖条，不许做成气泡 —— */
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body:empty {
+  width: calc(24 * var(--u));
+  height: calc(11 * var(--u));
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  position: relative;
+  background-image: linear-gradient(var(--z-signal), var(--z-signal));
+  background-size: calc(4 * var(--u)) calc(11 * var(--u));
+  background-position: calc(20 * var(--u)) 0;
+  background-repeat: no-repeat;
+  animation: zz-typing 1400ms steps(1, end) infinite;
+  animation-delay: -466ms; /* 第三根（右）：934–1400ms 亮 */
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body:empty::before,
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body:empty::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: calc(4 * var(--u));
+  height: calc(11 * var(--u));
+  background: var(--z-signal);
+  animation: zz-typing 1400ms steps(1, end) infinite;
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body:empty::before {
+  left: 0;
+  animation-delay: 0ms; /* 第一根（左）：0–462ms 亮 */
+}
+
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] .el-msg-body:empty::after {
+  left: calc(10 * var(--u));
+  animation-delay: -933ms; /* 第二根（中）：467–935ms 亮 */
+}
+
+/* 暗的那两根不压到 0.18：壁纸是有明暗的实拍底，太淡会整条看不见。
+   0.34 仍能读出「有一根在亮」的节奏，又不至于糊成三条。 */
+@keyframes zz-typing {
+  0% {
+    opacity: 1;
+  }
+  33% {
+    opacity: 0.34;
+  }
+  100% {
+    opacity: 0.34;
+  }
+}
+
+/* 朗读钮：器件层操作件 */
+.ellen-app[data-skin='zzz'] .el-msg-speak {
+  margin-top: calc(4 * var(--u));
+  padding: calc(4 * var(--u)) calc(8 * var(--u));
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-2);
+  color: var(--z-ink-3);
+  font-size: calc(10.5 * var(--u));
+  background: transparent;
+}
+
+/* 时间戳分隔（左 2u 荧光竖条）：DOM 暂未输出 .zz-stamp，样式先就位 */
+.ellen-app[data-skin='zzz'] .zz-stamp {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  margin: calc(8 * var(--u)) 0 calc(2 * var(--u));
+  padding-left: calc(8 * var(--u));
+  position: relative;
+  font-size: calc(10 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .zz-stamp::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: calc(1 * var(--u));
+  bottom: calc(1 * var(--u));
+  width: calc(2 * var(--u));
+  background: var(--z-signal);
+}
+
+/* —— 输入条：18u 圆角 + 2u 硬影，外边距与消息区同一条 16u 竖线 —— */
+.ellen-app[data-skin='zzz'] .el-chat-composer {
+  margin: calc(12 * var(--u)) var(--z-gutter) calc(10 * var(--u));
+  padding: calc(10 * var(--u)) calc(11 * var(--u));
+  gap: calc(8 * var(--u));
+  align-items: center;
+  background: var(--z-panel);
+  border: 1px solid var(--z-line-strong);
+  border-radius: var(--z-r-1);
+  box-shadow: var(--z-hard-t);
+  transform: translateZ(0);
+  z-index: 2;
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-field {
+  padding: calc(8 * var(--u)) calc(2 * var(--u));
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--z-ink);
+  font-family: var(--z-font-text);
+  font-size: calc(14 * var(--u));
+  line-height: calc(22 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-field::placeholder {
+  color: var(--z-ink-3);
+}
+
+/* 左 32u ＋ 方钮（9u 圆角） */
+.ellen-app[data-skin='zzz'] .el-composer-mic {
+  flex: none;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  border: 1px solid var(--z-line-strong);
+  border-radius: calc(9 * var(--u));
+  background: transparent;
+  color: var(--z-ink-2);
+  font-size: 0;
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-mic .el-icon svg {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
+
+/* 右发送钮：荧光底 + 右下缺角（骨架件，允许切角） */
+.ellen-app[data-skin='zzz'] .el-composer-send,
+.ellen-app[data-skin='zzz'] .el-composer-stop {
+  flex: none;
+  width: calc(34 * var(--u));
+  height: calc(34 * var(--u));
+  border: 0;
+  border-radius: 0;
+  background: var(--z-signal);
+  color: var(--z-signal-ink);
+  font-family: var(--z-font-display);
+  font-size: calc(13 * var(--u));
+  box-shadow: var(--z-hard-s);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 7 * var(--u)),
+    calc(100% - 7 * var(--u)) 100%,
+    0 100%
+  );
+  transition: transform var(--z-t-instant) linear;
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-send:active,
+.ellen-app[data-skin='zzz'] .el-composer-stop:active {
+  transform: translate(calc(1 * var(--u)), calc(1 * var(--u)));
+  box-shadow: none;
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-send:disabled {
+  background: var(--z-card);
+  color: var(--z-ink-dis);
+  box-shadow: none;
+}
+
+.ellen-app[data-skin='zzz'] .el-composer-stop {
+  background: transparent;
+  color: var(--z-danger, var(--z-pink));
+  box-shadow: inset 0 0 0 1px var(--z-line-strong);
+}
+
+/* —— 空态：18u 一句话（chat 是 C 档，不铺网点） —— */
+.ellen-app[data-skin='zzz'] .el-chat-empty-title {
+  font-family: var(--z-font-display);
+  font-size: calc(18 * var(--u));
+  line-height: calc(24 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-chat-empty-hint {
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-chat-model-chip,
+.ellen-app[data-skin='zzz'] .el-chat-thinking-chip {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-3);
+  background: transparent;
+  color: var(--z-ink-3);
+  font-size: calc(10.5 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-chat-model-chip.is-on {
+  background: var(--z-signal);
+  border-color: transparent;
+  color: var(--z-signal-ink);
+}
+
+/* —— 搜索框：34u 高 / 10u 圆角 / sunken 底 / 左 2u 荧光竖标（不用放大镜） ——
+   竖标只给「搜索」语义的框。设置页的输入框是同族器件但不该有荧光：
+   在 10u 圆角上画 inset 直条会被圆角切成半个括号，视觉上是噪点。 */
+.ellen-app[data-skin='zzz'] .el-history-search,
+.ellen-app[data-skin='zzz'] .el-settings-input,
+.ellen-app[data-skin='zzz'] .el-settings-select,
+.ellen-app[data-skin='zzz'] .el-settings-textarea {
+  border: 1px solid var(--z-line-hair);
+  background: var(--z-sunken);
+  color: var(--z-ink);
+  font-family: var(--z-font-text);
+  font-size: calc(13 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-history-search,
+.ellen-app[data-skin='zzz'] .el-settings-input,
+.ellen-app[data-skin='zzz'] .el-settings-select {
+  height: calc(34 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  border-radius: calc(10 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-history-search {
+  box-shadow: inset calc(2 * var(--u)) 0 0 var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-settings-textarea {
+  border-radius: calc(10 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-history-search::placeholder,
+.ellen-app[data-skin='zzz'] .el-settings-input::placeholder,
+.ellen-app[data-skin='zzz'] .el-settings-textarea::placeholder {
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-history-search:focus-visible,
+.ellen-app[data-skin='zzz'] .el-settings-input:focus,
+.ellen-app[data-skin='zzz'] .el-settings-select:focus,
+.ellen-app[data-skin='zzz'] .el-settings-textarea:focus {
+  outline: none;
+  border-color: var(--z-line-strong);
+}
+
+/* —— tile：列表卡（高 56u / 12u 圆角 / 硬影 3u） —— */
+.ellen-app[data-skin='zzz'] .el-history-card {
+  min-height: calc(56 * var(--u));
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  background: var(--z-card);
+  border: 1px solid var(--z-line-hair);
+  border-radius: calc(12 * var(--u));
+  box-shadow: var(--z-hard-s);
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-history-card.is-current {
+  border-color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-history-name {
+  font-size: calc(13 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-history-time,
+.ellen-app[data-skin='zzz'] .el-history-preview {
+  font-size: calc(10.5 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-history-count {
+  color: var(--z-signal);
+  font-size: calc(10.5 * var(--u));
+}
+
+/* —— 标签（3u 圆角 / 9u 字） —— */
+.ellen-app[data-skin='zzz'] .el-tag,
+.ellen-app[data-skin='zzz'] .el-settings-chip {
+  border-radius: var(--z-r-3);
+  background: var(--z-signal);
+  color: var(--z-signal-ink);
+  font-size: clamp(10px, calc(9 * var(--u)), 11px);
+  padding: calc(2 * var(--u)) calc(5 * var(--u));
+}
+
+/* ============================================================
+ * 横屏列宽（批 1 的骨架规则在这里补一遍）
+ * 原因：zz-parts 的 .el-chat-stream / .el-chat-composer 基础声明比
+ * zz-frame 的 @media 块更晚进 cascade，同特异度时基础声明会赢 ——
+ * 所以对齐算式必须写在基础声明**之后**。顶栏在 frame 里没有冲突。
+ * ============================================================ */
+@media (orientation: landscape) and (min-width: 560px) {
+  .ellen-app[data-skin='zzz'] .el-chat-stream {
+    padding-left: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+    padding-right: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+  }
+
+  .ellen-app[data-skin='zzz'] .el-chat-composer {
+    margin-left: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+    margin-right: max(calc(28 * var(--u)), calc((100% - 560 * var(--u)) / 2));
+  }
+
+  .ellen-app[data-skin='zzz'] .el-msg {
+    max-width: calc(560 * var(--u));
+  }
+}

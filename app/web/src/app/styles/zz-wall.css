@@ -1,0 +1,132 @@
+/* ============================================================
+ * 绝区零 · 手机版壁纸层（批 2.5）
+ * 出处：md笔记\手机版UI重构方案-绝区零.md §四·五 壁纸层
+ *
+ * 只铺聊天页：顶栏 / 底栏 / 抽屉 / 输入条一律不铺。
+ * 整幅不裁人：cover + 50% 46%，禁止 auto 150% 贴顶（老大否过贴顶裁切）。
+ * 时段切只换 --wp 与亮度/饱和，不重排布局。
+ *
+ * 已知坑（方案里写死）：filter 自成层叠上下文，所以壁纸放在 ::before 上、
+ * 页面自身 isolation，内容全部抬到 z-index 1 —— 否则横屏会把左侧导航条整条盖掉。
+ * ============================================================ */
+
+.ellen-app[data-skin='zzz'] .el-chat-page {
+  position: relative;
+  isolation: isolate;
+  background: var(--z-bg);
+  /* 默认档：深夜（JS 未接时段时与底栏 LIVE 的「在线」状态词不冲突） */
+  --wp: url('../assets/wall-night.webp');
+  --wp-wide: url('../assets/wall-night-wide.webp');
+  --wp-b: 0.88;
+  --wp-s: 0.92;
+  --wp-extra: 0;
+}
+
+/* —— 时段三档 —— */
+.ellen-app[data-skin='zzz'][data-slot='morning'] .el-chat-page {
+  --wp: url('../assets/wall-morning.webp');
+  --wp-wide: url('../assets/wall-morning-wide.webp');
+  --wp-b: 0.68;
+  --wp-s: 0.7;
+  --wp-extra: 0.1;
+}
+
+.ellen-app[data-skin='zzz'][data-slot='tram'] .el-chat-page {
+  --wp: url('../assets/wall-tram.webp');
+  --wp-wide: url('../assets/wall-tram-wide.webp');
+  --wp-b: 0.64;
+  --wp-s: 0.74;
+  --wp-extra: 0.08;
+}
+
+.ellen-app[data-skin='zzz'][data-slot='night'] .el-chat-page {
+  --wp: url('../assets/wall-night.webp');
+  --wp-wide: url('../assets/wall-night-wide.webp');
+  --wp-b: 0.88;
+  --wp-s: 0.92;
+  --wp-extra: 0;
+}
+
+/* —— 壁纸本体 —— */
+.ellen-app[data-skin='zzz'] .el-chat-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--wp);
+  background-size: cover;
+  background-position: 50% 46%;
+  background-repeat: no-repeat;
+  filter: brightness(var(--wp-b)) saturate(var(--wp-s)) contrast(1.04);
+  pointer-events: none;
+}
+
+/* —— 压暗 + 两端渐变 + 地脚聚光（保证气泡在纸上读得清）—— */
+.ellen-app[data-skin='zzz'] .el-chat-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: rgba(10, 11, 12, var(--wp-extra));
+  background-image: linear-gradient(
+      180deg,
+      #0a0b0cb8 0%,
+      #0a0b0c55 14%,
+      #0a0b0c1a 42%,
+      #0a0b0c66 74%,
+      #0a0b0cc4 100%
+    ),
+    radial-gradient(120% 34% at 50% 100%, #0a0b0c 0%, transparent 72%);
+  pointer-events: none;
+}
+
+/* 内容抬层 */
+.ellen-app[data-skin='zzz'] .el-chat-page > .el-chat-stream,
+.ellen-app[data-skin='zzz'] .el-chat-page > .el-chat-composer,
+.ellen-app[data-skin='zzz'] .el-chat-page > .el-chat-empty {
+  position: relative;
+  z-index: 1;
+}
+
+/* —— 半透明气泡跟着时段走（night 走令牌默认值）—— */
+.ellen-app[data-skin='zzz'][data-slot='tram']
+  .el-msg[data-role='assistant']
+  .el-msg-body {
+  background: #f3ecddeb;
+}
+
+.ellen-app[data-skin='zzz'][data-slot='morning']
+  .el-msg[data-role='assistant']
+  .el-msg-body {
+  background: #f3ecddf2;
+}
+
+.ellen-app[data-skin='zzz'][data-slot='tram'] .el-msg[data-role='user'] .el-msg-body {
+  background: #191c20eb;
+}
+
+.ellen-app[data-skin='zzz'][data-slot='morning'] .el-msg[data-role='user'] .el-msg-body {
+  background: #191c20f2;
+}
+
+/* —— 横屏：换 wide 图，机位略上抬（wide 构图地平线更低）—— */
+@media (orientation: landscape) and (min-width: 560px) {
+  .ellen-app[data-skin='zzz'] .el-chat-page::before {
+    background-image: var(--wp-wide);
+    background-position: 50% 42%;
+  }
+}
+
+/* —— 浅色主题：纸面提亮、描边加深（气泡可读性优先）—— */
+.ellen-app[data-skin='zzz'][data-theme='light'] .el-chat-page::after,
+.ellen-app[data-theme='light'][data-skin='zzz'] .el-chat-page::after {
+  background-color: rgba(10, 11, 12, 0.12);
+  background-image: linear-gradient(
+    180deg,
+    #0a0b0c66 0%,
+    #0a0b0c22 18%,
+    #0a0b0c00 48%,
+    #0a0b0c33 78%,
+    #0a0b0c88 100%
+  );
+}

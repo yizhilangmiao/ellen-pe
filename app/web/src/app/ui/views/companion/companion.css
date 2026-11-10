@@ -290,3 +290,67 @@
   display: block;
 }
 
+
+/* 绝区零皮肤（批 5 · B 档）：立绘带硬影、层级用荧光数字与 pill 表示。 */
+.ellen-app[data-skin='zzz'] .el-companion-title {
+  font-family: var(--z-font-display);
+  font-size: calc(22 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-portrait {
+  border-radius: var(--z-r-1);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+  overflow: hidden;
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-note,
+.ellen-app[data-skin='zzz'] .el-companion-between {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-1);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-label,
+.ellen-app[data-skin='zzz'] .el-companion-note-label,
+.ellen-app[data-skin='zzz'] .el-companion-days-title,
+.ellen-app[data-skin='zzz'] .el-companion-between-title {
+  font-size: clamp(10px, calc(10.5 * var(--u)), 11.5px);
+  letter-spacing: calc(1.2 * var(--u));
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-mood-word {
+  font-family: var(--z-font-display);
+  font-size: calc(26 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-level-option {
+  border-radius: var(--z-r-2);
+  border: 1px solid var(--z-line-hair);
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-level-option.is-active {
+  background: var(--z-signal);
+  border-color: transparent;
+  color: var(--z-signal-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-days-pill {
+  border-radius: var(--z-r-3);
+  background: #ffffff10;
+  color: var(--z-ink-2);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-days-pill b {
+  color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-peek {
+  border-radius: var(--z-r-2);
+  box-shadow: var(--z-hard-s);
+  overflow: hidden;
+}
