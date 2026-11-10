@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import time
 import zipfile
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -77,10 +78,36 @@ def main():
         plan.append((e, p))
 
     print("条目 %d / 同 %d / 改 %d / 缺 %d" % (len(entries), same, len(changed), len(missing)))
+    # ---- 新增文件：work 里有、但 manifest 没登记的，也必须进包 ----
+    # 2026-10-31 事故：ellen-proactive.js / ellen-proactive-ui.js 是新加文件，
+    # manifest 里没有 → 打完包文件不在 APK 里 → index.html 引用 404 → 功能静默失效。
+    covered = set()
+    for e in entries:
+        covered.add(os.path.normcase(os.path.normpath(
+            e.get("path", e["name"]).replace("/", os.sep))))
+    extras = []
+    for root, _dirs, files in os.walk(args.work):
+        for f in files:
+            p = os.path.join(root, f)
+            rel = os.path.relpath(p, args.work)
+            low = rel.lower()
+            if os.path.normcase(os.path.normpath(rel)) in covered:
+                continue
+            # 只收 assets\ 与 res\ 下的；备份 / 脚本 / 清单本身一律不进包
+            if not (low.startswith("assets" + os.sep) or low.startswith("res" + os.sep)):
+                continue
+            if ".bak" in low or low.endswith(".py") or os.path.basename(low).startswith((".", "_")):
+                continue
+            extras.append((rel, p))
+
+    print("条目 %d / 同 %d / 改 %d / 缺 %d / 新增 %d"
+          % (len(entries), same, len(changed), len(missing), len(extras)))
     for n in changed:
         print("  [CHANGED] " + n)
     for n in missing:
         print("  [MISSING] " + n)
+    for rel, _p in extras:
+        print("  [NEW]     " + rel.replace(os.sep, "/"))
     if missing:
         sys.exit("有文件缺失，拒绝出包")
     if args.report:
@@ -100,6 +127,14 @@ def main():
             zi = zipfile.ZipInfo(e["name"], tuple(e["date_time"]))
             zi.compress_type = e["compress"]
             zi.external_attr = e["external_attr"]
+            with open(p, "rb") as f:
+                zo.writestr(zi, f.read())
+        # 新增文件：用当前时间戳 + DEFLATED（文本类，deflate 后体积接近原包里的同类条目）
+        now = tuple(time.localtime()[:6])
+        for rel, p in extras:
+            zi = zipfile.ZipInfo(rel.replace(os.sep, "/"), now)
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o644 << 16
             with open(p, "rb") as f:
                 zo.writestr(zi, f.read())
 

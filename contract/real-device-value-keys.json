@@ -1,0 +1,587 @@
+{
+ "revisionCount": 2118,
+ "kinds": {
+  "emotion": {
+   "count": 1859,
+   "keys": {
+    "version": "number",
+    "namespace": "string",
+    "scope": "string",
+    "deviceId": "string",
+    "workId": "string",
+    "position": "number",
+    "entry": "object",
+    "id": "string",
+    "kind": "string",
+    "provider": "string",
+    "model": "string",
+    "purpose": "string",
+    "startedAt": "string",
+    "region": "string",
+    "characterId": "null",
+    "characterName": "string",
+    "threadId": "null",
+    "characters": "number",
+    "characterUnit": "string",
+    "status": "string",
+    "endedAt": "string",
+    "tokens": "null",
+    "providerCharacters": "number",
+    "errorCode": "null",
+    "startRecorded": "boolean",
+    "requestSent": "boolean",
+    "assessmentId": "string",
+    "assessmentInput": "object",
+    "generation": "number",
+    "latestUserMessageId": "null",
+    "counts": "object",
+    "hasMemoryRecovery": "boolean",
+    "formatVersion": "number",
+    "jobs": "object",
+    "recalls": "object",
+    "type": "string",
+    "day": "string",
+    "calls": "object",
+    "turnId": "string",
+    "reportedModel": "string",
+    "updatedAt": "string",
+    "categoryId": "string",
+    "factId": "string",
+    "factRevisionId": "string",
+    "sourceRefs": "array<object>",
+    "occurredAt": "string",
+    "sourceId": "string",
+    "attachmentId": "null",
+    "role": "string",
+    "images": "number",
+    "videos": "number",
+    "ownerDeviceId": "string",
+    "revision": "number",
+    "state": "object",
+    "identity": "string",
+    "basis": "string",
+    "memoryRevisionId": "string",
+    "evidenceToken": "string",
+    "attempts": "number",
+    "token": "string",
+    "envelope": "object",
+    "originScope": "object",
+    "evidenceBindings": "array<object>",
+    "roleRecordId": "string",
+    "reason": "null",
+    "allowLong": "boolean",
+    "blocked": "array<empty>",
+    "attempt": "object",
+    "last": "null",
+    "selected": "object",
+    "placementId": "string",
+    "placementRevisionId": "string",
+    "feeling": "object",
+    "sourceRevisionId": "string",
+    "rulesVersion": "string",
+    "completedAt": "string",
+    "configurationNamespace": "string",
+    "previous": "null",
+    "hasPrevious": "boolean",
+    "profileId": "string",
+    "retry": "object",
+    "initializedAt": "string",
+    "cutoffOrdinal": "number",
+    "lease": "object",
+    "dialogueReadAloud": "boolean",
+    "dialogueActionNarration": "boolean",
+    "dialogueInnerVoice": "boolean",
+    "dialogueTextOnly": "boolean",
+    "tracks": "array<object>",
+    "selectedTrackId": "string",
+    "volume": "number",
+    "loop": "boolean"
+   },
+   "nested": {
+    "entry": {
+     "id": "string",
+     "key": "string",
+     "purpose": "string",
+     "taskRevisionId": "string",
+     "sourceIds": "array<string>",
+     "threadId": "string",
+     "anchorMessageId": "string",
+     "generation": "number",
+     "preferenceRevisionIds": "object",
+     "notBefore": "string",
+     "phase": "string",
+     "mode": "string",
+     "automatic": "boolean",
+     "ownerToken": "string",
+     "leaseToken": "string",
+     "leaseUntil": "string",
+     "steps": "array<empty>",
+     "assessmentReceipt": "null",
+     "committedReceipt": "null",
+     "error": "object",
+     "updatedAt": "string",
+     "sourceId": "string",
+     "sourceRevisionId": "string",
+     "messageId": "string",
+     "role": "string",
+     "proof": "string",
+     "capturedAt": "string",
+     "memoryEnabled": "boolean",
+     "sealedLeases": "array<object>",
+     "state": "string",
+     "failureType": "string",
+     "code": "string",
+     "attempts": "number",
+     "retryAt": "string",
+     "batchLimit": "number",
+     "condition": "null",
+     "journalRetryStartedAt": "string",
+     "journalRetryTimeZone": "string",
+     "journalRetryCount": "number",
+     "journalRetryAt": "string"
+    },
+    "assessmentInput": {
+     "requestChars": "number",
+     "ordinaryChars": "number",
+     "stateChars": "number",
+     "messageChars": "number",
+     "messageCount": "number",
+     "evidenceCount": "number",
+     "pending": "number",
+     "selected": "number",
+     "reviewChars": "number",
+     "aliases": "number"
+    },
+    "counts": {
+     "qualifications": "number",
+     "tasks": "number",
+     "memoryRecovery": "number"
+    },
+    "jobs": {
+     "source:5f280dd7-1dfa-4f6e-b15f-dd1051f6a0e9": "object",
+     "source:b7ef1369-0017-4de3-83ef-ac8f27042d70": "object",
+     "source:15ac3e9c-a4ef-47d5-b2d2-c6411aff0af1": "object",
+     "source:fb01bc3f-c0b4-42be-9073-0f1afa5479b5": "object",
+     "source:2d8f5154-14b8-4fb0-baf2-e1bb5e6038ac": "object",
+     "source:c326f022-768e-49a1-9dc3-fb001ae53c70": "object",
+     "source:44837b69-beeb-4b4c-bb42-03e3a4765445": "object",
+     "source:457ca67d-54aa-4bc7-9cb0-f4acde0c143e": "object",
+     "source:785c165d-4aaa-4584-8c16-dc5ea7b70576": "object",
+     "source:7b235e62-2980-4cb8-8875-2ddad531bf7b": "object",
+     "source:5f7d4804-affe-4da3-90d7-790da27dc60d": "object",
+     "source:87f1b3e6-78f3-4671-afbd-e3720172d135": "object",
+     "source:2b606008-fb58-44ab-b86d-28d6d9679144": "object",
+     "source:fb9e4b35-cc18-49d2-87ce-1d2e4c89220a": "object",
+     "source:a3bf1f9f-b1e5-45f4-a399-73ea75d8e80a": "object",
+     "source:0a0d3c22-5ec0-40f3-8d55-2bf3ee61d58a": "object",
+     "source:440afa99-4660-44ae-aad7-09f5aa94db93": "object",
+     "source:ceea2492-1ddd-4f27-8d36-6ae475983287": "object",
+     "source:3fe1813f-5802-486c-9793-6d3af4a7b894": "object",
+     "source:4bedc187-bab3-4cab-897e-f083b64b6c7d": "object",
+     "source:29809df9-0308-45b9-9cb6-e3e14aa0c63a": "object",
+     "source:f47c8b5e-c58e-4dd3-b648-ff65a1c72c51": "object",
+     "source:96c3ee68-948a-4d02-846a-a6f792523cd3": "object",
+     "source:3a801bdd-6cd8-4ea1-921a-b31b21260904": "object",
+     "source:e1a845e4-1ae8-495e-a620-b1241a7ecdc3": "object",
+     "source:42513e54-ac88-4cdd-86f1-4ff2cf4686c1": "object",
+     "source:e2e45325-b0b1-45ed-9527-09b4aaea38ce": "object",
+     "source:fd9a8793-122b-472e-ab8f-e23dd71c6c5e": "object",
+     "source:a910edd6-ca5a-4c66-a7bb-7747b46f90d1": "object",
+     "source:456e9c0c-4098-426d-9dea-36c0347c01be": "object",
+     "source:71724d86-8942-40e7-86c1-4aa76c92e1f1": "object",
+     "source:31d1a0aa-129c-4776-a9d0-59a6a83477b6": "object",
+     "source:2b29242c-3511-4edf-a5ac-4cc7ce54384f": "object",
+     "source:5c6739af-07d9-4173-abf8-f51f6cda8783": "object",
+     "source:7d61ab71-8f53-40c3-ba35-7ee57d1b7dc2": "object"
+    },
+    "recalls": {
+     "mem-0419d2cda8854cbdee58abe36327ae7655845f2e": "number",
+     "mem-083a4b9475a1c68099a76b5525489a4b86579c57": "number",
+     "mem-136f30f390ee8544ee38d32fa990cf22c770d8d4": "number",
+     "mem-44b0651b05138c8cdf5153ed04b7aeafdf16c0cc": "number",
+     "mem-42dc6e6a9d3783d093148e5ff3247b58d21d5629": "number",
+     "mem-4551248d2232af90df578df9925637ac44e78834": "number",
+     "mem-b86c1ef2af0048c8bf53a80fb83a136c41df0136": "number",
+     "mem-eff9d4cf0019345bda879aeaa08eb96774b996c5": "number",
+     "mem-7795f38ff9869e2d22ef9f1eab5443e79f116210": "number",
+     "mem-d6942d3e85c672a85f1dc758c992c183a576d922": "number",
+     "mem-4084296e060df092e7fa9a0345a537ee6821380b": "number",
+     "mem-f8682bbd75f75db5e22d2ac8b176ad6df3d585f0": "number",
+     "mem-5a37113950e9f94af84cf4b97e18fe9f1ab54708": "number",
+     "mem-6dc17986116d6ce70a398aab4d78eaf09f79049c": "number",
+     "mem-fa4170ee871f40db1856af61ae5bb4351b10bf4f": "number",
+     "mem-601e4ce6ec880b6eefc3b0da54f31171f81a7d16": "number",
+     "mem-6895d546c839bcbbdc94d02a85517b8dc5e9f4ea": "number",
+     "mem-cc5ab98f040c6ac59eebc867a3de042db53a1e07": "number",
+     "mem-5af2aac2d53d2e3b644ba803a3c7f96e73819cf9": "number",
+     "mem-4ebccca6ce34589154400d8a04635aaee15ea719": "number"
+    },
+    "calls": {
+     "journal": "number",
+     "books": "number",
+     "reading": "number"
+    },
+    "tokens": {
+     "inputTokens": "number",
+     "outputTokens": "number",
+     "totalTokens": "number",
+     "cacheHitTokens": "number",
+     "cacheMissTokens": "number",
+     "reasoningTokens": "number",
+     "inconsistent": "boolean"
+    },
+    "state": {
+     "version": "number",
+     "latestUser": "object",
+     "latestReply": "null",
+     "contactPlan": "object",
+     "waiting": "null",
+     "lastContactReviewAt": "null",
+     "attempt": "null",
+     "returnContext": "null",
+     "contactPolicy": "string",
+     "lastCheckAt": "string"
+    },
+    "envelope": {
+     "version": "number",
+     "events": "array<string>",
+     "facts": "array<empty>",
+     "archives": "array<empty>",
+     "diagnostics": "array<empty>",
+     "freshness": "object",
+     "state": "object",
+     "emotionRuntime": "object",
+     "last_assessment": "object",
+     "history": "array<empty>"
+    },
+    "originScope": {
+     "characterId": "string",
+     "archiveId": "string"
+    },
+    "attempt": {
+     "eventId": "string",
+     "batchId": "string",
+     "ids": "array<string>",
+     "at": "string"
+    },
+    "selected": {
+     "id": "string",
+     "revisionId": "string"
+    },
+    "feeling": {
+     "text": "string",
+     "stance": "string"
+    },
+    "last": {
+     "eventId": "string",
+     "batchId": "string",
+     "at": "string",
+     "selected": "number",
+     "reviewed": "number",
+     "pendingBefore": "number",
+     "pendingAfter": "number",
+     "requestChars": "number",
+     "reviewChars": "number"
+    },
+    "retry": {
+     "count": "number",
+     "eligible": "boolean",
+     "after": "string"
+    },
+    "lease": {
+     "token": "string",
+     "kind": "string",
+     "until": "string"
+    }
+   },
+   "nestedKeys": {
+    "sourceRefs": {
+     "sourceId": "string",
+     "sourceRevisionId": "string"
+    },
+    "jobs": {
+     "messageId": "string",
+     "conversationId": "string",
+     "role": "string",
+     "origin": "string",
+     "experienceKey": "string",
+     "occurredAt": "string",
+     "proof": "string",
+     "attempts": "number",
+     "after": "string",
+     "blocked": "boolean",
+     "attention": "boolean"
+    },
+    "evidenceBindings": {
+     "evidenceId": "string",
+     "kind": "string",
+     "id": "string",
+     "revisionId": "string",
+     "threadId": "string",
+     "role": "string"
+    },
+    "basis": {
+     "placementId": "string",
+     "placementRevisionId": "string"
+    },
+    "tracks": {
+     "id": "string",
+     "fileRef": "string",
+     "name": "string",
+     "mimeType": "string",
+     "sizeBytes": "number",
+     "sha256": "string",
+     "durationMs": "number",
+     "source": "string"
+    }
+   },
+   "hasRefs": 195,
+   "hasOrigin": {
+    "deviceId+platform": 1859
+   }
+  },
+  "message": {
+   "count": 162,
+   "keys": {
+    "role": "string",
+    "text": "string",
+    "status": "string",
+    "language": "string",
+    "createdAt": "string",
+    "pacedDelivery": "boolean",
+    "replyToUserIds": "array<string>",
+    "threadId": "string",
+    "messageOrder": "object",
+    "replyDiagnostics": "object",
+    "deliveryPlan": "object",
+    "usage": "object",
+    "replyParts": "array<string>",
+    "messageDeliveries": "array<object>",
+    "speechSegments": "array<object>",
+    "readAloudCaches": "array<object>",
+    "sceneNature": "string",
+    "origin": "string",
+    "automaticTask": "object",
+    "proactiveReceipt": "object",
+    "replyNote": "string"
+   },
+   "nested": {
+    "messageOrder": {
+     "deviceId": "string",
+     "ordinal": "number"
+    },
+    "replyDiagnostics": {
+     "version": "number",
+     "scope": "string",
+     "stages": "array<object>",
+     "inputs": "array<array<object>>",
+     "context": "object"
+    },
+    "deliveryPlan": {
+     "version": "number",
+     "plan": "string",
+     "force": "null",
+     "readAloud": "boolean",
+     "voiceCapability": "string",
+     "voiceServiceStatus": "string"
+    },
+    "usage": {
+     "version": "number",
+     "provider": "string",
+     "requestedModel": "string",
+     "model": "string",
+     "startedAt": "string",
+     "endedAt": "string",
+     "elapsedMs": "number",
+     "finished": "boolean",
+     "requestSent": "boolean",
+     "tokens": "object",
+     "cost": "object"
+    },
+    "automaticTask": {
+     "id": "string",
+     "key": "string",
+     "anchorMessageId": "string"
+    },
+    "proactiveReceipt": {
+     "taskKey": "string",
+     "claimRevision": "number",
+     "expectedUserId": "string"
+    }
+   },
+   "nestedKeys": {
+    "messageDeliveries": {
+     "kind": "string",
+     "text": "string",
+     "status": "string",
+     "transcriptVisible": "boolean",
+     "opened": "boolean",
+     "presentation": "string",
+     "speechStyle": "object",
+     "attachmentId": "string",
+     "fileRef": "string",
+     "audioId": "string",
+     "durationSeconds": "number",
+     "transcript": "string",
+     "cacheKey": "string",
+     "requestVersion": "string",
+     "sceneParts": "array<object>",
+     "vocalizations": "array<object>",
+     "errorCode": "string",
+     "error": "string"
+    },
+    "speechSegments": {
+     "text": "string",
+     "expression": "null",
+     "index": "number",
+     "sceneParts": "array<object>"
+    },
+    "readAloudCaches": {
+     "cacheKey": "string",
+     "partIndex": "number",
+     "partText": "string",
+     "attachmentId": "string",
+     "sourceText": "string",
+     "requestVersion": "string",
+     "config": "object",
+     "sourceScene": "string"
+    }
+   },
+   "hasRefs": 162,
+   "hasOrigin": {
+    "deviceId+platform": 162
+   }
+  },
+  "memory": {
+   "count": 25,
+   "keys": {
+    "kind": "string",
+    "title": "string",
+    "summary": "string",
+    "subject": "string",
+    "confidence": "number",
+    "status": "string",
+    "baseStrength": "number",
+    "createdAt": "string",
+    "anchorAt": "string",
+    "autoRetained": "boolean",
+    "userRetained": "boolean",
+    "autoSuppressed": "boolean",
+    "reason": "string"
+   },
+   "nested": {},
+   "nestedKeys": {},
+   "hasRefs": 25,
+   "hasOrigin": {
+    "deviceId+platform": 25
+   }
+  },
+  "attachment": {
+   "count": 23,
+   "keys": {
+    "id": "string",
+    "kind": "string",
+    "name": "string",
+    "fileRef": "string",
+    "sizeBytes": "number",
+    "sha256": "string",
+    "mimeType": "string",
+    "frames": "array<empty>",
+    "durationSeconds": "number"
+   },
+   "nested": {},
+   "nestedKeys": {},
+   "hasRefs": 23,
+   "hasOrigin": {
+    "deviceId+platform": 23
+   }
+  },
+  "source": {
+   "count": 38,
+   "keys": {
+    "role": "string",
+    "text": "string",
+    "occurredAt": "string",
+    "origin": "string",
+    "threadId": "string",
+    "messageId": "string",
+    "experienceKey": "string",
+    "captureOrdinal": "number"
+   },
+   "nested": {},
+   "nestedKeys": {},
+   "hasRefs": 38,
+   "hasOrigin": {
+    "deviceId+platform": 38
+   }
+  },
+  "journal": {
+   "count": 7,
+   "keys": {
+    "namespace": "string",
+    "version": "number",
+    "scope": "string",
+    "day": "string",
+    "timeZone": "string",
+    "title": "string",
+    "diary": "string",
+    "thoughts": "string",
+    "sourceIds": "array<string>",
+    "processedIds": "array<string>",
+    "understanding": "object",
+    "retained": "boolean",
+    "createdAt": "string",
+    "updatedAt": "string",
+    "editedBy": "string"
+   },
+   "nested": {
+    "understanding": {
+     "body": "string",
+     "sourceIds": "array<string>",
+     "processedIds": "array<string>",
+     "updatedAt": "string"
+    }
+   },
+   "nestedKeys": {},
+   "hasRefs": 7,
+   "hasOrigin": {
+    "deviceId+platform": 7
+   }
+  },
+  "note": {
+   "count": 2,
+   "keys": {
+    "version": "number",
+    "text": "string",
+    "createdAt": "string",
+    "conversationId": "string",
+    "messageId": "string",
+    "updatesToday": "number",
+    "namespace": "string",
+    "scope": "string",
+    "editedBy": "string",
+    "replyUserMessageId": "string",
+    "replyUserMessageIds": "array<string>"
+   },
+   "nested": {},
+   "nestedKeys": {},
+   "hasRefs": 2,
+   "hasOrigin": {
+    "deviceId+platform": 2
+   }
+  },
+  "thread": {
+   "count": 2,
+   "keys": {
+    "title": "string",
+    "createdAt": "string"
+   },
+   "nested": {},
+   "nestedKeys": {},
+   "hasRefs": 0,
+   "hasOrigin": {
+    "deviceId+platform": 2
+   }
+  }
+ }
+}

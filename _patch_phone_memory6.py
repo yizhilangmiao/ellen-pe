@@ -87,6 +87,32 @@ P4_NEW = (
 )
 PATCHES.append(("P4", P4_OLD, P4_NEW))
 
+# ---------------------------------------------------------------- P5 落库失败埋点
+# Nm() 里 `if (d2 && !f2) return null;` 是「需要用户确认」分支：静默丢弃。
+# 用 localStorage["ellen-mem-dbg2"] 记录是走到哪一步丢的。
+P5_OLD = "if (d2 && !f2) return null;"
+P5_NEW = (
+    "if (d2 && !f2){try{localStorage.setItem(`ellen-mem-dbg2`,"
+    "`drop:confirmation d2=`+String(d2)+` f2=`+String(!!f2))}catch(_e5a){} return null;}"
+)
+PATCHES.append(("P5", P5_OLD, P5_NEW))
+
+# 构造出条目时留痕（说明校验全过）
+P6_OLD = "return { id: p2, index: i2, action: e8.action"
+P6_NEW = (
+    "try{localStorage.setItem(`ellen-mem-dbg2`,`built:`+String(s2)+`|`+String(c2))}"
+    "catch(_e6){} return { id: p2, index: i2, action: e8.action"
+)
+PATCHES.append(("P6", P6_OLD, P6_NEW))
+
+# 调用点留痕（Nm 返回 null 还是条目）
+P7_OLD = "if (!p5) continue;"
+P7_NEW = (
+    "try{localStorage.setItem(`ellen-mem-dbg3`,p5?(`ok `+String(p5.kind)+` `+String(p5.title)):`null`)}"
+    "catch(_e7){} if (!p5) continue;"
+)
+PATCHES.append(("P7", P7_OLD, P7_NEW))
+
 
 def read():
     with open(TARGET, encoding="utf-8") as f:

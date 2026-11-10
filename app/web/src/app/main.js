@@ -499,7 +499,7 @@ function sendMessage(text) {
 
   // 暴露给验收脚本（只读快照，不参与业务）
   window.__ellen = {
-    version: '0.3.0-m6',
+    version: '0.3.0-m7',
     state: () => appState.snapshot(),
     show,
     pop,

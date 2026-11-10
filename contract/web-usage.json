@@ -1,0 +1,1007 @@
+{
+ "chunks": [
+  "autonomy-cavPmG33.js",
+  "dist-CMedSjkm.js",
+  "embedding-worker-gjfdPtme.js",
+  "main-CFFhpb4h.js",
+  "ort.wasm.bundle.min-DAwYOVSu.js",
+  "persona-CBp1pExX.js",
+  "persona-Dkk6mfxq.js",
+  "rolldown-runtime-D8NudN84.js",
+  "service-DGjhUELY.js",
+  "storage-worker-C5hDp6Bk.js",
+  "transformers.web-C3J9_dM3.js",
+  "web-BM7xF5pS.js"
+ ],
+ "pluginCount": 21,
+ "usedMethodTotal": 105,
+ "absentPlugins": [],
+ "unusedMethodsCount": 3,
+ "unusedMethods": [
+  "cancelPermission",
+  "minimize",
+  "requestOverlayPermission"
+ ],
+ "globalMethodHits": {
+  "beginReceive": {
+   "directCalls": 6,
+   "nameLiterals": 7,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "cancel": {
+   "directCalls": 134,
+   "nameLiterals": 100,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "capabilities": {
+   "directCalls": 2,
+   "nameLiterals": 0,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "captureScreen": {
+   "directCalls": 0,
+   "nameLiterals": 15,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "close": {
+   "directCalls": 183,
+   "nameLiterals": 164,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "commit": {
+   "directCalls": 25,
+   "nameLiterals": 23,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "commitAppearance": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "commitFile": {
+   "directCalls": 0,
+   "nameLiterals": 2,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "describe": {
+   "directCalls": 12,
+   "nameLiterals": 14,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "describeAppearance": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "discard": {
+   "directCalls": 17,
+   "nameLiterals": 27,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "discardAppearance": {
+   "directCalls": 0,
+   "nameLiterals": 2,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "discardReceive": {
+   "directCalls": 6,
+   "nameLiterals": 8,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "extractVideoAudio": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "finishReceive": {
+   "directCalls": 6,
+   "nameLiterals": 7,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "has": {
+   "directCalls": 945,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "loadVideo": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "pasteImage": {
+   "directCalls": 0,
+   "nameLiterals": 8,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "pauseVideo": {
+   "directCalls": 0,
+   "nameLiterals": 5,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "pick": {
+   "directCalls": 4,
+   "nameLiterals": 38,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "pickAlbum": {
+   "directCalls": 0,
+   "nameLiterals": 12,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "playVideo": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "prepare": {
+   "directCalls": 18,
+   "nameLiterals": 14,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "preview": {
+   "directCalls": 5,
+   "nameLiterals": 50,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "readAppearanceChunk": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "readChunk": {
+   "directCalls": 5,
+   "nameLiterals": 3,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "readFrames": {
+   "directCalls": 1,
+   "nameLiterals": 3,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "releaseSelections": {
+   "directCalls": 11,
+   "nameLiterals": 11,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "releaseVideo": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "removeAppearance": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "removeCachedFile": {
+   "directCalls": 2,
+   "nameLiterals": 0,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "writeAppearance": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenMedia",
+   "via": "name-string"
+  },
+  "writeChunk": {
+   "directCalls": 6,
+   "nameLiterals": 8,
+   "plugin": "EllenMedia",
+   "via": "direct"
+  },
+  "appendCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "cancelRecording": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "finishCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "loadAudio": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "loadCallSound": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "openCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "pause": {
+   "directCalls": 12,
+   "nameLiterals": 50,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "pauseCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "play": {
+   "directCalls": 17,
+   "nameLiterals": 40,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "playCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "releaseAudio": {
+   "directCalls": 3,
+   "nameLiterals": 2,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "releaseCallPcm": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "releaseRecording": {
+   "directCalls": 0,
+   "nameLiterals": 2,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "setLoop": {
+   "directCalls": 2,
+   "nameLiterals": 2,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "setVolume": {
+   "directCalls": 8,
+   "nameLiterals": 4,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "startRecording": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "stopRecording": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "transcribe": {
+   "directCalls": 5,
+   "nameLiterals": 6,
+   "plugin": "EllenAudio",
+   "via": "direct"
+  },
+  "volumeCallPcm": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenAudio",
+   "via": "name-string"
+  },
+  "debugProcess": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "ready": {
+   "directCalls": 9,
+   "nameLiterals": 269,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "readyRecognizer": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenCallCapture",
+   "via": "name-string"
+  },
+  "release": {
+   "directCalls": 55,
+   "nameLiterals": 19,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "releasePreparation": {
+   "directCalls": 2,
+   "nameLiterals": 1,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "releaseRecognizer": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "start": {
+   "directCalls": 21,
+   "nameLiterals": 31,
+   "plugin": "EllenCallCapture",
+   "via": "direct"
+  },
+  "transcribeRecognizer": {
+   "directCalls": 0,
+   "nameLiterals": 1,
+   "plugin": "EllenCallCapture",
+   "via": "name-string"
+  },
+  "claim": {
+   "directCalls": 2,
+   "nameLiterals": 1,
+   "plugin": "EllenMini",
+   "via": "direct"
+  },
+  "consumeOpen": {
+   "directCalls": 3,
+   "nameLiterals": 0,
+   "plugin": "EllenMini",
+   "via": "direct"
+  },
+  "present": {
+   "directCalls": 0,
+   "nameLiterals": 5,
+   "plugin": "EllenMini",
+   "via": "name-string"
+  },
+  "result": {
+   "directCalls": 0,
+   "nameLiterals": 6,
+   "plugin": "EllenMini",
+   "via": "name-string"
+  },
+  "state": {
+   "directCalls": 172,
+   "nameLiterals": 126,
+   "plugin": "EllenMini",
+   "via": "direct"
+  },
+  "stop": {
+   "directCalls": 44,
+   "nameLiterals": 50,
+   "plugin": "EllenMini",
+   "via": "direct"
+  },
+  "cancelImport": {
+   "directCalls": 2,
+   "nameLiterals": 0,
+   "plugin": "EllenMusic",
+   "via": "direct"
+  },
+  "cancelPick": {
+   "directCalls": 1,
+   "nameLiterals": 7,
+   "plugin": "EllenMusic",
+   "via": "direct"
+  },
+  "ensureDefault": {
+   "directCalls": 1,
+   "nameLiterals": 2,
+   "plugin": "EllenMusic",
+   "via": "direct"
+  },
+  "importSelection": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenMusic",
+   "via": "direct"
+  },
+  "background": {
+   "directCalls": 25,
+   "nameLiterals": 64,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "createExport": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "pickImport": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "readImport": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "saveExport": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "writeExport": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenArchive",
+   "via": "direct"
+  },
+  "exchange": {
+   "directCalls": 2,
+   "nameLiterals": 3,
+   "plugin": "EllenLocalSync",
+   "via": "direct"
+  },
+  "media": {
+   "directCalls": 4,
+   "nameLiterals": 32,
+   "plugin": "EllenLocalSync",
+   "via": "direct"
+  },
+  "pair": {
+   "directCalls": 2,
+   "nameLiterals": 20,
+   "plugin": "EllenLocalSync",
+   "via": "direct"
+  },
+  "records": {
+   "directCalls": 39,
+   "nameLiterals": 4,
+   "plugin": "EllenLocalSync",
+   "via": "direct"
+  },
+  "unpair": {
+   "directCalls": 2,
+   "nameLiterals": 5,
+   "plugin": "EllenLocalSync",
+   "via": "direct"
+  },
+  "configure": {
+   "directCalls": 4,
+   "nameLiterals": 9,
+   "plugin": "EllenAutonomy",
+   "via": "direct"
+  },
+  "foreground": {
+   "directCalls": 15,
+   "nameLiterals": 24,
+   "plugin": "EllenAutonomy",
+   "via": "direct"
+  },
+  "organizationComplete": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenAutonomy",
+   "via": "direct"
+  },
+  "requestPermission": {
+   "directCalls": 2,
+   "nameLiterals": 3,
+   "plugin": "EllenBackground",
+   "via": "direct"
+  },
+  "update": {
+   "directCalls": 17,
+   "nameLiterals": 3,
+   "plugin": "EllenBackground",
+   "via": "direct"
+  },
+  "ackStream": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenVoiceHttp",
+   "via": "direct"
+  },
+  "request": {
+   "directCalls": 18,
+   "nameLiterals": 12,
+   "plugin": "EllenVoiceHttp",
+   "via": "direct"
+  },
+  "requestStream": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenVoiceHttp",
+   "via": "direct"
+  },
+  "sourceInfo": {
+   "directCalls": 1,
+   "nameLiterals": 2,
+   "plugin": "EllenVoiceHttp",
+   "via": "direct"
+  },
+  "upload": {
+   "directCalls": 9,
+   "nameLiterals": 8,
+   "plugin": "EllenVoiceHttp",
+   "via": "direct"
+  },
+  "cancelProbe": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenCallProbe",
+   "via": "direct"
+  },
+  "probeCapabilities": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenCallProbe",
+   "via": "direct"
+  },
+  "releaseProbe": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenCallProbe",
+   "via": "direct"
+  },
+  "startProbe": {
+   "directCalls": 1,
+   "nameLiterals": 1,
+   "plugin": "EllenCallProbe",
+   "via": "direct"
+  },
+  "check": {
+   "directCalls": 20,
+   "nameLiterals": 21,
+   "plugin": "EllenUpdates",
+   "via": "direct"
+  },
+  "download": {
+   "directCalls": 5,
+   "nameLiterals": 11,
+   "plugin": "EllenUpdates",
+   "via": "direct"
+  },
+  "install": {
+   "directCalls": 0,
+   "nameLiterals": 3,
+   "plugin": "EllenUpdates",
+   "via": "name-string"
+  },
+  "pickCharacter": {
+   "directCalls": 2,
+   "nameLiterals": 0,
+   "plugin": "EllenDocuments",
+   "via": "direct"
+  },
+  "pickText": {
+   "directCalls": 3,
+   "nameLiterals": 0,
+   "plugin": "EllenDocuments",
+   "via": "direct"
+  },
+  "read": {
+   "directCalls": 108,
+   "nameLiterals": 40,
+   "plugin": "EllenSecureConfig",
+   "via": "direct"
+  },
+  "remove": {
+   "directCalls": 112,
+   "nameLiterals": 33,
+   "plugin": "EllenSecureConfig",
+   "via": "direct"
+  },
+  "write": {
+   "directCalls": 17,
+   "nameLiterals": 9,
+   "plugin": "EllenSecureConfig",
+   "via": "direct"
+  },
+  "activate": {
+   "directCalls": 4,
+   "nameLiterals": 3,
+   "plugin": "EllenLicense",
+   "via": "direct"
+  },
+  "setAppearance": {
+   "directCalls": 1,
+   "nameLiterals": 0,
+   "plugin": "EllenScreenShell",
+   "via": "direct"
+  }
+ },
+ "plugins": {
+  "EllenArchive": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel"
+   ],
+   "otherPluginMethodsInWindow": [
+    "configure",
+    "consumeOpen",
+    "foreground",
+    "organizationComplete",
+    "release",
+    "state"
+   ],
+   "addListenerMentions": 1
+  },
+  "EllenAudio": {
+   "occurrences": 9,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "capabilities",
+    "close",
+    "pause",
+    "play",
+    "setVolume"
+   ],
+   "otherPluginMethodsInWindow": [
+    "cancel",
+    "releaseSelections"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenAutonomy": {
+   "occurrences": 10,
+   "files": [
+    "autonomy-cavPmG33.js",
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "configure",
+    "consumeOpen",
+    "foreground",
+    "organizationComplete",
+    "release",
+    "state"
+   ],
+   "otherPluginMethodsInWindow": [
+    "cancel"
+   ],
+   "addListenerMentions": 1
+  },
+  "EllenBackground": {
+   "occurrences": 7,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "consumeOpen",
+    "requestPermission",
+    "state",
+    "stop",
+    "update"
+   ],
+   "otherPluginMethodsInWindow": [
+    "cancel"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenCallCapture": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "close",
+    "releaseRecognizer"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 1
+  },
+  "EllenCallProbe": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "close"
+   ],
+   "otherPluginMethodsInWindow": [
+    "releaseRecognizer",
+    "remove"
+   ],
+   "addListenerMentions": 4
+  },
+  "EllenCallSession": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "close",
+    "start",
+    "state",
+    "stop",
+    "update"
+   ],
+   "otherPluginMethodsInWindow": [
+    "cancel",
+    "request"
+   ],
+   "addListenerMentions": 1
+  },
+  "EllenDocuments": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenFeedbackHttp": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "request"
+   ],
+   "otherPluginMethodsInWindow": [
+    "configure",
+    "consumeOpen",
+    "foreground",
+    "organizationComplete",
+    "release",
+    "state"
+   ],
+   "addListenerMentions": 1
+  },
+  "EllenLicense": {
+   "occurrences": 7,
+   "files": [
+    "persona-CBp1pExX.js",
+    "service-DGjhUELY.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "activate",
+    "state"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenLocalSpeech": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "close"
+   ],
+   "otherPluginMethodsInWindow": [
+    "capabilities",
+    "releaseSelections"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenLocalSync": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "records",
+    "state"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenMedia": {
+   "occurrences": 7,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "service-DGjhUELY.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "capabilities",
+    "close",
+    "commit",
+    "releaseSelections",
+    "removeCachedFile"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenMini": {
+   "occurrences": 8,
+   "files": [
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenModelCatalogHttp": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "request"
+   ],
+   "otherPluginMethodsInWindow": [
+    "close",
+    "start",
+    "state",
+    "stop",
+    "update"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenMusic": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancelImport",
+    "discard"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenReleaseInfo": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "state"
+   ],
+   "otherPluginMethodsInWindow": [
+    "cancel",
+    "request"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenScreenShell": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "setAppearance"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  },
+  "EllenSecureConfig": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "read",
+    "write"
+   ],
+   "otherPluginMethodsInWindow": [
+    "close"
+   ],
+   "addListenerMentions": 0
+  },
+  "EllenUpdates": {
+   "occurrences": 5,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel"
+   ],
+   "otherPluginMethodsInWindow": [
+    "close",
+    "remove"
+   ],
+   "addListenerMentions": 1
+  },
+  "EllenVoiceHttp": {
+   "occurrences": 6,
+   "files": [
+    "main-CFFhpb4h.js",
+    "persona-CBp1pExX.js",
+    "storage-worker-C5hDp6Bk.js"
+   ],
+   "usedMethods": [
+    "cancel",
+    "requestStream"
+   ],
+   "otherPluginMethodsInWindow": [],
+   "addListenerMentions": 0
+  }
+ }
+}

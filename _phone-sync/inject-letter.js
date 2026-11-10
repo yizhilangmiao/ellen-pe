@@ -1117,7 +1117,7 @@
     ".elbs-fab[data-empty='1']{opacity:.55;}",
     ".elbs-fab svg{width:clamp(17.64px,4.862vmin,24.36px);height:clamp(17.64px,4.862vmin,24.36px);fill:none;stroke:currentColor;stroke-width:1.5;}",
     ".elbs-badge{position:absolute;top:calc(-1*clamp(3.36px,0.926vmin,4.64px));right:calc(-1*clamp(3.36px,0.926vmin,4.64px));min-width:clamp(14.28px,3.936vmin,19.72px);height:clamp(14.28px,3.936vmin,19.72px);padding:0 clamp(4.2px,1.157vmin,5.8px);",
-    "border-radius:clamp(7.56px,2.083vmin,10.44px);background:#d6a0b4;color:#241a1e;font-weight:600;font-size:clamp(9.24px,2.546vmin,12.76px);line-height:clamp(14.28px,3.936vmin,19.72px);font-family:system-ui,sans-serif;text-align:center;}",
+    "border-radius:clamp(7.56px,2.083vmin,10.44px);background:#ecb8c0;color:#241a1e;font-weight:600;font-size:clamp(9.24px,2.546vmin,12.76px);line-height:clamp(14.28px,3.936vmin,19.72px);font-family:system-ui,sans-serif;text-align:center;}",
     ".elbs-layer{position:fixed;inset:0;z-index:2147483100;display:flex;align-items:flex-end;justify-content:center;",
     "background:rgba(6,8,12,.5);opacity:0;pointer-events:none;transition:opacity .22s ease;",
     "padding-bottom:env(safe-area-inset-bottom,0px);}",
@@ -1129,13 +1129,13 @@
     ".elbs-layer[data-open='1'] .elbs-sheet{transform:translateY(0);}",
     ".elbs-head{display:flex;align-items:center;gap:clamp(8.4px,2.315vmin,11.6px);padding:clamp(13.44px,3.704vmin,18.56px) clamp(13.44px,3.704vmin,18.56px) clamp(8.4px,2.315vmin,11.6px);}",
     ".elbs-title{font-weight:600;font-size:clamp(13.44px,3.704vmin,18.56px);line-height:1.3;font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif;color:#ece7e3;flex:1;}",
-    ".elbs-chip{font-weight:600;font-size:clamp(10.08px,2.778vmin,13.92px);line-height:1;font-family:system-ui,sans-serif;color:#241a1e;background:#d6a0b4;",
+    ".elbs-chip{font-weight:600;font-size:clamp(10.08px,2.778vmin,13.92px);line-height:1;font-family:system-ui,sans-serif;color:#241a1e;background:#ecb8c0;",
     "padding:clamp(4.2px,1.157vmin,5.8px) clamp(7.56px,2.083vmin,10.44px);border-radius:clamp(839.16px,231.269vmin,1158.84px);}",
     ".elbs-x{width:clamp(25.2px,6.945vmin,34.8px);height:clamp(25.2px,6.945vmin,34.8px);border-radius:50%;border:0;background:#20252c;color:#9aa3ad;",
     "font-weight:400;font-size:clamp(13.44px,3.704vmin,18.56px);line-height:1;font-family:system-ui,sans-serif;}",
     ".elbs-meta{padding:0 clamp(13.44px,3.704vmin,18.56px) clamp(10.08px,2.778vmin,13.92px);font-weight:400;font-size:clamp(10.08px,2.778vmin,13.92px);line-height:1.7;font-family:system-ui,sans-serif;color:#8d95a0;}",
     ".elbs-bar{height:clamp(2.52px,0.695vmin,3.48px);border-radius:clamp(1.68px,0.463vmin,2.32px);background:#232830;overflow:hidden;margin:0 clamp(13.44px,3.704vmin,18.56px) clamp(11.76px,3.241vmin,16.24px);}",
-    ".elbs-bar>i{display:block;height:100%;background:linear-gradient(90deg,#d6a0b4,#c9a86a);}",
+    ".elbs-bar>i{display:block;height:100%;background:linear-gradient(90deg,#ecb8c0,#c9a86a);}",
     ".elbs-list{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 clamp(10.08px,2.778vmin,13.92px) clamp(18.48px,5.093vmin,25.52px);}",
     ".elbs-item{display:flex;gap:clamp(10.08px,2.778vmin,13.92px);align-items:flex-start;width:100%;text-align:left;",
     "background:#1a1e24;border:1px solid #2c313a;border-radius:clamp(11.76px,3.241vmin,16.24px);padding:clamp(10.92px,3.01vmin,15.08px) clamp(11.76px,3.241vmin,16.24px);margin:clamp(6.72px,1.852vmin,9.28px) 0;",
@@ -1145,8 +1145,8 @@
     ".elbs-item-main{flex:1;min-width:0;}",
     ".elbs-item-title{font-weight:600;font-size:clamp(11.76px,3.241vmin,16.24px);color:#ece7e3;margin-bottom:clamp(2.52px,0.695vmin,3.48px);}",
     ".elbs-item-sub{font-size:clamp(9.66px,2.662vmin,13.34px);color:#7f8892;}",
-    ".elbs-dot{width:clamp(5.88px,1.621vmin,8.12px);height:clamp(5.88px,1.621vmin,8.12px);border-radius:50%;background:#d6a0b4;margin-top:clamp(5.04px,1.389vmin,6.96px);flex:0 0 auto;}",
-    ".elbs-stage{font-weight:600;font-size:clamp(8.82px,2.431vmin,12.18px);line-height:1;font-family:system-ui,sans-serif;color:#d6a0b4;border:1px solid rgba(214,160,180,.35);",
+    ".elbs-dot{width:clamp(5.88px,1.621vmin,8.12px);height:clamp(5.88px,1.621vmin,8.12px);border-radius:50%;background:#ecb8c0;margin-top:clamp(5.04px,1.389vmin,6.96px);flex:0 0 auto;}",
+    ".elbs-stage{font-weight:600;font-size:clamp(8.82px,2.431vmin,12.18px);line-height:1;font-family:system-ui,sans-serif;color:#ecb8c0;border:1px solid rgba(214,160,180,.35);",
     "border-radius:clamp(839.16px,231.269vmin,1158.84px);padding:clamp(2.52px,0.695vmin,3.48px) clamp(5.88px,1.621vmin,8.12px);flex:0 0 auto;margin-top:1px;}",
     ".elbs-empty{padding:clamp(28.56px,7.871vmin,39.44px) clamp(16.8px,4.63vmin,23.2px);text-align:center;color:#79828d;font-weight:400;font-size:clamp(10.92px,3.01vmin,15.08px);line-height:1.8;font-family:system-ui,sans-serif;}",
     ".elbs-reader{position:fixed;inset:0;z-index:2147483200;background:radial-gradient(120% 80% at 50% 0%,#12161c 0%,#080a0d 70%);",
@@ -1160,7 +1160,7 @@
     ".elbs-btn:active{background:rgba(255,255,255,.12);}",
     ".elbs-btn[disabled]{opacity:.32;pointer-events:none;}",
     ".elbs-btn svg{width:clamp(13.44px,3.704vmin,18.56px);height:clamp(13.44px,3.704vmin,18.56px);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}",
-    ".elbs-btn.key{background:#d6a0b4;border-color:#d6a0b4;color:#241a1e;font-weight:600;}",
+    ".elbs-btn.key{background:#ecb8c0;border-color:#ecb8c0;color:#241a1e;font-weight:600;}",
     ".elbs-btn.key:active{background:#c78fa5;}",
     ".elbs-top .mid{flex:1;text-align:center;font-weight:500;font-size:clamp(10.92px,3.01vmin,15.08px);line-height:1.4;font-family:system-ui,sans-serif;color:#8b939e;letter-spacing:.3px;}",
     ".elbs-paper-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:clamp(3.36px,0.926vmin,4.64px) clamp(11.76px,3.241vmin,16.24px) clamp(8.4px,2.315vmin,11.6px);display:flex;justify-content:center;}",
@@ -1222,13 +1222,49 @@
     "justify-content:center;gap:clamp(15.12px,4.167vmin,20.88px);background:rgba(18,16,14,.74);",
     "border-radius:clamp(5.04px,1.389vmin,6.96px);color:#f4efe6;padding:clamp(21.84px,6.019vmin,30.16px);text-align:center;}",
     ".elbs-lock p{margin:0;font-weight:400;font-size:clamp(11.76px,3.241vmin,16.24px);line-height:1.9;font-family:system-ui,sans-serif;color:#efe8dd;}",
-    ".elbs-lock button{border:0;background:#d6a0b4;color:#1c2026;min-width:clamp(77.28px,21.298vmin,106.72px);min-height:clamp(33.6px,9.26vmin,46.4px);",
+    ".elbs-lock button{border:0;background:#ecb8c0;color:#1c2026;min-width:clamp(77.28px,21.298vmin,106.72px);min-height:clamp(33.6px,9.26vmin,46.4px);",
     "border-radius:clamp(839.16px,231.269vmin,1158.84px);padding:clamp(8.4px,2.315vmin,11.6px) clamp(18.48px,5.093vmin,25.52px);font-weight:600;font-size:clamp(10.92px,3.01vmin,15.08px);line-height:1;font-family:system-ui,sans-serif;}",
     ".elbs-toast{position:fixed;left:50%;bottom:22%;transform:translateX(-50%);z-index:2147483300;",
     "background:rgba(20,23,28,.94);color:#e6e1dd;border:1px solid #2c313a;border-radius:clamp(839.16px,231.269vmin,1158.84px);",
     "padding:clamp(7.56px,2.083vmin,10.44px) clamp(13.44px,3.704vmin,18.56px);font-weight:400;font-size:clamp(10.5px,2.894vmin,14.5px);line-height:1;font-family:system-ui,sans-serif;opacity:0;transition:opacity .2s ease;pointer-events:none;}",
     ".elbs-toast[data-show='1']{opacity:1;}",
-    "@media (prefers-reduced-motion:reduce){.elbs-sheet,.elbs-layer,.elbs-reader,.elbs-sign[data-wipe='1']>span",
+    /* 退出确认：返回键要离开 App 时先问一句，避免误触直接掉到桌面 */
+    ".elbs-quit{position:fixed;inset:0;z-index:2147483400;display:flex;align-items:center;justify-content:center;",
+    "background:rgba(6,8,12,.62);backdrop-filter:blur(clamp(2.52px,0.695vmin,3.48px));",
+    "opacity:0;pointer-events:none;transition:opacity .18s ease;",
+    "padding:clamp(16.8px,4.63vmin,23.2px);}",
+    ".elbs-quit[data-open='1']{opacity:1;pointer-events:auto;}",
+    ".elbs-quit-card{width:100%;max-width:clamp(268.8px,74.08vmin,371.2px);background:#14171c;border:1px solid #2c313a;",
+    "border-radius:clamp(16.8px,4.63vmin,23.2px);padding:clamp(18.48px,5.093vmin,25.52px);",
+    "box-shadow:0 clamp(12.6px,3.473vmin,17.4px) clamp(33.6px,9.26vmin,46.4px) rgba(0,0,0,.55);",
+    "transform:translateY(clamp(6.72px,1.852vmin,9.28px));transition:transform .2s cubic-bezier(.22,.61,.36,1);}",
+    ".elbs-quit[data-open='1'] .elbs-quit-card{transform:translateY(0);}",
+    ".elbs-quit-title{font-weight:600;font-size:clamp(13.44px,3.704vmin,18.56px);line-height:1.35;",
+    "font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif;color:#ece7e3;margin-bottom:clamp(6.72px,1.852vmin,9.28px);}",
+    ".elbs-quit-text{font-weight:400;font-size:clamp(10.5px,2.894vmin,14.5px);line-height:1.75;",
+    "font-family:system-ui,sans-serif;color:#8d95a0;margin-bottom:clamp(15.12px,4.167vmin,20.88px);}",
+    ".elbs-quit-acts{display:flex;gap:clamp(8.4px,2.315vmin,11.6px);}",
+    ".elbs-quit-acts .elbs-btn{flex:1;height:clamp(36.96px,10.185vmin,51.04px);justify-content:center;",
+    "font-size:clamp(11.76px,3.241vmin,16.24px);}",
+    /* 配置失败提示：错误原因要看清楚，不能只留底部一行小字 */
+    ".elbs-alert{position:fixed;inset:0;z-index:2147483500;display:flex;align-items:center;justify-content:center;",
+    "background:rgba(6,8,12,.66);backdrop-filter:blur(clamp(2.52px,0.695vmin,3.48px));",
+    "opacity:0;pointer-events:none;transition:opacity .18s ease;",
+    "padding:clamp(16.8px,4.63vmin,23.2px);}",
+    ".elbs-alert[data-open='1']{opacity:1;pointer-events:auto;}",
+    ".elbs-alert-card{width:100%;max-width:clamp(268.8px,74.08vmin,371.2px);background:#14171c;border:1px solid #4a2b30;",
+    "border-radius:clamp(16.8px,4.63vmin,23.2px);padding:clamp(18.48px,5.093vmin,25.52px);",
+    "box-shadow:0 clamp(12.6px,3.473vmin,17.4px) clamp(33.6px,9.26vmin,46.4px) rgba(0,0,0,.55);",
+    "transform:translateY(clamp(6.72px,1.852vmin,9.28px));transition:transform .2s cubic-bezier(.22,.61,.36,1);}",
+    ".elbs-alert[data-open='1'] .elbs-alert-card{transform:translateY(0);}",
+    ".elbs-alert-title{font-weight:600;font-size:clamp(13.44px,3.704vmin,18.56px);line-height:1.35;",
+    "font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif;color:#f0b7bd;margin-bottom:clamp(6.72px,1.852vmin,9.28px);}",
+    ".elbs-alert-text{font-weight:400;font-size:clamp(10.5px,2.894vmin,14.5px);line-height:1.75;",
+    "font-family:system-ui,sans-serif;color:#aab2bd;margin-bottom:clamp(15.12px,4.167vmin,20.88px);",
+    "max-height:52vh;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}",
+    ".elbs-alert-acts .elbs-btn{width:100%;height:clamp(36.96px,10.185vmin,51.04px);justify-content:center;",
+    "font-size:clamp(11.76px,3.241vmin,16.24px);}",
+    "@media (prefers-reduced-motion:reduce){.elbs-sheet,.elbs-layer,.elbs-reader,.elbs-quit,.elbs-quit-card,.elbs-alert,.elbs-alert-card,.elbs-sign[data-wipe='1']>span",
     "{transition-duration:.12s!important;}}",
   ].join("");
 
@@ -1263,6 +1299,10 @@
     readerPrev: null,
     readerNext: null,
     toast: null,
+    quit: null,
+    alert: null,
+    alertTitle: null,
+    alertText: null,
   };
   var readerState = { letterId: null, order: [] };
 
@@ -1367,10 +1407,66 @@
 
     var t = el("div", "elbs-toast", "");
 
+    /* 退出确认弹窗：只有「退出到桌面」才真的 minimizeApp，避免误触 */
+    var quit = el("div", "elbs-quit");
+    quit.setAttribute("data-open", "0");
+    var qCard = el("div", "elbs-quit-card");
+    var qTitle = el("div", "elbs-quit-title", "要离开了吗");
+    var qText = el("div", "elbs-quit-text", "艾莲会留在后台等你，下次打开还是这里。");
+    var qActs = el("div", "elbs-quit-acts");
+    var qStay = el("button", "elbs-btn");
+    qStay.setAttribute("type", "button");
+    qStay.textContent = "再待一会儿";
+    qStay.addEventListener("click", function () {
+      mark("ellen-quit", "stay");
+      closeQuit();
+    });
+    var qGo = el("button", "elbs-btn key");
+    qGo.setAttribute("type", "button");
+    qGo.textContent = "退出到桌面";
+    qGo.addEventListener("click", function () {
+      mark("ellen-quit", "go");
+      closeQuit();
+      leaveApp();
+    });
+    qActs.appendChild(qStay);
+    qActs.appendChild(qGo);
+    qCard.appendChild(qTitle);
+    qCard.appendChild(qText);
+    qCard.appendChild(qActs);
+    quit.appendChild(qCard);
+    quit.addEventListener("click", function (ev) {
+      if (ev.target === quit) closeQuit();
+    });
+
     document.body.appendChild(fab);
     document.body.appendChild(layer);
     document.body.appendChild(reader);
     document.body.appendChild(t);
+    document.body.appendChild(quit);
+
+    /* 配置失败提示弹窗：主程序出错时调 window.__ellenNotice(原因) */
+    var alertBox = el("div", "elbs-alert");
+    alertBox.setAttribute("data-open", "0");
+    var aCard = el("div", "elbs-alert-card");
+    var aTitle = el("div", "elbs-alert-title", "配置没有成功");
+    var aText = el("div", "elbs-alert-text", "");
+    var aActs = el("div", "elbs-alert-acts");
+    var aOk = el("button", "elbs-btn key");
+    aOk.setAttribute("type", "button");
+    aOk.textContent = "知道了";
+    aOk.addEventListener("click", function () {
+      closeAlert();
+    });
+    aActs.appendChild(aOk);
+    aCard.appendChild(aTitle);
+    aCard.appendChild(aText);
+    aCard.appendChild(aActs);
+    alertBox.appendChild(aCard);
+    alertBox.addEventListener("click", function (ev) {
+      if (ev.target === alertBox) closeAlert();
+    });
+    document.body.appendChild(alertBox);
 
     dom.fab = fab;
     dom.badge = badge;
@@ -1386,6 +1482,10 @@
     dom.readerPrev = prev;
     dom.readerNext = next;
     dom.toast = t;
+    dom.quit = quit;
+    dom.alert = alertBox;
+    dom.alertTitle = aTitle;
+    dom.alertText = aText;
   }
 
   function render() {
@@ -1485,7 +1585,7 @@
   }
 
   /* 点「回一句」→ 把焦点交给宿主的聊天输入框 */
-  function focusComposer() {
+  function focusComposer(quiet) {
     var sels = ["textarea", "input[type=text]", "input[type=search]", '[contenteditable="true"]'];
     for (var i = 0; i < sels.length; i++) {
       var nodes = document.querySelectorAll(sels[i]);
@@ -1501,12 +1601,91 @@
         } catch (e) {}
       }
     }
-    toast("在下面说一句吧");
+    if (!quiet) toast("在下面说一句吧");
     return false;
+  }
+
+  /* 宿主的底部 tab：挑屏幕下缘、文字正好是 label 的最小可点元素。
+     壳子没有导出切页 API，只能点它自己的 tab 按钮。 */
+  function hostTab(label) {
+    var all = document.querySelectorAll("button,a,[role='tab'],[role='button'],div,span");
+    var h = window.innerHeight || 800;
+    var best = null;
+    var bestW = 1e9;
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (!n || n.offsetParent === null) continue;
+      if ((n.textContent || "").replace(/\s+/g, "") !== label) continue;
+      var r = n.getBoundingClientRect();
+      if (!r.height || r.top < h * 0.72) continue;
+      if (r.width > h) continue;
+      var target = n;
+      for (var up = 0; up < 3 && target; up++) {
+        var tag = target.tagName;
+        if (tag === "BUTTON" || tag === "A") break;
+        var role = target.getAttribute && target.getAttribute("role");
+        if (role === "tab" || role === "button") break;
+        target = target.parentElement;
+      }
+      if (!target || target.offsetParent === null) continue;
+      var w = target.getBoundingClientRect().width;
+      if (w < bestW) {
+        best = target;
+        bestW = w;
+      }
+    }
+    return best;
+  }
+
+  /* 当前激活的底部 tab 文字。宿主用 .is-active + aria-selected(page/true) 标选中项，
+     比「有没有可见输入框」可靠：相处/回忆页没有输入框，靠 focusComposer 猜不出来。 */
+  function activeNavLabel() {
+    var all = document.querySelectorAll("button,a,[role='tab'],[role='button']");
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (!n || n.offsetParent === null) continue;
+      var cls = (n.className && n.className.toString()) || "";
+      var aria =
+        (n.getAttribute && (n.getAttribute("aria-selected") || n.getAttribute("aria-current"))) || "";
+      if (cls.indexOf("is-active") < 0 && aria !== "true" && aria !== "page") continue;
+      var txt = (n.textContent || "").replace(/\s+/g, "");
+      if (txt && txt.length <= 4) return txt;
+    }
+    return "";
+  }
+
+  /* 回一句：关信 → 关信匣 → 切到聊天页 → 聚焦输入框。
+     宿主切页是异步渲染，输入框不会立刻可见，所以按 100ms 重试。 */
+  function replyInChat() {
+    suppressBackUntil = Date.now() + 800; /* ellen-letter-reply */
+    closeReader();
+    closeSheet();
+    var tries = 0;
+    var tick = function () {
+      tries++;
+      if (tries <= 3) {
+        var tab = hostTab("聊天");
+        if (tab) {
+          try {
+            tab.click();
+          } catch (e) {}
+        }
+      }
+      if (focusComposer(true)) return;
+      if (tries < 15) setTimeout(tick, 100);
+      else toast("在下面说一句吧");
+    };
+    setTimeout(tick, 50);
   }
 
   /* Android 返回键：阅读器打开时先关它，不要直接退出 App */
   var backGuard = false;
+  /* 回一句要关信，关信必然 history.back()，宿主会把那次 popstate 当成按返回键。
+     这里开一个短窗口把它挡掉；只挡我们自己造出来的那一次，不挡用户真按返回。 */
+  var suppressBackUntil = 0; /* ellen-letter-reply */
+  function backSuppressed() {
+    return suppressBackUntil !== 0 && Date.now() < suppressBackUntil;
+  }
   function guardOn() {
     if (backGuard) return;
     backGuard = true;
@@ -1535,31 +1714,23 @@
      没注册过它就由原生直接 finish（实测：阅读器里按返回直接退到桌面）。 */
   /* 有的自定义 WebView 壳会在 onBackPressed 里调页面钩子；挂上不吃亏，没壳就是死代码 */
   window.__ellenBack = function () {
-    if (dom.reader && dom.reader.getAttribute("data-open") === "1") {
-      closeReader();
-      return true;
-    }
-    if (dom.layer && dom.layer.getAttribute("data-open") === "1") {
-      closeSheet();
-      return true;
-    }
-    return false;
+    if (backSuppressed()) return true; /* ellen-letter-reply */
+    if (appBack()) return true;
+    /* 根页面：先弹确认，弹窗没建好才直接退 */
+    if (!askQuit()) leaveApp();
+    return true;
   };
 
   document.addEventListener(
     "backbutton",
     function (e) {
       if (e && typeof e.preventDefault === "function") e.preventDefault();
-      if (dom.reader && dom.reader.getAttribute("data-open") === "1") {
-        closeReader();
-        return;
+      if (backSuppressed()) return; /* ellen-letter-reply */
+      if (appBack()) return;
+      if (!leaveApp()) {
+        var app = window.navigator && window.navigator.app;
+        if (app && typeof app.exitApp === "function") app.exitApp();
       }
-      if (dom.layer && dom.layer.getAttribute("data-open") === "1") {
-        closeSheet();
-        return;
-      }
-      var app = window.navigator && window.navigator.app;
-      if (app && typeof app.exitApp === "function") app.exitApp();
     },
     false
   );
@@ -1649,8 +1820,7 @@
     var replyBtn = el("button", "key", "回一句");
     replyBtn.setAttribute("type", "button");
     replyBtn.addEventListener("click", function () {
-      closeReader();
-      focusComposer();
+      replyInChat();
     });
     var putBtn = el("button", "", "收起来");
     putBtn.setAttribute("type", "button");
@@ -1753,9 +1923,335 @@
   }
 
   /* ------------------------------------------------ 启动 */
+  /* ===== Android 返回键接管 =====
+     现状：AppPlugin 的 OnBackPressedCallback 只有在「JS 侧没有任何 backButton 监听」时
+     才会去 canGoBack/goBack 然后 return —— 页面没有历史条目，所以按返回就直接 finish
+     （整个应用退掉）。挂上监听之后它不再自己处理，只把事件丢给 JS，由这里决定去哪。
+     处理顺序：关信 → 关信匣 → 点 App 自带的左上角 ×/‹ → 回聊天页 → 退到后台。 */
+  function topLeftBackTarget() {
+    var w = window.innerWidth || 400;
+    var h = window.innerHeight || 800;
+    var all = document.querySelectorAll("button,a,[role='button'],div,span");
+    var best = null;
+    var bestScore = 1e9;
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (!n || n.offsetParent === null) continue;
+      var r = n.getBoundingClientRect();
+      if (!r.height || r.width < 8) continue;
+      if (r.top > h * 0.22 || r.left > w * 0.3) continue;
+      if (r.width > w * 0.3) continue;
+      var t = (n.textContent || "").replace(/\s+/g, "");
+      var hit =
+        t === "×" || t === "✕" || t === "x" || t === "X" ||
+        t === "‹" || t === "＜" || t === "<" || t === "←" ||
+        t === "返回" || t === "关闭" || t === "信匣" || t.indexOf("信匣") === 0;
+      if (!hit) continue;
+      var target = n;
+      for (var up = 0; up < 2 && target; up++) {
+        var tag = target.tagName;
+        if (tag === "BUTTON" || tag === "A") break;
+        var role = target.getAttribute && target.getAttribute("role");
+        if (role === "button") break;
+        target = target.parentElement;
+      }
+      if (!target || target.offsetParent === null) continue;
+      /* 只认真正可点到的：透明/被遮住的同名元素（隐藏浮层里的「关闭」）不算 */
+      try {
+        var cs = window.getComputedStyle(n);
+        if (cs && (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0")) continue;
+        var tr = target.getBoundingClientRect();
+        var cx = tr.left + Math.min(tr.width / 2, 14);
+        var cy = tr.top + tr.height / 2;
+        var probe = document.elementFromPoint(cx, cy);
+        if (!probe) continue;
+        if (!(probe === target || target.contains(probe) || probe.contains(target))) continue;
+      } catch (e) {}
+      var score = r.top * 1000 + r.left;
+      if (score < bestScore) {
+        best = target;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  /* 设置页和二级页（语音模型/聊天模型等）的左上角返回键是纯图标按钮：
+     class 含 `el-round icon-only`，里面只有一个 <svg>，textContent 是空串。
+     topLeftBackTarget() 靠文字匹配，永远认不出它，所以这里单独认一遍。
+     必须限定「左上角很靠左」——聊天页顶栏那几个图标按钮也在 header 里，
+     但它们从左半边排开，位置靠右，靠 r.left < w*0.2 就能避开。 */
+  function topLeftIconBack() {
+    var w = window.innerWidth || 400;
+    var h = window.innerHeight || 800;
+    var all = document.querySelectorAll("button,[role='button'],a");
+    var best = null;
+    var bestScore = 1e9;
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (!n || n.offsetParent === null) continue;
+      var cls = String(n.className || "");
+      if (cls.indexOf("elbs-") >= 0) continue;
+      var r = n.getBoundingClientRect();
+      if (!r.height || r.width < 8) continue;
+      if (r.top > h * 0.14 || r.left > w * 0.2) continue;
+      if (r.width > w * 0.16 || r.height > h * 0.1) continue;
+      var aria = String(n.getAttribute("aria-label") || "");
+      var looksBack =
+        /返回|关闭|back|close/i.test(aria) ||
+        (cls.indexOf("el-round") >= 0 && cls.indexOf("icon-only") >= 0);
+      if (!looksBack) continue;
+      var t = (n.textContent || "").replace(/\s+/g, "");
+      if (t.length > 2) continue;
+      if (!n.querySelector("svg") && !aria) continue;
+      try {
+        var cs = window.getComputedStyle(n);
+        if (cs && (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0")) continue;
+        var cx = r.left + Math.min(r.width / 2, 14);
+        var cy = r.top + r.height / 2;
+        var probe = document.elementFromPoint(cx, cy);
+        if (!probe) continue;
+        if (!(probe === n || n.contains(probe) || probe.contains(n))) continue;
+      } catch (e) {}
+      var score = r.top * 1000 + r.left;
+      if (score < bestScore) {
+        best = n;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  function mark(k, v) {
+    try {
+      window.localStorage.setItem(k, String(v));
+    } catch (e) {}
+  }
+
+  /* 退出确认弹窗：返回键想离开 App 时先问一句，别一下把用户扔到桌面 */
+  function closeQuit() {
+    quitPending = false;
+    if (dom.quit) dom.quit.setAttribute("data-open", "0");
+  }
+
+  /* 配置失败提示：把原因整段显示出来，别让人只看到底部一行小字 */
+  function closeAlert() {
+    if (dom.alert) dom.alert.setAttribute("data-open", "0");
+  }
+
+  function notice(text, title) {
+    if (!dom.alert) return;
+    var body = String(text == null ? "" : text).trim();
+    if (!body) return;
+    dom.alertTitle.textContent = title || "配置没有成功";
+    dom.alertText.textContent = body;
+    dom.alert.setAttribute("data-open", "1");
+  }
+  window.__ellenNotice = notice;
+
+  /* 收软键盘：Android WebView 里只 blur 有时不收，补一招把焦点转给 body。
+     弹窗必须等键盘开始收再出现，否则会被键盘顶到屏幕上半截。 */
+  function hideKeyboard() {
+    try {
+      var ae = document.activeElement;
+      if (ae && typeof ae.blur === "function") ae.blur();
+      if (document.body && typeof document.body.focus === "function") {
+        document.body.setAttribute("tabindex", "-1");
+        document.body.focus();
+      }
+      var sel = window.getSelection && window.getSelection();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    } catch (e) {}
+  }
+
+  var quitPending = false;
+
+  function askQuit() {
+    if (!dom.quit) return false;
+    if (dom.quit.getAttribute("data-open") === "1") return true;
+    if (quitPending) return true;
+    quitPending = true;
+    mark("ellen-quit", "ask");
+    hideKeyboard();
+    window.setTimeout(function () {
+      quitPending = false;
+      if (dom.quit && dom.quit.getAttribute("data-open") !== "1") {
+        dom.quit.setAttribute("data-open", "1");
+      }
+    }, 120);
+    return true;
+  }
+
+  function leaveApp() {
+    var note = [];
+    try {
+      var C = window.Capacitor;
+      var P = C && C.Plugins;
+      note.push("cap=" + (C ? "y" : "n"));
+      note.push("plugins=" + (P ? Object.keys(P).join("|") : "n"));
+      var App = P && P.App;
+      if (!App && C && typeof C.registerPlugin === "function") {
+        try {
+          App = C.registerPlugin("App");
+          note.push("reg=y");
+        } catch (e) {
+          note.push("reg=err");
+        }
+      }
+      note.push("app=" + (App ? "y" : "n"));
+      if (App) {
+        note.push("min=" + typeof App.minimizeApp);
+        note.push("exit=" + typeof App.exitApp);
+      }
+      if (App && typeof App.minimizeApp === "function") {
+        note.push("min-call");
+        mark("ellen-leave", note.join(","));
+        App.minimizeApp({});
+        return true;
+      }
+      if (App && typeof App.exitApp === "function") {
+        note.push("exit-call");
+        mark("ellen-leave", note.join(","));
+        App.exitApp();
+        return true;
+      }
+    } catch (e) {
+      note.push("err=" + (e && e.message));
+    }
+    mark("ellen-leave", note.join(","));
+    return false;
+  }
+
+  var ROOT_BACK_AT = 0;
+  var BACK_STATE = { ellenBackGuard: 1 };
+
+  function pushBackGuard() {
+    try {
+      window.history.pushState(BACK_STATE, "");
+    } catch (e) {}
+  }
+
+  /* AppPlugin 的 canGoBack 分支会走 webView.goBack()，返回键就变成了 history 后退；
+     压一个哨兵条目接管，处理完再压回去。根页面上按返回不再直接退到桌面，
+     而是弹「要离开了吗」，用户点「退出到桌面」才 minimizeApp。 */
+  function onBackPop() {
+    /* 先补哨兵：popstate 已经把栈顶吃掉了，不补的话下一次返回就没得退 */
+    pushBackGuard();
+    if (appBack()) return;
+    if (!askQuit()) leaveApp();
+  }
+
+
+  function appBack() {
+    if (backSuppressed()) return true; /* ellen-letter-reply */
+    mark("ellen-bk2", "enter reader=" + (dom.reader && dom.reader.getAttribute("data-open")) + " layer=" + (dom.layer && dom.layer.getAttribute("data-open")));
+    /* 配置失败提示开着时，返回 = 关掉它 */
+    if (dom.alert && dom.alert.getAttribute("data-open") === "1") {
+      mark("ellen-bk2", "close-alert");
+      closeAlert();
+      return true;
+    }
+    /* 退出确认弹窗开着时，返回 = 关掉它 */
+    if (dom.quit && dom.quit.getAttribute("data-open") === "1") {
+      mark("ellen-bk2", "close-quit");
+      closeQuit();
+      return true;
+    }
+    if (dom.reader && dom.reader.getAttribute("data-open") === "1") {
+      mark("ellen-bk2", "close-reader");
+      closeReader();
+      return true;
+    }
+    if (dom.layer && dom.layer.getAttribute("data-open") === "1") {
+      mark("ellen-bk2", "close-sheet");
+      closeSheet();
+      return true;
+    }
+    var hit = topLeftBackTarget() || topLeftIconBack();
+    if (hit) {
+      var hr = hit.getBoundingClientRect();
+      mark("ellen-bk2", "hit:" + hit.tagName + ":" + (hit.textContent || "").replace(/\s+/g, "").slice(0, 8) + "@" + Math.round(hr.left) + "," + Math.round(hr.top) + "," + Math.round(hr.width) + "x" + Math.round(hr.height));
+      try {
+        hit.click();
+        return true;
+      } catch (e) {}
+    }
+    /* 非聊天页（相处/回忆/设置）：返回 = 切回聊天页。
+       这一段是真实导航，绝不能写 ROOT_BACK_AT —— 那个时间戳只服务于
+       「已在聊天页根状态时连按两下才退到后台」。以前两者共用，导致
+       「刚切回聊天后的第一次按键」被判成第二次确认，一下按到桌面。 */
+    var curNav = activeNavLabel();
+    if (curNav && curNav !== "聊天") {
+      var backTab = hostTab("聊天");
+      if (backTab) {
+        mark("ellen-bk2", "tab-back:" + curNav);
+        ROOT_BACK_AT = 0;
+        try {
+          backTab.click();
+        } catch (e) {}
+        return true;
+      }
+    }
+    var fc = focusComposer(true);
+    mark("ellen-bk2", "no-hit focus=" + fc);
+    if (!fc) {
+      var tab = hostTab("聊天");
+      if (tab) {
+        ROOT_BACK_AT = 0;
+        try {
+          tab.click();
+        } catch (e) {}
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function installBackGuard(tries) {
+    var C = null;
+    var App = null;
+    try {
+      C = window.Capacitor;
+      App = C && C.Plugins && C.Plugins.App;
+      if (!App && C && typeof C.registerPlugin === "function") {
+        App = C.registerPlugin("App");
+      }
+      /* addListener 在原生侧是 keepAlive 的 PluginMethod，promise 永不 resolve 是正常现象 */
+    } catch (e) {}
+    if (App && typeof App.addListener === "function") {
+      try {
+        App.addListener("backButton", function () {
+          if (appBack()) return;
+          if (askQuit()) return;
+          if (!leaveApp()) {
+            try {
+              window.history.back();
+            } catch (e) {}
+          }
+        });
+        return true;
+      } catch (e) {}
+    }
+    if ((tries || 0) < 40) {
+      window.setTimeout(function () {
+        installBackGuard((tries || 0) + 1);
+      }, 250);
+    }
+    return false;
+  }
+
+  /* ===== Android 返回键接管（history 守位法）=====
+     AppPlugin 的回调只有在 JS 侧 registerPlugin('App') 过才认 backButton 监听，
+     本包没打 @capacitor/app 的 JS，addListener 走 native 挂在半路不 resolve（实测）。
+     但它的另一条分支是「canGoBack() ? goBack() : finish()」——只要 WebView 里有历史条目，
+     返回键就会走 goBack 而不是退应用。于是我们自己压一个哨兵条目，在 popstate 里接管：
+     关信 → 关信匣 → 回聊天页 → 最后 minimizeApp（退到后台，不杀进程）。 */
   function start() {
     build();
     render();
+    installBackGuard(0);
+    window.addEventListener("popstate", onBackPop, false);
+    pushBackGuard();
     try {
       console.log("[letter] ready v" + (window.__ellenLetterSync.version || "?"));
     } catch (e) {}

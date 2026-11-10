@@ -1,4 +1,4 @@
-# 新建一个「电脑版 → 手机版」功能同步骨架实例
+﻿# 新建一个「电脑版 → 手机版」功能同步骨架实例
 # 用法：pwsh -File _phone-sync\new-phone-sync.ps1 -Feature letter -Title "好感度情书"
 # 产出：_patch_phone_<feat>.py（注入补丁） + _phone-sync\inject-<feat>.js（模块骨架）
 param(

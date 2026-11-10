@@ -1,0 +1,4339 @@
+{
+ "runtime": "E:\\ailian\\艾莲手机版\\创作版\\contract\\runtime-capacitor-b17.json",
+ "native": "E:\\ailian\\艾莲手机版\\创作版\\contract\\native-plugins.json",
+ "pluginCount": 27,
+ "pluginMethodCount": 184,
+ "methodsWithOptions": 82,
+ "onlyInRuntime": [],
+ "onlyInSmali": [
+  "EllenMini"
+ ],
+ "plugins": [
+  {
+   "plugin": "EllenMedia",
+   "class": "dev.ellen.mobile.media.EllenMediaPlugin",
+   "events": [
+    "videoEvent"
+   ],
+   "staticStrings": {},
+   "methodCount": 38,
+   "pluginMethodCount": 33,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "preview",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "readFrames",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "discard",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "prepare",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "retainSelection",
+      "selectionToken"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_SELECTION"
+      },
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "writeAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeCachedFile",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "describeAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "commit",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "readAppearanceChunk",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "pauseVideo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "writeChunk",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "commitAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pasteImage",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pick",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "releaseSelections",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "tokens"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MEDIA_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "has",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "releaseVideo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "capabilities",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "readChunk",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "discardAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "beginReceive",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "captureScreen",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "playVideo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "extractVideoAudio",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "commitFile",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "finishReceive",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "discardReceive",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "loadVideo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "describe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pickAlbum",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_BUSY"
+      }
+     ],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenAudio",
+   "class": "dev.ellen.mobile.audio.EllenAudioPlugin",
+   "events": [
+    "audioEvent",
+    "recordingLevel"
+   ],
+   "staticStrings": {},
+   "methodCount": 26,
+   "pluginMethodCount": 21,
+   "methods": [
+    {
+     "name": "play",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "openCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "appendCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "finishCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "transcribe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_ASR_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "releaseRecording",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "cancelRecording",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "recordingId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "loadCallSound",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "playCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "stopRecording",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "releaseCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "capabilities",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setLoop",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setVolume",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "pause",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "startRecording",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "fileId",
+      "recordingId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LICENSE_REQUIRED"
+      },
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      },
+      {
+       "api": "reject",
+       "key": "VOICE_BUSY"
+      },
+      {
+       "api": "resolve",
+       "key": "fileId"
+      },
+      {
+       "api": "reject",
+       "key": "AUDIO_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pauseCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "releaseAudio",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "loadAudio",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "\\u5e94\\u7528\\u5df2\\u8fdb\\u5165\\u540e\\u53f0\\u6216\\u901a\\u8bdd\\u4f1a\\u8bdd\\u5df2\\u7ed3\\u675f\\u3002",
+      "purpose",
+      "sessionId",
+      "slotId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_PLAYBACK"
+      },
+      {
+       "api": "reject",
+       "key": "AUDIO_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "volumeCallPcm",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenArchive",
+   "class": "dev.ellen.mobile.platform.EllenArchivePlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 16,
+   "pluginMethodCount": 11,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "readImport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "cancelBackup",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "discard",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "saveExport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "backupCall",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "createExport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pickImport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "writeExport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "background",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "chooseBackupDirectory",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "ARCHIVE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "ARCHIVE_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenBackground",
+   "class": "dev.ellen.mobile.platform.EllenBackgroundPlugin",
+   "events": [
+    "event"
+   ],
+   "staticStrings": {},
+   "methodCount": 16,
+   "pluginMethodCount": 11,
+   "methods": [
+    {
+     "name": "consumeOpen",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermission",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "NOTIFICATION_STORAGE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "messageContext",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestInitialPermission",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "update",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "mediaActive",
+      "organizationActive",
+      "organizationDone",
+      "organizationProfileId",
+      "organizationTotal",
+      "paused",
+      "replyActive",
+      "sessionId",
+      "threadId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "BACKGROUND_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_BACKGROUND_WORK"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "notificationSettings",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "messageArrived",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "stop",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "consumeMessageOpen",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenCallCapture",
+   "class": "dev.ellen.mobile.audio.EllenCallCapturePlugin",
+   "events": [
+    "callCaptureEvent"
+   ],
+   "staticStrings": {
+    "MODEL": "local-vad/silero_vad.onnx",
+    "MODEL_SHA": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+   },
+   "methodCount": 16,
+   "pluginMethodCount": 11,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "captureId",
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "prepare",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "ownerId",
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "releasePreparation",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "ownerId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "release",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "captureId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "start",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "captureId",
+      "ownerId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "releaseRecognizer",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "readyRecognizer",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "ready",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "ownerId",
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": [
+      "callCaptureEvent"
+     ]
+    },
+    {
+     "name": "debugProcess",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "captureId",
+      "fileRef",
+      "ownerId",
+      "sessionId",
+      "sha256"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "transcribeRecognizer",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_VAD_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenMusic",
+   "class": "dev.ellen.mobile.audio.EllenMusicPlugin",
+   "events": [],
+   "staticStrings": {
+    "DEFAULT_ID": "ellen-music-default-v1",
+    "DEFAULT_SHA": "6de411076df38c518178f7dcc215342e77d8736f2a8804fc621ec5c9ef00f174"
+   },
+   "methodCount": 14,
+   "pluginMethodCount": 9,
+   "methods": [
+    {
+     "name": "cancelImport",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "discard",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "commit",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "cancelPick",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "ensureDefault",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      },
+      {
+       "api": "reject",
+       "key": "MUSIC_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "pick",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "MUSIC_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "MUSIC_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "importSelection",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "selectionToken"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_SELECTION"
+      },
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      },
+      {
+       "api": "reject",
+       "key": "MUSIC_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "describe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODULE_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DUPLICATE_REQUEST"
+      },
+      {
+       "api": "reject",
+       "key": "MUSIC_OPERATION_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenAutonomy",
+   "class": "dev.ellen.mobile.platform.EllenAutonomyPlugin",
+   "events": [
+    "event"
+   ],
+   "staticStrings": {},
+   "methodCount": 13,
+   "pluginMethodCount": 8,
+   "methods": [
+    {
+     "name": "consumeOpen",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "organizationComplete",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "done",
+      "jobId",
+      "profileId",
+      "review"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_ORGANIZATION_NOTICE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "release",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_UI_LEASE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "configure",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "enabled",
+      "profileId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_AUTONOMY_SETTINGS"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "foreground",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestInitialBackgroundPermission",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestBackgroundPermission",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenLocalSync",
+   "class": "dev.ellen.mobile.platform.EllenLocalSyncPlugin",
+   "events": [],
+   "staticStrings": {
+    "RECORD_PROTOCOL": "ellen-record-stream-v1"
+   },
+   "methodCount": 13,
+   "pluginMethodCount": 8,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "capabilities",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "records",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "media",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "pair",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "exchange",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "unpair",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SYNC_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "PAIR_STORAGE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "App",
+   "class": "com.capacitorjs.plugins.app.AppPlugin",
+   "events": [
+    "appStateChange",
+    "appRestoredResult",
+    "appUrlOpen",
+    "pause",
+    "resume"
+   ],
+   "staticStrings": {
+    "EVENT_BACK_BUTTON": "backButton",
+    "EVENT_PAUSE": "pause",
+    "EVENT_RESTORED_RESULT": "appRestoredResult",
+    "EVENT_RESUME": "resume",
+    "EVENT_STATE_CHANGE": "appStateChange",
+    "EVENT_URL_OPEN": "appUrlOpen"
+   },
+   "methodCount": 12,
+   "pluginMethodCount": 7,
+   "methods": [
+    {
+     "name": "toggleBackButtonHandler",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "enabled"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "onBackPressedCallback is not set"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "getState",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "getInfo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Unable to get App Info"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "getLaunchUrl",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "exitApp",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "getAppLanguage",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "minimizeApp",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "CapacitorHttp",
+   "class": "com.getcapacitor.plugin.CapacitorHttp",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 11,
+   "pluginMethodCount": 6,
+   "methods": [
+    {
+     "name": "patch",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "request",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "post",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "get",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "delete",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "put",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Failed to execute request - Http Plugin was shutdown"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenVoiceHttp",
+   "class": "dev.ellen.mobile.platform.EllenVoiceHttpPlugin",
+   "events": [
+    "voiceHttpStream"
+   ],
+   "staticStrings": {},
+   "methodCount": 11,
+   "pluginMethodCount": 6,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "waitForRelease"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "VOICE_CLEANUP_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "request",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "apiKey",
+      "body",
+      "requestId",
+      "sessionId",
+      "url"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LICENSE_REQUIRED"
+      },
+      {
+       "api": "reject",
+       "key": "CALL_SESSION_ENDED"
+      },
+      {
+       "api": "reject",
+       "key": "VOICE_HTTP_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_VOICE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "sourceInfo",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_VOICE_REQUEST"
+      },
+      {
+       "api": "reject",
+       "key": "VOICE_HTTP_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "upload",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "apiKey",
+      "kind",
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LICENSE_REQUIRED"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_VOICE_REQUEST"
+      },
+      {
+       "api": "reject",
+       "key": "VOICE_HTTP_BUSY"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestStream",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "apiKey",
+      "body",
+      "requestId",
+      "sessionId",
+      "url"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LICENSE_REQUIRED"
+      },
+      {
+       "api": "reject",
+       "key": "CALL_SESSION_ENDED"
+      },
+      {
+       "api": "reject",
+       "key": "CANCELLED"
+      },
+      {
+       "api": "reject",
+       "key": "VOICE_HTTP_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_VOICE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "ackStream",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sequence"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_VOICE_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "CapacitorCookies",
+   "class": "com.getcapacitor.plugin.CapacitorCookies",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 10,
+   "pluginMethodCount": 5,
+   "methods": [
+    {
+     "name": "deleteCookie",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "/",
+      "expires",
+      "key",
+      "url",
+      "value"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Must provide key"
+      },
+      {
+       "api": "reject",
+       "key": "Must provide value"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "clearCookies",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "/",
+      "expires",
+      "key",
+      "url",
+      "value"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Must provide key"
+      },
+      {
+       "api": "reject",
+       "key": "Must provide value"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "getCookies",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "clearAllCookies",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setCookie",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "/",
+      "expires",
+      "key",
+      "url",
+      "value"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Must provide key"
+      },
+      {
+       "api": "reject",
+       "key": "Must provide value"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenCallProbe",
+   "class": "dev.ellen.mobile.audio.EllenCallProbePlugin",
+   "events": [
+    "callProbeEvent"
+   ],
+   "staticStrings": {
+    "HASH": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    "MODEL": "local-vad/silero_vad.onnx"
+   },
+   "methodCount": 10,
+   "pluginMethodCount": 5,
+   "methods": [
+    {
+     "name": "probeCapabilities",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "resolve",
+       "key": "unknown"
+      },
+      {
+       "api": "reject",
+       "key": "CALL_PROBE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "cancelProbe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "probeId",
+      "replyId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CALL_PROBE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "startProbe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CALL_PROBE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "releaseProbe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "probeId",
+      "replyId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "CALL_PROBE_FAILED"
+      }
+     ],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenCallSession",
+   "class": "dev.ellen.mobile.platform.EllenCallSessionPlugin",
+   "events": [
+    "event"
+   ],
+   "staticStrings": {},
+   "methodCount": 10,
+   "pluginMethodCount": 5,
+   "methods": [
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "stop",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "start",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "update",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenUpdates",
+   "class": "dev.ellen.mobile.platform.EllenUpdatesPlugin",
+   "events": [
+    "updateState"
+   ],
+   "staticStrings": {},
+   "methodCount": 10,
+   "pluginMethodCount": 5,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "UPDATE_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "download",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "UPDATE_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "UPDATE_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "install",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "UPDATE_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "UPDATE_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "check",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "UPDATE_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "UPDATE_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "UPDATE_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenDiagnostics",
+   "class": "dev.ellen.mobile.platform.EllenDiagnosticsPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 9,
+   "pluginMethodCount": 4,
+   "methods": [
+    {
+     "name": "read",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "clear",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "share",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "text"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "DIAGNOSTIC_FORMAT"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "append",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenLocalSpeech",
+   "class": "dev.ellen.mobile.platform.EllenLocalSpeechPlugin",
+   "events": [],
+   "staticStrings": {
+    "MODEL_ID": "sense-voice-zh-int8-2024-07-17"
+   },
+   "methodCount": 9,
+   "pluginMethodCount": 4,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "transcribe",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_ASR_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "ready",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sessionId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LOCAL_ASR_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "close",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "SystemBars",
+   "class": "com.getcapacitor.plugin.SystemBars",
+   "events": [],
+   "staticStrings": {
+    "BAR_GESTURE_BAR": "NavigationBar",
+    "BAR_STATUS_BAR": "StatusBar",
+    "INSETS_HANDLING_CSS": "css",
+    "INSETS_HANDLING_DISABLE": "disable",
+    "INSETS_HANDLING_NATIVE": "native",
+    "STYLE_DARK": "DARK",
+    "STYLE_DEFAULT": "DEFAULT",
+    "STYLE_LIGHT": "LIGHT",
+    "viewportMetaJSFunction": "function capacitorSystemBarsCheckMetaViewport() {\\n    const meta = document.querySelectorAll(\\\"meta[name=viewport]\\\");\\n    if (meta.length == 0) {\\n        return false;\\n    }\\n    // get the last found meta viewport tag\\n    const metaContent = meta[meta.length - 1].content;\\n    return metaContent.includes(\\\"viewport-fit=cover\\\");\\n}\\ncapacitorSystemBarsCheckMetaViewport();\\n"
+   },
+   "methodCount": 9,
+   "pluginMethodCount": 4,
+   "methods": [
+    {
+     "name": "hide",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "bar"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "show",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "bar"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setStyle",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "DEFAULT",
+      "bar"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setAnimation",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "WebView",
+   "class": "com.getcapacitor.plugin.WebView",
+   "events": [],
+   "staticStrings": {
+    "CAP_SERVER_PATH": "serverBasePath",
+    "WEBVIEW_PREFS_NAME": "CapWebViewSettings"
+   },
+   "methodCount": 9,
+   "pluginMethodCount": 4,
+   "methods": [
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "persistServerBasePath",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setServerAssetPath",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "path"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setServerBasePath",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "path"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "getServerBasePath",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenDocuments",
+   "class": "dev.ellen.mobile.platform.EllenDocumentsPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 8,
+   "pluginMethodCount": 3,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "pickText",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "DOCUMENTS_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DOCUMENTS_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "pickCharacter",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "DOCUMENTS_CLOSED"
+      },
+      {
+       "api": "reject",
+       "key": "DOCUMENTS_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenModelHttp",
+   "class": "dev.ellen.mobile.platform.EllenModelHttpPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 8,
+   "pluginMethodCount": 3,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "read",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId",
+      "sequence"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "open",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "apiKey",
+      "body",
+      "requestId",
+      "url"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenSecureConfig",
+   "class": "dev.ellen.mobile.platform.EllenSecureConfigPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 8,
+   "pluginMethodCount": 3,
+   "methods": [
+    {
+     "name": "read",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "model"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SECURE_STORAGE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "write",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "model",
+      "value"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "INVALID_CONFIG"
+      },
+      {
+       "api": "reject",
+       "key": "SECURE_STORAGE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "remove",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "model"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "SECURE_STORAGE_FAILED"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenFeedbackHttp",
+   "class": "dev.ellen.mobile.platform.EllenFeedbackHttpPlugin",
+   "events": [],
+   "staticStrings": {
+    "ENDPOINT": "https://formsubmit.co/ajax/1520208183@qq.com",
+    "SOURCE": "https://formsubmit.co/el/xutine"
+   },
+   "methodCount": 7,
+   "pluginMethodCount": 2,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "request",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "body",
+      "requestId"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "FEEDBACK_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_FEEDBACK"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenLicense",
+   "class": "dev.ellen.mobile.platform.EllenLicensePlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 7,
+   "pluginMethodCount": 2,
+   "methods": [
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "activate",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "token"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "LICENSE_STORAGE_FAILED"
+      },
+      {
+       "api": "reject",
+       "key": "\\u6388\\u6743\\u4fdd\\u5b58\\u6216\\u6838\\u5bf9\\u5c1a\\u672a\\u786e\\u8ba4\\uff0c\\u8bf7\\u91cd\\u65b0\\u8bfb\\u53d6\\uff0c\\u539f\\u8d44\\u6599\\u4fdd\\u7559\\u3002"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenModelCatalogHttp",
+   "class": "dev.ellen.mobile.platform.EllenModelCatalogHttpPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 7,
+   "pluginMethodCount": 2,
+   "methods": [
+    {
+     "name": "cancel",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "requestId"
+     ],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "request",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "apiKey",
+      "requestId",
+      "url"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MODEL_HTTP_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "INVALID_MODEL_CATALOG_REQUEST"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenReleaseInfo",
+   "class": "dev.ellen.mobile.platform.EllenReleaseInfoPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 6,
+   "pluginMethodCount": 1,
+   "methods": [
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "state",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "VERSION_UNAVAILABLE"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  },
+  {
+   "plugin": "EllenScreenShell",
+   "class": "dev.ellen.mobile.platform.EllenScreenShellPlugin",
+   "events": [],
+   "staticStrings": {},
+   "methodCount": 6,
+   "pluginMethodCount": 1,
+   "methods": [
+    {
+     "name": "removeAllListeners",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "checkPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "requestPermissions",
+     "rtype": "promise",
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "setAppearance",
+     "rtype": "promise",
+     "auto": false,
+     "inSmali": true,
+     "options": [
+      "theme"
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "Unsupported screen appearance"
+      }
+     ],
+     "events": []
+    },
+    {
+     "name": "removeListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    },
+    {
+     "name": "addListener",
+     "rtype": null,
+     "auto": true,
+     "inSmali": false,
+     "options": [],
+     "messages": [],
+     "events": []
+    }
+   ],
+   "smaliOnlyMethods": []
+  }
+ ]
+}

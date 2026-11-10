@@ -1,0 +1,33 @@
+{
+  "source": "cn.ellen.companion2 M1 骨架（capacitorjs:core 8.6.0，只注册了 Echo）",
+  "capturedAt": "2026-11-03T14:21+08:00",
+  "device": "MuMu 实例 1 (127.0.0.1:16416)",
+  "note": "core 8.6.0 自带 4 个社区插件，方法集（去掉 addListener/removeListener/removeAllListeners/checkPermissions/requestPermissions 5 个自动方法后）与 b17 旧包完全一致；App 插件需额外引入 com.capacitorjs:app。",
+  "plugins": [
+    {
+      "name": "SystemBars",
+      "allMethods": ["hide", "removeAllListeners", "checkPermissions", "requestPermissions", "show", "setStyle", "removeListener", "setAnimation", "addListener"],
+      "ownMethods": ["hide", "show", "setStyle", "setAnimation"]
+    },
+    {
+      "name": "Echo",
+      "allMethods": ["removeAllListeners", "checkPermissions", "requestPermissions", "fire", "echo", "removeListener", "addListener"],
+      "ownMethods": ["fire", "echo"]
+    },
+    {
+      "name": "CapacitorCookies",
+      "allMethods": ["deleteCookie", "removeAllListeners", "clearCookies", "getCookies", "checkPermissions", "requestPermissions", "clearAllCookies", "setCookie", "removeListener", "addListener"],
+      "ownMethods": ["deleteCookie", "clearCookies", "getCookies", "clearAllCookies", "setCookie"]
+    },
+    {
+      "name": "WebView",
+      "allMethods": ["removeAllListeners", "persistServerBasePath", "checkPermissions", "requestPermissions", "setServerAssetPath", "removeListener", "setServerBasePath", "addListener", "getServerBasePath"],
+      "ownMethods": ["persistServerBasePath", "setServerAssetPath", "setServerBasePath", "getServerBasePath"]
+    },
+    {
+      "name": "CapacitorHttp",
+      "allMethods": ["patch", "request", "post", "removeAllListeners", "get", "checkPermissions", "requestPermissions", "removeListener", "delete", "put", "addListener"],
+      "ownMethods": ["patch", "request", "post", "get", "delete", "put"]
+    }
+  ]
+}
