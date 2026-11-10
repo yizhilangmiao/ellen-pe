@@ -1,0 +1,106 @@
+/* 抽屉外壳（批 3）。默认变量走 --el-*，zzz 皮肤下换成 --z-* 硬边那套。
+   规则：抽屉一定是 portal（.ellen-app 直属），不进 .el-page，见 frame-drawer.js 头注释。 */
+
+.el-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: #05070b99;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.el-drawer-scrim[hidden] {
+  display: none;
+}
+
+.el-drawer {
+  position: fixed;
+  z-index: 56;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 88vw;
+  max-width: calc(430 * var(--u));
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg);
+  color: var(--el-text);
+  box-shadow: calc(-10 * var(--u)) 0 calc(24 * var(--u)) #00000066;
+  border-left: 1px solid var(--el-line);
+  overflow: hidden;
+}
+.el-drawer[hidden] {
+  display: none;
+}
+.el-drawer-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 抽屉里的视图用绝对定位铺满 body，和 .el-pages 里一致 */
+.el-drawer-body > .el-page {
+  position: absolute;
+  inset: 0;
+}
+/* 换内容时那 30ms 的遮挡，别让旧页闪出来 */
+.el-drawer.is-swapping .el-drawer-body {
+  visibility: hidden;
+}
+.el-drawer.is-dragging {
+  box-shadow: none;
+}
+
+/* 竖屏：左上角缺角（绝区零的切角语言），横屏不收，免得压住 rail */
+.ellen-app[data-skin='zzz'] .el-drawer {
+  background: var(--z-panel);
+  color: var(--z-ink);
+  border-left: 1px solid var(--z-line-strong);
+  box-shadow: calc(-8 * var(--u)) 0 calc(28 * var(--u)) #000000b8;
+  width: 88vw;
+  max-width: none;
+  clip-path: polygon(var(--z-cut) 0, 100% 0, 100% 100%, 0 100%, 0 var(--z-cut));
+}
+.ellen-app[data-skin='zzz'] .el-drawer.is-dragging {
+  clip-path: none;
+}
+.ellen-app[data-skin='zzz'] .el-drawer-scrim {
+  background: #05070bcc;
+}
+
+/* 抽屉里第一屏的标题按方案收窄（各页 view 自己的 padding 会叠，压一层） */
+.ellen-app[data-skin='zzz'] .el-drawer .el-scroll-page {
+  padding-left: calc(14 * var(--u));
+  padding-right: calc(14 * var(--u));
+}
+
+/* 横屏：从右侧滑入、宽 78%，永远不压住左侧 88u 的 rail */
+@media (orientation: landscape) {
+  .el-drawer {
+    width: 78vw;
+    max-width: calc(560 * var(--u));
+  }
+  .ellen-app[data-skin='zzz'] .el-drawer {
+    width: 78vw;
+    max-width: none;
+    clip-path: none;
+    box-shadow: calc(-8 * var(--u)) 0 calc(28 * var(--u)) #000000b8;
+  }
+}
+
+/* 动效（批 4 之前只有打开时那一下）：位移动画只给打开，关闭立刻走 */
+@media (prefers-reduced-motion: no-preference) {
+  .el-drawer.is-open {
+    animation: el-drawer-in var(--z-t-instant, 80ms) var(--z-e-out, ease-out) both;
+  }
+  @keyframes el-drawer-in {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}

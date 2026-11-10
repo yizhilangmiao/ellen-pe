@@ -14,11 +14,14 @@ import './styles/base.css';
 import './styles/zz-frame.css';
 import './styles/zz-parts.css';
 import './styles/zz-wall.css';
+// 批 3：抽屉外壳（记忆 / 相处 / 设置不再换根页面）
+import './styles/zz-drawer.css';
 
 import { s } from './strings.zh.js';
 import { iconEl } from './ui/icons.js';
 import { call, isNative } from './core/native/bridge.js';
 import { defineView, mountRouter, show, push, pop, current, currentName } from './ui/router.js';
+import { createDrawer } from './ui/frame-drawer.js';
 import { createChatView } from './ui/views/chat/chat.js';
 import { createPlaceholderView } from './ui/views/placeholder.js';
 import { createMemoryView } from './ui/views/memory/memory.js';
@@ -268,8 +271,7 @@ function sendMessage(text) {
         const message = (err && err.message) || '';
         if (err && err.code === 'ASR_NOT_CONFIGURED') {
           flash(s('chat.voiceNeedConfig'));
-          show('settings');
-          syncTabs('settings');
+          openSettings();
         } else {
           flash(`${s('chat.voiceFailed')}${(err && err.message) || ''}`);
         }
@@ -282,8 +284,7 @@ function sendMessage(text) {
     const cfg = await loadAsrConfig();
     if (!asrUsable(cfg)) {
       flash(s('chat.voiceNeedConfig'));
-      show('settings');
-      syncTabs('settings');
+      openSettings();
       return;
     }
     try {
@@ -321,10 +322,7 @@ function sendMessage(text) {
           onSend: (text) => sendMessage(text),
           onStop: () => session.stop(),
           onMic: (action) => handleMic(action),
-          onRequestModel: () => {
-            show('settings');
-            syncTabs('settings');
-          },
+          onRequestModel: openSettings,
         });
         chatHandle = handle;
         return handle;
@@ -358,10 +356,25 @@ function sendMessage(text) {
 
   mountRouter(shell.pages, {
     onNavigate: (cur) => {
+      // 抽屉里的视图 push 了全屏页（设置子页 / 手记详情）→ 抽屉让开，
+      // 否则全屏页会被盖在抽屉下面，看起来像「点了没反应」。
+      if (cur && cur.depth > 1) drawer.yieldToPage();
       if (cur) syncTabs(cur.name);
       syncBack(cur);
     },
   });
+
+  const DRAWER_TABS = new Set(['memory', 'companion', 'settings']);
+  const drawer = createDrawer({
+    root,
+    onChange: (name) => {
+      syncTabs(name || currentName());
+    },
+  });
+  function openSettings() {
+    drawer.open('settings');
+    syncTabs('settings');
+  }
 
   /**
    * 全屏页压栈时，左上角「艾莲」变成返回箭头（照旧包：顶栏第一个按钮就是返回）。
@@ -395,8 +408,19 @@ function sendMessage(text) {
     if (btn) btn.classList.toggle('has-unread', unread);
   }
 
+  // 记忆 / 相处 / 设置走抽屉：聊天页不被销毁，草稿和滚动位置都还在。
+  // 聊天仍然是根页面，切回它就是关抽屉（不重建）。
   for (const [tab, btn] of shell.tabButtons) {
-    btn.addEventListener('click', () => show(tab));
+    btn.addEventListener('click', () => {
+      if (DRAWER_TABS.has(tab)) {
+        drawer.toggle(tab, { from: btn });
+        syncTabs(drawer.isOpen() ? tab : currentName());
+      } else {
+        drawer.close({ silent: true });
+        show(tab);
+        syncTabs(tab);
+      }
+    });
   }
 
   shell.brand.addEventListener('click', () => {
@@ -411,14 +435,19 @@ function sendMessage(text) {
     const label = theme === 'dark' ? s('header.appearanceLight') : s('header.appearanceDark');
     shell.toolButtons.appearance.setAttribute('aria-label', label);
   });
-  shell.toolButtons.settings.addEventListener('click', () => show('settings'));
+  shell.toolButtons.settings.addEventListener('click', () => {
+    drawer.toggle('settings', { from: shell.toolButtons.settings });
+    syncTabs(drawer.isOpen() ? 'settings' : currentName());
+  });
   shell.toolButtons.notices.addEventListener('click', () => push('notices'));
   shell.toolButtons.history.addEventListener('click', () => push('history'));
   shell.toolButtons.background.addEventListener('click', () => push('background'));
 
   // 系统返回键：Android 上 pop 一层
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') pop();
+    if (e.key !== 'Escape') return;
+    if (drawer.isOpen()) return; // 抽屉自己处理（关抽屉，不 pop 页面）
+    pop();
   });
 
   // 会话状态 → 聊天视图
@@ -513,6 +542,12 @@ function sendMessage(text) {
   // 暴露给验收脚本（只读快照，不参与业务）
   window.__ellen = {
     version: '0.3.0-m7',
+    drawer: {
+      open: (name) => drawer.open(name),
+      close: () => drawer.close(),
+      current: () => drawer.currentName(),
+    },
+    push,
     state: () => appState.snapshot(),
     show,
     pop,

@@ -99,6 +99,30 @@ export function pop() {
   return true;
 }
 
+/**
+ * 把视图挂到「不是 .el-pages」的容器里（抽屉用）。
+ * 不进栈、不激活、不参与 onChange —— 抽屉自己管显隐，路由只借用它的 view 工厂。
+ * 返回值交给 dispose() 销毁，别让它泄漏监听。
+ */
+export function mountInto(name, host, params) {
+  const factory = views.get(name);
+  if (!factory) throw new Error(`未注册的视图: ${name}`);
+  const el = document.createElement('section');
+  el.className = 'el-page';
+  el.dataset.view = name;
+  host.appendChild(el);
+  const instance = factory() || {};
+  let handle = null;
+  if (typeof instance.mount === 'function') handle = instance.mount(el, params || {});
+  else if (typeof instance === 'function') handle = instance(el, params || {});
+  return { el, params: params || {}, handle, name };
+}
+
+/** 销毁 mountInto 的产物（与路由栈里的 teardown 同语义）。 */
+export function dispose(node) {
+  teardown(node);
+}
+
 export function current() {
   const node = stack[stack.length - 1];
   return node ? { name: node.name, params: node.params, depth: stack.length } : null;
