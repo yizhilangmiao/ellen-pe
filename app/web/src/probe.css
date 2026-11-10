@@ -1,0 +1,67 @@
+/* M1 骨架样式：只做可读性，M3 起改用 --ellen-* 变量表 + clamp() 相对单位 */
+:root {
+  color-scheme: light;
+  --bg: #fff8f9;
+  --ink: #3a2b31;
+  --brand: #d6a0b4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Noto Sans SC', sans-serif;
+}
+
+#app {
+  padding: 16px 14px calc(24px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 8px 0 4px;
+}
+
+.hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.card {
+  border: 1px solid rgba(214, 160, 180, 0.45);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.card h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: var(--brand);
+}
+
+.out {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.ok {
+  color: #2e7d52;
+}
+
+.bad {
+  color: #b3323f;
+}

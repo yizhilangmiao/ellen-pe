@@ -1,0 +1,293 @@
+/* 聊天页：版式照 _verify/ui-baseline/01-home.png 与 11-chat-clean.png */
+.el-chat-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.el-chat-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(10 * var(--u)) calc(16 * var(--u)) calc(12 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+}
+
+/* 空态：标题 + 提示 + 模型胶囊，垂直落在视觉中线偏上 */
+.el-chat-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10 * var(--u));
+  padding: calc(24 * var(--u)) calc(20 * var(--u)) calc(60 * var(--u));
+  text-align: center;
+}
+
+.el-chat-empty-title {
+  margin: 0;
+  font-size: calc(20 * var(--u));
+  line-height: calc(30 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  font-weight: 400;
+  color: var(--el-text);
+}
+
+.ellen-app[data-theme='light'] .el-chat-empty-title {
+  color: var(--el-ink);
+}
+
+.el-chat-empty-hint {
+  margin: 0;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.88;
+}
+
+.el-chat-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  margin-top: calc(6 * var(--u));
+}
+
+.el-chat-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(7 * var(--u)) calc(13 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-chat-model-chip.is-unset {
+  color: var(--el-error);
+  border-color: color-mix(in srgb, var(--el-error) 45%, transparent);
+  background: var(--el-error-bg);
+}
+
+.el-chat-thinking-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(5 * var(--u));
+  padding: calc(7 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: 1px solid var(--el-line);
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-chat-action);
+}
+
+/* —— 气泡 —— */
+.el-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 84%;
+}
+
+.el-msg[data-role='user'] {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.el-msg[data-role='assistant'] {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.el-msg-body {
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(15 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(26 * var(--u));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 强调不用 font-weight：EllenKuaiLe 只有 400 一个字重，Chromium 会合成粗体，
+   在这套圆胖字形上会拖出一层灰影（截图对比过）。改用品牌粉上色，干净且更像"她强调"。
+   代价是深色底上的对比度略低，但比糊字好。 */
+.el-msg-body strong {
+  font-weight: 400;
+  color: var(--el-pink);
+}
+
+.el-msg-body code {
+  padding: 0 calc(4 * var(--u));
+  border-radius: calc(4 * var(--u));
+  background: var(--el-raised);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.el-msg[data-role='user'] .el-msg-body {
+  background: var(--el-self);
+  color: var(--el-self-ink);
+  border-bottom-right-radius: calc(5 * var(--u));
+}
+
+.el-msg[data-role='assistant'] .el-msg-body {
+  background: var(--el-surface);
+  color: var(--el-text);
+  border-bottom-left-radius: calc(5 * var(--u));
+}
+
+.ellen-app[data-theme='light'] .el-msg[data-role='assistant'] .el-msg-body {
+  background: #efedf0;
+  color: #343039;
+}
+
+.el-msg[data-pending='1'] .el-msg-body {
+  opacity: 0.62;
+}
+
+/* 失败时的弱化细节行：只放 HTTP 状态 / 错误码 / 平台名，正文是人话 */
+.el-msg-detail {
+  margin-top: calc(5 * var(--u));
+  padding-left: calc(4 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.72;
+  word-break: break-word;
+}
+
+.el-msg[data-failed='1'] .el-msg-body {
+  background: var(--el-error-bg);
+  color: var(--el-error);
+}
+
+.ellen-app[data-theme='light'] .el-msg[data-failed='1'] .el-msg-body {
+  background: #f4e2e9;
+  color: #963451;
+}
+
+/* —— 输入栏 —— */
+.el-chat-composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: calc(8 * var(--u));
+  padding: calc(8 * var(--u)) calc(12 * var(--u));
+  padding-bottom: calc(8 * var(--u) + var(--el-safe-bottom));
+  border-top: 1px solid var(--el-line);
+  background: var(--el-bg);
+}
+
+.el-composer-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: calc(126 * var(--u));
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(20 * var(--u));
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-size: calc(15 * var(--u));
+  line-height: calc(24 * var(--u));
+  resize: none;
+  outline: none;
+}
+
+.ellen-app[data-theme='light'] .el-composer-field {
+  background: #efedf0;
+  color: #343039;
+}
+
+.el-composer-field::placeholder {
+  color: var(--el-muted);
+  opacity: 0.75;
+}
+
+.el-composer-send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+  font-size: calc(13 * var(--u));
+}
+
+.el-composer-send[disabled] {
+  opacity: 0.4;
+}
+
+.el-composer-stop {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: var(--el-error-bg);
+  color: var(--el-error);
+  font-size: calc(16 * var(--u));
+}
+
+/* 发送/停止图标：按钮 38u，图标 18u */
+.el-composer-send .el-icon svg,
+.el-composer-stop .el-icon svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+
+/* —— 朗读按钮：贴在她那句话的右下角，低调但点得到 —— */
+.el-msg-speak {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: calc(4 * var(--u)) 0 0;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--el-chat-action);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.el-msg-speak .el-icon svg {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
+
+.el-msg.is-speaking .el-msg-speak {
+  opacity: 1;
+  color: var(--el-pink);
+}
+
+/* 语音输入按钮：比发送键淡一档，录音时变粉色并轻微呼吸 */
+.el-composer-mic {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(34*var(--u));
+  height: calc(34*var(--u));
+  border-radius: 50%;
+  color: var(--el-chat-action);
+  flex: 0 0 auto;
+}
+.el-composer-mic .el-icon svg { width: calc(19*var(--u)); height: calc(19*var(--u)); }
+.el-composer-mic.is-recording { color: var(--el-pink); }
+.el-composer-mic.is-recording .el-icon svg { animation: el-mic-pulse 1.1s ease-in-out infinite; }
+@keyframes el-mic-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }

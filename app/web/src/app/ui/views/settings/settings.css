@@ -1,0 +1,202 @@
+/* 设置页：暗紫独立色系，只认 --el-current-* 派生令牌 */
+.ellen-app .el-settings-context {
+  background: var(--el-current-bg);
+  color: var(--el-current-text);
+}
+
+.el-settings-group-title {
+  margin: calc(18 * var(--u)) 0 calc(8 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-current-muted);
+  opacity: 0.85;
+}
+
+.el-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border-radius: var(--el-current-radius);
+  background: var(--el-current-card);
+  box-shadow: var(--el-current-shadow);
+}
+
+.el-settings-card + .el-settings-card {
+  margin-top: calc(10 * var(--u));
+}
+
+.el-settings-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+}
+
+.el-settings-card-title {
+  font-size: calc(15 * var(--u));
+  line-height: calc(26 * var(--u));
+  color: var(--el-current-text);
+}
+
+.el-settings-card-hint {
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-current-muted);
+}
+
+.el-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+}
+
+.el-settings-label {
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-current-muted);
+}
+
+.el-settings-input,
+.el-settings-select {
+  width: 100%;
+  padding: calc(9 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border: 1px solid var(--el-current-control-line);
+  background: var(--el-current-input);
+  color: var(--el-current-text);
+  font-size: calc(14 * var(--u));
+  line-height: calc(24 * var(--u));
+  outline: none;
+}
+
+.el-settings-input:focus,
+.el-settings-select:focus {
+  border-color: var(--el-current-accent);
+}
+
+.el-settings-input::placeholder {
+  color: var(--el-current-disabled);
+}
+
+.el-settings-row {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  flex-wrap: wrap;
+}
+
+/* 平台选择：复刻旧包的分段控件外壳（button.el-segment），三选一 */
+.el-settings-segments {
+  display: flex;
+  gap: calc(6 * var(--u));
+  padding: calc(4 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--el-current-raised);
+}
+
+.el-settings-segment {
+  flex: 1;
+  padding: calc(7 * var(--u)) calc(4 * var(--u));
+  border-radius: calc(9 * var(--u));
+  font-size: calc(13 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-current-muted);
+  text-align: center;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.el-settings-segment.is-active {
+  background: var(--el-current-primary);
+  color: var(--el-current-primary-ink);
+}
+
+/* 常用模型快捷芯片 */
+.el-settings-chips {
+  display: flex;
+  gap: calc(6 * var(--u));
+  flex-wrap: wrap;
+}
+
+.el-settings-chip {
+  padding: calc(5 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(9 * var(--u));
+  border: 1px solid var(--el-current-control-line);
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-current-muted);
+}
+
+.el-settings-chip.is-active {
+  border-color: var(--el-current-accent);
+  color: var(--el-current-accent);
+}
+
+.el-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(9 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--el-current-primary);
+  color: var(--el-current-primary-ink);
+  font-size: calc(14 * var(--u));
+  line-height: calc(24 * var(--u));
+}
+
+.el-settings-btn.is-ghost {
+  background: transparent;
+  color: var(--el-current-muted);
+  border: 1px solid var(--el-current-control-line);
+}
+
+.el-settings-note {
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-current-muted);
+}
+
+.el-settings-note.is-error {
+  color: var(--el-settings-error);
+}
+
+.el-settings-status {
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-current-accent);
+}
+
+.el-placeholder-row {
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  margin-top: calc(10 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: 1px dashed var(--el-line);
+  font-size: calc(13 * var(--u));
+  line-height: calc(22 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+/* 云端音色字段：选系统朗读时整块收起（别用 inline style，视图层不允许） */
+.el-settings-cloud-field.is-hidden { display: none; }
+
+
+/* 角色卡：多行「还要她记住的」。textarea 要跟 input 一样的外观，只多撑一点高度 */
+.el-settings-textarea {
+  min-height: calc(72 * var(--u));
+  resize: none;
+  line-height: calc(20 * var(--u));
+  padding-top: calc(9 * var(--u));
+  padding-bottom: calc(9 * var(--u));
+}
+
+/* 记忆关掉时，条数那一栏只是看着在、点不动（不要藏掉，藏了他会以为丢了设置） */
+.el-settings-field.is-muted {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.el-settings-btn:disabled {
+  opacity: 0.5;
+}

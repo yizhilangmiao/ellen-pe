@@ -1,0 +1,188 @@
+/* ============================================================
+ * 绝区零 · 手机版令牌层（批 0）
+ * 出处：md笔记\手机版UI重构方案-绝区零.md §2（已选 01 纸片对撞）
+ *
+ * 这一层只做两件事：
+ *   1. 定义 --z-* 新令牌（值全部来自效果稿 index.html 定稿）
+ *   2. 在老包的 --el-* 上挂别名桥，把旧组件直接拉进新色板
+ *
+ * 铁律：
+ *   - 只在 .ellen-app[data-skin="zzz"] 下生效 —— 不挂这个属性时，
+ *     下面任何一个字节都不参与计算，回退 = 删这一个 data-skin。
+ *   - 不写裸 px：尺寸一律 calc(N * var(--u))，只有 1px 细线留在 px。
+ *   - 这里只放"值"，不放布局。组件 CSS 一律 var() 取值。
+ *   - --z-card 必须保持深色：它被别名桥映射成 --el-surface（全站面板底），
+ *     一旦变纸白，任务页/设置页/长列表会一起翻白，01 就退化成浅色主题。
+ * ============================================================ */
+
+.ellen-app[data-skin='zzz'] {
+  /* —— 字体分工（老大 2026-11-10 定：快乐体只做品牌/标题/按钮/大数字）—— */
+  --z-font-display: EllenKuaiLe, 'Microsoft YaHei', sans-serif;
+  --z-font-text: 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+
+  /* —— 底 —— */
+  --z-sunken: #050607;
+  --z-bg: #0a0b0c;
+  --z-panel: #0f1113;
+  --z-card: #17191c;
+  --z-raised: #0e1013;
+
+  /* —— 线（全部白透明，跟着底色走）—— */
+  --z-line-hair: #ffffff14;
+  --z-line-soft: #ffffff24;
+  --z-line-strong: #ffffff33;
+
+  /* —— 字（暗底）—— */
+  --z-ink: #fffdf8;
+  --z-ink-2: #c9c4bc;
+  --z-ink-3: #8c9096;
+  --z-ink-dis: #4e535c;
+
+  /* —— 纸族（亮底）：只给气泡 / 记忆行 / 时间纸条三类，别扩散 —— */
+  --z-paper: #f4eee5;
+  --z-paper-card: #f3ecdd;
+  --z-paper-bub: #f3ecdde6; /* 90% */
+  --z-ink-paper: #12100f;
+  --z-ink-paper-2: #5a5348;
+
+  /* —— 我方气泡 —— */
+  --z-self: #191c20f2;
+  --z-self-line: #ffffff29;
+
+  /* —— 信号色：只做块，字用 --z-signal-ink —— */
+  --z-signal: #d6f24a;
+  --z-signal-ink: #171a12;
+  --z-pink: #ff6e96;
+
+  /* —— 圆角 3 档（只有 3 档，不许再长第 4 档）—— */
+  --z-r-1: calc(18 * var(--u)); /* 内容件：气泡 / 输入条 / 抽屉 / 卡片 */
+  --z-r-2: calc(6 * var(--u)); /* 控件：工具钮 / 发送 / 搜索 / 时间条 */
+  --z-r-3: calc(3 * var(--u)); /* 标识：头像 / tab 选中 / 未读点 */
+
+  /* —— 斜切（只给骨架件：底栏 tab / 抽屉 / 发送钮）—— */
+  --z-cut: calc(14 * var(--u));
+  --z-cut-s: calc(6 * var(--u));
+
+  /* —— 硬影 3 档：近黑底上必须叠暗描边，否则 4u 黑影看不见 —— */
+  --z-hard: calc(4 * var(--u)) calc(4 * var(--u)) 0 #000000b8;
+  --z-hard-s: calc(3 * var(--u)) calc(3 * var(--u)) 0 #000000b8;
+  --z-hard-t: calc(2 * var(--u)) calc(2 * var(--u)) 0 #000000b8;
+  --z-hard-pink: calc(3 * var(--u)) calc(3 * var(--u)) 0 var(--z-pink);
+  --z-hard-edge: 0 0 0 1px #00000040; /* 硬影的配套描边 */
+
+  /* —— 曲线（禁 ease / ease-in-out；linear 只给无限循环）—— */
+  --z-e-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --z-e-in: cubic-bezier(0.55, 0.085, 0.68, 0.53);
+  --z-e-inout: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  --z-e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --z-e-glitch: cubic-bezier(0.36, 0, 0.66, -0.56);
+
+  /* —— 时长 —— */
+  --z-t-instant: 80ms;
+  --z-t-micro: 120ms;
+  --z-t-small: 180ms;
+  --z-t-mid: 260ms;
+  --z-t-page: 400ms;
+  --z-t-loop: 1400ms;
+
+  /* —— 骨架件尺寸（竖屏基准）—— */
+  --z-gutter: calc(16 * var(--u)); /* 单一 gutter：气泡/发送/托盘/底栏同一条右缘 */
+  --z-head-h: calc(54 * var(--u));
+  --z-nav-h: calc(58 * var(--u));
+  --z-tab-icon: calc(19 * var(--u));
+  --z-safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* ============================================================
+   * 别名桥：老包 --el-* → 新 --z-*
+   * 组件一行不改就能换皮；改完哪个组件就把哪个组件挪到 --z-* 上，
+   * 挪完的组件不再依赖这张表（批 2 起逐步拆桥）。
+   * ============================================================ */
+
+  --el-bg: var(--z-bg);
+  --el-surface: var(--z-card);
+  --el-raised: var(--z-raised);
+  --el-text: var(--z-ink);
+  --el-muted: var(--z-ink-3);
+  --el-line: var(--z-line-hair);
+  --el-pink: var(--z-pink);
+  --el-paper: var(--z-paper);
+  --el-ink: var(--z-ink-paper);
+  --el-paper-muted: var(--z-ink-paper-2);
+
+  /* 我方气泡：旧语义是"自述/自己说的话" */
+  --el-self: var(--z-self);
+  --el-self-ink: var(--z-ink);
+
+  /* 主操作：荧光块 + 黑字 */
+  --el-primary: var(--z-signal);
+  --el-primary-ink: var(--z-signal-ink);
+
+  /* 状态色：01 只有一种"亮"，错误仍要红，靠粉红压住 */
+  --el-error: #ff7a8f;
+  --el-error-bg: #2a1016;
+  --el-warning: #f0d68a;
+  --el-warning-bg: #2a2110;
+  --el-success: #9fe0b4;
+  --el-chat-action: var(--z-ink-2);
+
+  /* 设置页暗紫：老大 2026-11-10 定「砍了」。
+     这里把 --el-settings-* 收回主色板，设置页跟随全局，不再另开一套。
+     保留变量名只为让老组件不报 undefined，值全部指向 --z-*。 */
+  --el-settings-page: var(--z-bg);
+  --el-settings-surface: var(--z-card);
+  --el-settings-raised: var(--z-raised);
+  --el-settings-input: var(--z-panel);
+  --el-settings-ink: var(--z-ink);
+  --el-settings-muted: var(--z-ink-3);
+  --el-settings-line: var(--z-line-soft);
+  --el-settings-control-line: var(--z-line-strong);
+  --el-settings-accent: var(--z-signal);
+  --el-settings-focus: var(--z-signal);
+  --el-settings-primary: var(--z-signal);
+  --el-settings-primary-ink: var(--z-signal-ink);
+  --el-settings-error: var(--el-error);
+  --el-settings-error-bg: var(--el-error-bg);
+  --el-settings-success: var(--el-success);
+  --el-settings-readonly: var(--z-panel);
+  --el-settings-disabled: var(--z-ink-dis);
+  --el-settings-shadow: none;
+  --el-settings-radius: var(--z-r-1);
+
+  /* 手记日历：米纸 + 玫红，跟随纸族 */
+  --jr-rose: var(--z-pink);
+  --jr-soft: var(--z-paper);
+  --jr-line: var(--z-line-strong);
+  --jr-muted: var(--z-ink-paper-2);
+
+  /* 浮钮：老包写死 rgba(214,160,180,.5)，跟着粉走 */
+  --el-fab-bg: #0e1013f2;
+  --el-fab-border: #ff6e9680;
+  --el-fab-ink: var(--z-ink);
+  --el-fab-shadow: var(--z-hard-s);
+}
+
+/* —— 日间：老大定「跟旧版一样」，chrome 保持深色，只校准纸面 ——
+   评审实测昼夜气泡纸只差 Δ4（那是 90% 透明的渗色，不是日间色板），
+   所以日间真正要动的是纸的描边与影，不是整条顶栏。 */
+.ellen-app[data-skin='zzz'][data-theme='light'] {
+  --z-paper: #f7f2e7;
+  --z-paper-card: #f6efe0;
+  --z-paper-bub: #f3ecddf2; /* 日间提到 95%，压住底下亮窗 */
+  --z-ink-paper: #12100f;
+  --z-ink-paper-2: #5a5348;
+  --z-hard: calc(4 * var(--u)) calc(4 * var(--u)) 0 #00000099;
+  --z-hard-s: calc(3 * var(--u)) calc(3 * var(--u)) 0 #00000099;
+  --z-hard-edge: 0 0 0 1px #c7bca6; /* 日间纸和亮背景贴一起，必须给暖描边 */
+}
+
+/* 动效降级链：只承认这三种"关"，统一收口，别在组件里各写一遍 */
+@media (prefers-reduced-motion: reduce) {
+  .ellen-app[data-skin='zzz'] {
+    /* 用 0.01ms 不用 none：animationend / transitionend 还要能触发 */
+    --z-t-instant: 0.01ms;
+    --z-t-micro: 0.01ms;
+    --z-t-small: 0.01ms;
+    --z-t-mid: 0.01ms;
+    --z-t-page: 0.01ms;
+  }
+}

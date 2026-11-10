@@ -1,0 +1,202 @@
+/* 记忆页样式。单位全走 --u（clamp 标尺），不写死 px（见 contract/ui-tokens.md）。
+ *
+ * 版式照 `_verify/ui-baseline/08-memory-tab.png`：
+ *   三段 segmented（选中＝深紫底浅字、方角）
+ *   胶囊（选中＝深紫底 + ✓）
+ *   记忆卡片＝米白底、圆角 18、左上书本图标、底部「翻开这段回忆 →」
+ */
+
+.el-memory-page {
+  padding-bottom: calc(96 * var(--u));
+}
+
+.el-eyebrow {
+  margin: calc(14 * var(--u)) 0 calc(4 * var(--u));
+  font-size: calc(10 * var(--u));
+  letter-spacing: calc(2.4 * var(--u));
+  text-transform: uppercase;
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+/* —— 三段 —— */
+.el-segments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: calc(18 * var(--u)) 0 0;
+  border-bottom: 1px solid var(--el-line);
+}
+
+.el-segment {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: 1.5;
+  padding: calc(12 * var(--u)) calc(4 * var(--u)) calc(13 * var(--u));
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.el-segment.is-active {
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+}
+
+/* —— 胶囊 —— */
+.el-recall-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: calc(10 * var(--u));
+  margin: calc(18 * var(--u)) 0 0;
+}
+
+.el-recall-group {
+  appearance: none;
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: 1.4;
+  padding: calc(12 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(12 * var(--u));
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.el-recall-group.is-active {
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+  border-color: transparent;
+}
+
+/* 选中项前面补一个 ✓（旧包同款）*/
+.el-recall-group.is-active::before {
+  content: '✓';
+  margin-right: calc(4 * var(--u));
+  font-size: calc(11 * var(--u));
+}
+
+.el-section-hint {
+  margin: calc(16 * var(--u)) 0 calc(10 * var(--u));
+  font-size: calc(12.5 * var(--u));
+  line-height: 1.7;
+  color: var(--el-muted);
+}
+
+.el-section-hint:empty {
+  display: none;
+}
+
+/* —— 卡片 —— */
+.el-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(14 * var(--u));
+}
+
+.el-memory-card,
+.el-journal-card {
+  position: relative;
+  background: var(--el-paper);
+  color: var(--el-ink);
+  border-radius: calc(18 * var(--u));
+  padding: calc(18 * var(--u)) calc(18 * var(--u)) calc(14 * var(--u));
+  box-shadow: 0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.06);
+}
+
+.el-memory-mark {
+  display: inline-flex;
+  color: var(--el-ink);
+  opacity: 0.75;
+  margin-bottom: calc(6 * var(--u));
+}
+
+.el-memory-mark .el-icon {
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+}
+
+.el-memory-mark .el-icon svg {
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+}
+
+.el-memory-title,
+.el-journal-title {
+  margin: 0 0 calc(8 * var(--u));
+  font-size: calc(17 * var(--u));
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.el-memory-body,
+.el-journal-body {
+  margin: 0;
+  font-size: calc(13 * var(--u));
+  line-height: 1.85;
+  color: var(--el-ink);
+  opacity: 0.88;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.el-memory-card.is-expanded .el-memory-body,
+.el-journal-card.is-expanded .el-journal-body {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+.el-journal-day {
+  font-size: calc(11 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--jr-rose);
+  margin-bottom: calc(4 * var(--u));
+}
+
+.el-memory-more {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: calc(10 * var(--u)) 0 0;
+  color: var(--el-ink);
+  opacity: 0.62;
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  cursor: pointer;
+}
+
+.el-memory-arrow {
+  margin-left: calc(4 * var(--u));
+}
+
+/* —— 空态 / 加载 —— */
+.el-memory-empty,
+.el-memory-loading {
+  padding: calc(28 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(16 * var(--u));
+  background: var(--el-surface);
+  text-align: center;
+}
+
+.el-memory-empty-title {
+  font-size: calc(13.5 * var(--u));
+  color: var(--el-text);
+  opacity: 0.86;
+}
+
+.el-memory-empty-sub,
+.el-memory-loading {
+  margin-top: calc(6 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: 1.7;
+  color: var(--el-muted);
+}

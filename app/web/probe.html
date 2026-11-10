@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>艾莲 · 探针</title>
+  </head>
+  <body>
+    <main id="app">
+      <h1>艾莲 · M1 骨架</h1>
+      <p class="hint">这一页只做一件事：证明 JS 和原生插件能来回说话。</p>
+
+      <section class="card">
+        <h2>1 请求 / 响应</h2>
+        <p id="echo-out" class="out">等待…</p>
+      </section>
+
+      <section class="card">
+        <h2>2 原生 → JS 事件</h2>
+        <p id="event-out" class="out">等待…</p>
+      </section>
+
+      <section class="card">
+        <h2>3 运行环境</h2>
+        <pre id="env-out" class="out">等待…</pre>
+      </section>
+
+      <h2 class="group">M2 第一批</h2>
+
+      <section class="card">
+        <h2>4 EllenReleaseInfo.state</h2>
+        <pre id="release-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>5 EllenSecureConfig 往返</h2>
+        <pre id="secure-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>6 EllenSecureConfig 边界 / reject</h2>
+        <pre id="secure-edge-out" class="out">等待…</pre>
+        <pre id="secure-remove-out" class="out">等待…</pre>
+      </section>
+      <h2 class="group">M2 第二批</h2>
+
+      <section class="card">
+        <h2>7 EllenModelHttp 参数校验</h2>
+        <pre id="m3-badurl-out" class="out">等待…</pre>
+        <pre id="m3-badkey-out" class="out">等待…</pre>
+        <pre id="m3-readunknown-out" class="out">等待…</pre>
+        <pre id="m3-cancel-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>8 EllenModelHttp 真实往返（假 key，期望 401 + 读到 body）</h2>
+        <pre id="m3-open-out" class="out">等待…</pre>
+        <pre id="m3-seq-out" class="out">等待…</pre>
+        <pre id="m3-abort-out" class="out">等待…</pre>
+        <pre id="m3-stream-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>9 EllenModelCatalogHttp</h2>
+        <pre id="m3-cat-bad-out" class="out">等待…</pre>
+        <pre id="m3-cat-out" class="out">等待…</pre>
+        <pre id="m3-cat-busy-out" class="out">等待…</pre>
+      </section>
+      <h2 class="group">M2 第三批</h2>
+
+      <section class="card">
+        <h2>10 EllenScreenShell 系统栏外观</h2>
+        <pre id="m4-appearance-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>11 EllenDocuments 选择状态机</h2>
+        <pre id="m4-documents-out" class="out">等待…</pre>
+      </section>
+
+      <h2 class="group">M2 第四批</h2>
+
+      <section class="card">
+        <h2>12 EllenArchive manifest 校验</h2>
+        <pre id="m5-bad-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>13 EllenArchive createExport</h2>
+        <pre id="m5-create-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>14 EllenArchive 分块写入（offset 校验 / 归零）</h2>
+        <pre id="m5-writebad-out" class="out">等待…</pre>
+        <pre id="m5-write-out" class="out">等待…</pre>
+        <pre id="m5-incomplete-out" class="out">等待…</pre>
+      </section>
+
+      <section class="card">
+        <h2>15 EllenArchive 句柄 / 备份 / 丢弃</h2>
+        <pre id="m5-read-out" class="out">等待…</pre>
+        <pre id="m5-backup-out" class="out">等待…</pre>
+        <pre id="m5-discard-out" class="out">等待…</pre>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

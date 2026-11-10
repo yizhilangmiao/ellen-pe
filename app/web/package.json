@@ -1,0 +1,16 @@
+{
+  "name": "ellen-mobile-web",
+  "private": true,
+  "version": "0.2.0-m1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "vite": "6.0.7"
+  }
+}

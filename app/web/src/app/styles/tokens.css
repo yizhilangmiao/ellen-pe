@@ -1,0 +1,150 @@
+/* ============================================================
+ * 设计令牌 · 全部值来自旧包 b17 运行时实测
+ * 出处：contract/ui-tokens.md（35 张样式表 / 3101 条规则 / getComputedStyle）
+ * 命名沿用旧包的 --el-* 前缀：新老两套代码能逐项对照，改版时不用二次翻译。
+ * 规则：这里只放"值"，不放布局；组件 css 一律 var() 取值，禁止写死颜色。
+ * ============================================================ */
+
+:root {
+  /* 标尺：1 单位 = 旧包 432 CSS 宽基准屏上的 1px。432 宽屏恰为 1px，随屏缩放。 */
+  --u: clamp(0.84px, 0.2315vmin, 1.16px);
+}
+
+/* 站酷快乐体（ZCOOL KuaiLe）。旧包把它注册成 EllenKuaiLe，这里沿用同名，
+   这样新老两套 CSS 里的 font-family 完全一致，改版时不用翻译。 */
+@font-face {
+  font-family: EllenKuaiLe;
+  src: url('../assets/ZCOOLKuaiLe-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.ellen-app {
+  --el-font-family: EllenKuaiLe, "Microsoft YaHei", sans-serif;
+
+  /* —— 暗色（默认）—— */
+  --el-bg: #17191f;
+  --el-surface: #23262e;
+  --el-raised: #2c3039;
+  --el-text: #f0edf1;
+  --el-muted: #a9adb7;
+  --el-line: #ffffff14;
+  --el-pink: #e4b8cd;
+  --el-paper: #f4eee5;
+  --el-ink: #39363c;
+  --el-paper-muted: #817780;
+  --el-self: #e9d4e0;
+  --el-self-ink: #332934;
+  --el-primary: #e4cad7;
+  --el-primary-ink: #332c36;
+  --el-error: #f2becf;
+  --el-error-bg: #30272d;
+  --el-warning: #eed6b6;
+  --el-warning-bg: #342b22;
+  --el-success: #bcdcc8;
+  --el-chat-action: #c5c0c7;
+
+  /* 设置页（暗紫，独立一套色，别和主色混用） */
+  --el-settings-page: #1b1820;
+  --el-settings-surface: #27212d;
+  --el-settings-raised: #322936;
+  --el-settings-input: #201b26;
+  --el-settings-ink: #f7edf5;
+  --el-settings-muted: #c3b1c0;
+  --el-settings-line: #645064;
+  --el-settings-control-line: #967e95;
+  --el-settings-accent: #e9b7d0;
+  --el-settings-focus: #d3afe7;
+  --el-settings-primary: #e5bad0;
+  --el-settings-primary-ink: #30202e;
+  --el-settings-error: #ffc1cc;
+  --el-settings-error-bg: #412632;
+  --el-settings-success: #b4ddc6;
+  --el-settings-readonly: #2d2532;
+  --el-settings-disabled: #b6a3b3;
+  --el-settings-shadow: 0 8px 28px #00000019;
+  --el-settings-radius: 18px;
+
+  /* 手记日历（米纸玫红，独立一套） */
+  --jr-rose: #955571;
+  --jr-soft: #f0d4e1;
+  --jr-line: #cfafbe;
+  --jr-muted: #6f5869;
+}
+
+/* —— 浅色：44 项覆盖，其余继承暗色 —— */
+.ellen-app[data-theme='light'] {
+  --el-bg: #f8f7f5;
+  --el-surface: #efedf0;
+  --el-raised: #e8e5ea;
+  --el-text: #343039;
+  --el-muted: #78727d;
+  --el-line: #30263519;
+  --el-pink: #976276;
+  --el-paper: #fffaf1;
+  --el-ink: #3e3540;
+  --el-paper-muted: #7d737b;
+  --el-self: #514754;
+  --el-self-ink: #fff9fc;
+  --el-primary: #514754;
+  --el-primary-ink: #fff9fc;
+  --el-error: #963451;
+  --el-error-bg: #f4e2e9;
+  --el-warning: #714719;
+  --el-warning-bg: #fbefdc;
+  --el-success: #306347;
+  --el-chat-action: #827a83;
+
+  --el-settings-page: #f8f1f5;
+  --el-settings-surface: #f0e5ed;
+  --el-settings-raised: #e8d9e5;
+  --el-settings-input: #fff8fc;
+  --el-settings-ink: #3e2f43;
+  --el-settings-muted: #705b70;
+  --el-settings-line: #c5afc1;
+  --el-settings-control-line: #96748c;
+  --el-settings-accent: #8d4969;
+  --el-settings-focus: #86518c;
+  --el-settings-primary: #74455f;
+  --el-settings-primary-ink: #fff7fc;
+  --el-settings-error: #a03750;
+  --el-settings-error-bg: #f5dfe6;
+  --el-settings-success: #32694d;
+  --el-settings-readonly: #ede2eb;
+  --el-settings-disabled: #6e596b;
+  --el-settings-shadow: 0 8px 28px #63465709;
+}
+
+/* 设置页内的派生令牌：让设置页组件只认 --el-current-*，不直接摸主题色 */
+.ellen-app .el-settings-context {
+  --el-current-bg: var(--el-settings-page);
+  --el-current-card: var(--el-settings-surface);
+  --el-current-raised: var(--el-settings-raised);
+  --el-current-input: var(--el-settings-input);
+  --el-current-text: var(--el-settings-ink);
+  --el-current-muted: var(--el-settings-muted);
+  --el-current-line: var(--el-settings-line);
+  --el-current-control-line: var(--el-settings-control-line);
+  --el-current-accent: var(--el-settings-accent);
+  --el-current-primary: var(--el-settings-primary);
+  --el-current-primary-ink: var(--el-settings-primary-ink);
+  --el-current-radius: var(--el-settings-radius);
+  --el-current-shadow: var(--el-settings-shadow);
+}
+
+/* 相处页内的派生令牌（旧包用 color-mix 现算，这里等价展开） */
+.ellen-app .el-companion-home {
+  --el-companion-glow: color-mix(in srgb, var(--el-pink) 13%, var(--el-bg));
+  --el-companion-card: color-mix(in srgb, var(--el-surface) 85%, var(--el-bg));
+  --el-companion-accent: var(--el-pink);
+  --el-companion-border: color-mix(in srgb, var(--el-pink) 23%, var(--el-line));
+}
+
+/* 浮钮描边：旧包写死 rgba(214,160,180,.5)（= #d6a0b4），老 bug 清单第 ⑨ 条指的就是它 */
+.ellen-app {
+  --el-fab-bg: rgba(28, 32, 38, 0.92);
+  --el-fab-border: rgba(214, 160, 180, 0.5);
+  --el-fab-ink: #f2e9ec;
+  --el-fab-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+}

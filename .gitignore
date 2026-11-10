@@ -1,41 +1,55 @@
-# 艾莲手机版 · 创作版仓库忽略规则
-# 仓库根 = E:\ailian\艾莲手机版\创作版
-# 只收「能动手改的东西」：_phone-sync\（注入层）、_patch_phone_*.py（锚点补丁）、
-#   _dev_*.py|ps1（解包/回包/签名流水线）、规范与验收清单。
-# 下列全是可再生产物或大件，一律不入库。
+# 艾莲手机版 · 创作版仓库忽略规则（仓库根 = 该目录）
+# 收什么：能动手改的源码 —— _phone-sync\（旧包注入层）、app\（新壳 Gradle + Vite 源码）、
+#         _patch_phone_*.py、_dev_*、契约与验收文档。
+# 不收：可再生产物、二进制大件、旧包解包基线。
 
-# ── APK 解包基线（780 MB，python _dev_extract.py --clean 可重建）──
-work/
-work_*/
-_dup*/
-
-# ── 打包中间产物 ──
-_build/
+# ── 新壳构建产物 ──
+/app/app/build/
+/app/build/
+/app/.gradle/
+/app/.kotlin/
+/app/web/node_modules/
+/app/web/dist/
+/app/app/src/main/assets/public/
 *.apk
 *.idsig
+*.aab
 
-# ── 0.1.8 时期遗留的前端 dist 与拆包残留 ──
-web/
-web_out/
-web_out.bak/
-web_out.bak_uuid/
-package/
-dexwork/
-dexcheck/
-test-main.js
-esbuild.tgz
+# ── 二进制大件（可重新下载，见 _verify 文档里的地址）──
+/app/app/libs/*.aar
+/app/app/src/main/assets/asr/
+/app/app/src/main/assets/local-asr/
+_downloads/
+_下载/
 
-# ── 备份与快照 ──
-_backup_mem/
-_b12/
+# ── 旧包解包基线（780 MB，_dev_extract.py 可重建）──
+/work/
+/work_*/
+/dexwork/
+/dexcheck/
+/package/
+/web/
+/web_out/
+/web_out.bak*/
+/dup/
+/dup_*/
+/web_out.bak_uuid/
+
+# ── 打包与临时 ──
+/_build/
+/_临时/
+/esbuild.tgz
+/test-main.js
+__pycache__/
+*.pyc
+*.log
 *.bak
 *.bak-*
 *.zip
 *.7z
-
-# ── 临时与缓存 ──
-__pycache__/
-_临时/
-*.log
 Thumbs.db
 desktop.ini
+
+# ── 备份快照 ──
+/_backup_mem/
+/_b12/

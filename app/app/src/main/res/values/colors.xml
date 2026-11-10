@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ellen_pink">#FFE4B8CD</color>
+    <color name="ellen_bg">#FF17191F</color>
+    <!-- 原生对话框不跟 web 皮肤走，单独给暗色底，否则白底浅字糊成一片 -->
+    <color name="ellen_dialog_bg">#FF23262E</color>
+    <color name="ellen_dialog_text">#FFF0EDF1</color>
+    <color name="ellen_dialog_muted">#FFA9ADB7</color>
+</resources>

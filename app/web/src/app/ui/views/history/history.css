@@ -1,0 +1,121 @@
+/* 聊天历史页。尺寸一律 calc(N * var(--u))，不写 px（见 AGENTS.md §7.5）。
+   卡片语言跟设置页一致：surface 底 + line 边 + 大圆角，避免出现第二套视觉。 */
+.el-history-page {
+  display: flex;
+  flex-direction: column;
+  gap: calc(14 * var(--u));
+  padding: calc(18 * var(--u)) calc(16 * var(--u)) calc(24 * var(--u));
+  min-height: 100%;
+}
+
+.el-history-head {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4 * var(--u));
+}
+
+.el-history-actions {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+}
+
+.el-history-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(6 * var(--u));
+}
+
+.el-history-start .el-icon svg {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+
+.el-history-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  font: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: 1.5;
+  color: var(--el-text);
+  background: var(--el-surface);
+  border: 1px solid var(--el-line);
+  border-radius: calc(12 * var(--u));
+  outline: none;
+}
+
+.el-history-search::placeholder {
+  color: var(--el-muted);
+}
+
+.el-history-search:focus-visible {
+  border-color: var(--el-pink);
+}
+
+.el-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+}
+
+.el-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  width: 100%;
+  padding: calc(13 * var(--u)) calc(14 * var(--u));
+  text-align: left;
+  color: var(--el-text);
+  background: var(--el-surface);
+  border: 1px solid var(--el-line);
+  border-radius: calc(14 * var(--u));
+  cursor: pointer;
+}
+
+.el-history-card.is-current {
+  border-color: var(--el-pink);
+}
+
+.el-history-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+}
+
+.el-history-name {
+  font-size: calc(14 * var(--u));
+  line-height: 1.4;
+}
+
+.el-history-time {
+  flex: 0 0 auto;
+  font-size: calc(11 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-history-preview {
+  margin: 0;
+  font-size: calc(12 * var(--u));
+  line-height: 1.6;
+  color: var(--el-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.el-history-count {
+  font-size: calc(11 * var(--u));
+  color: var(--el-chat-action);
+}
+
+.el-history-empty {
+  padding: calc(28 * var(--u)) calc(14 * var(--u));
+  text-align: center;
+  font-size: calc(12 * var(--u));
+  line-height: 1.7;
+  color: var(--el-muted);
+}

@@ -1,0 +1,95 @@
+/* 写信给她（全屏页）。全部尺寸走 --u 标尺，不写 px（1px 细线除外）。 */
+
+.el-feedback-page {
+  gap: calc(10 * var(--u));
+  padding: calc(4 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
+}
+
+.el-feedback-field-label {
+  margin-top: calc(6 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-feedback-kinds {
+  display: flex;
+  gap: calc(8 * var(--u));
+  padding: calc(4 * var(--u));
+  border-radius: calc(14 * var(--u));
+  background: var(--el-surface);
+}
+
+.el-feedback-kind {
+  flex: 1 1 0;
+  padding: calc(7 * var(--u)) calc(4 * var(--u));
+  border: 0;
+  border-radius: calc(10 * var(--u));
+  background: transparent;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: calc(20 * var(--u));
+  text-align: center;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.el-feedback-kind.is-active {
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+}
+
+.el-feedback-input {
+  width: 100%;
+  min-height: calc(150 * var(--u));
+  padding: calc(12 * var(--u));
+  border: 0.8px solid var(--el-line);
+  border-radius: calc(14 * var(--u));
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(14 * var(--u));
+  line-height: calc(22 * var(--u));
+  resize: none;
+}
+
+.el-feedback-input::placeholder {
+  color: var(--el-muted);
+}
+
+.el-feedback-input:focus {
+  outline: none;
+  border-color: var(--el-pink);
+}
+
+.el-feedback-counter {
+  min-height: calc(16 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+  text-align: right;
+}
+
+.el-feedback-actions {
+  display: flex;
+  gap: calc(10 * var(--u));
+  margin-top: calc(4 * var(--u));
+}
+
+.el-feedback-actions .el-primary,
+.el-feedback-actions .el-secondary {
+  flex: 1 1 0;
+}
+
+.el-feedback-note {
+  min-height: calc(34 * var(--u));
+  margin: 0;
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.ellen-app[data-theme='light'] .el-feedback-input {
+  background: var(--el-raised);
+  color: var(--el-ink);
+}

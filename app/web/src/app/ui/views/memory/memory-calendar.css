@@ -1,0 +1,130 @@
+/* 手记日历（记忆页「我们的回忆」顶部那块）。
+   旧包是 `button.el-journal-day[data-day][data-status]` + 月份箭头 + 最近一篇，
+   这里复刻同一套结构，只是类名前缀换成 el-journal-*。 */
+.el-journal-cal {
+  margin-top: calc(6 * var(--u));
+  padding: calc(14 * var(--u)) calc(14 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(18 * var(--u));
+  background: var(--el-paper);
+  color: var(--el-ink);
+  box-shadow: 0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(0, 0, 0, 0.06);
+}
+
+.el-journal-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(8 * var(--u));
+}
+
+.el-journal-cal-title {
+  font-size: calc(14 * var(--u));
+  line-height: calc(22 * var(--u));
+  letter-spacing: calc(0.5 * var(--u));
+  color: var(--jr-rose);
+}
+
+.el-journal-month-arrow {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: calc(2 * var(--u)) calc(8 * var(--u));
+  color: var(--jr-rose);
+  font-family: inherit;
+  font-size: calc(18 * var(--u));
+  line-height: calc(22 * var(--u));
+  cursor: pointer;
+}
+
+.el-journal-month-arrow[disabled] {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.el-journal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: calc(2 * var(--u));
+}
+
+.el-journal-week-cell {
+  text-align: center;
+  font-size: calc(10.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--jr-muted);
+  opacity: 0.75;
+}
+
+.el-journal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: calc(1 * var(--u));
+}
+
+.el-journal-day-cell {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: 1;
+  color: var(--el-ink);
+  opacity: 0.42;
+  cursor: default;
+  border-radius: calc(9 * var(--u));
+}
+
+.el-journal-day-cell.is-blank {
+  visibility: hidden;
+}
+
+.el-journal-day-cell.has-entry {
+  opacity: 1;
+  background: var(--jr-soft);
+  cursor: pointer;
+}
+
+/* 有手记的那天右下角一个小点，扫一眼就知道哪几天写了 */
+.el-journal-day-cell.has-entry::after {
+  content: '';
+  position: absolute;
+  bottom: calc(4 * var(--u));
+  width: calc(3 * var(--u));
+  height: calc(3 * var(--u));
+  border-radius: 50%;
+  background: var(--jr-rose);
+}
+
+.el-journal-day-cell.is-today {
+  box-shadow: inset 0 0 0 calc(1 * var(--u)) var(--jr-rose);
+}
+
+.el-journal-all-head {
+  margin: calc(14 * var(--u)) 0 calc(2 * var(--u));
+  font-size: calc(11 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-journal-cards {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+}
+
+.el-journal-more {
+  margin: calc(10 * var(--u)) auto calc(4 * var(--u));
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
+  border: calc(0.8 * var(--u)) solid var(--el-line);
+  border-radius: calc(999 * var(--u));
+  background: transparent;
+  color: var(--el-muted);
+  font-size: calc(12 * var(--u));
+  font-family: inherit;
+}

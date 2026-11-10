@@ -1,0 +1,88 @@
+/* 手记详情（全屏页）。米白纸张感，与记忆页的手记卡片同一套色；
+   尺寸一律 calc(N * var(--u))，禁 px（除 1px 细线与阴影）。 */
+.el-journal-page {
+  padding: calc(18 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
+  gap: calc(10 * var(--u));
+  background: var(--el-paper);
+  color: var(--el-ink);
+}
+
+.el-journal-stamp {
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--jr-muted);
+}
+
+.el-journal-detail-title {
+  margin: 0;
+  font-size: calc(23 * var(--u));
+  line-height: calc(34 * var(--u));
+  letter-spacing: calc(0.5 * var(--u));
+  font-weight: 400;
+  color: var(--el-ink);
+}
+
+.el-journal-body-text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+  margin-top: calc(4 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(27 * var(--u));
+  color: var(--el-ink);
+  white-space: pre-wrap;
+}
+
+.el-journal-body-text p {
+  margin: 0;
+}
+
+.el-journal-body-empty {
+  color: var(--jr-muted);
+}
+
+.el-journal-aside {
+  margin-top: calc(6 * var(--u));
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: rgba(240, 212, 225, 0.45);
+  border: 0.8px solid var(--jr-line);
+}
+
+.el-journal-aside-label {
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--jr-rose);
+}
+
+.el-journal-aside-text {
+  margin: calc(4 * var(--u)) 0 0;
+  font-size: calc(13 * var(--u));
+  line-height: calc(23 * var(--u));
+  color: var(--jr-muted);
+  white-space: pre-wrap;
+}
+
+.el-journal-pager {
+  display: flex;
+  gap: calc(10 * var(--u));
+  margin-top: calc(10 * var(--u));
+}
+
+.el-journal-pager-btn {
+  flex: 1 1 0;
+  padding: calc(9 * var(--u)) 0;
+  border-radius: calc(10 * var(--u));
+  border: 0.8px solid var(--jr-line);
+  background: transparent;
+  color: var(--jr-rose);
+  font-size: calc(13 * var(--u));
+  line-height: calc(20 * var(--u));
+  font-family: inherit;
+}
+
+.el-journal-pager-btn[disabled] {
+  opacity: 0.38;
+}

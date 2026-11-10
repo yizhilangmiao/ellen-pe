@@ -1,0 +1,339 @@
+/* ============================================================
+ * 底座：重置 + 页面外框 + 顶栏 + 底栏
+ * 尺寸一律 calc(N * var(--u))：N 就是旧包在 432 CSS 宽下的 px 值。
+ * 禁止裸 px（1px 细线除外），禁止 vw 做纵向尺寸。
+ * ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 组件自己的 display 会盖掉 [hidden]，这条要压住它 */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--el-font-family, EllenKuaiLe, 'Microsoft YaHei', sans-serif);
+  background: var(--el-bg);
+  color: var(--el-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* —— app 外壳 —— */
+.ellen-app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg);
+  color: var(--el-text);
+  font-family: var(--el-font-family, EllenKuaiLe, 'Microsoft YaHei', sans-serif);
+  font-size: calc(16 * var(--u));
+  line-height: calc(28 * var(--u));
+  overflow: hidden;
+  /* 老 bug ⑬：底部安全区必须让出来，否则输入栏被手势条压住 */
+  --el-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --el-safe-top: env(safe-area-inset-top, 0px);
+}
+
+/* —— 顶栏 —— */
+.el-chat-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(6 * var(--u));
+  padding: calc(7 * var(--u)) calc(12 * var(--u));
+  padding-top: calc(7 * var(--u) + var(--el-safe-top));
+  min-height: calc(58 * var(--u));
+}
+
+.el-brand {
+  display: inline-flex;
+  align-items: center;
+  font-size: calc(24 * var(--u));
+  line-height: calc(34 * var(--u));
+  letter-spacing: calc(0.5 * var(--u));
+  color: var(--el-ink);
+  font-weight: 400;
+}
+
+.ellen-app[data-theme='dark'] .el-brand {
+  color: var(--el-text);
+}
+
+/* 压栈时左上角变成返回箭头（照旧包顶栏第一个按钮） */
+.el-brand.is-back {
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--el-raised);
+  color: var(--el-text);
+}
+
+.ellen-app[data-theme='light'] .el-brand.is-back {
+  color: var(--el-ink);
+}
+
+.el-brand.is-back .el-icon svg {
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+}
+
+.el-header-tools {
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--u));
+}
+
+.el-round {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(2 * var(--u));
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  border-radius: calc(10 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-ink);
+  opacity: 0.9;
+}
+
+.ellen-app[data-theme='dark'] .el-round {
+  color: var(--el-text);
+}
+
+.el-round:active {
+  background: var(--el-line);
+}
+
+/* —— 页面容器 —— */
+.el-pages {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.el-page {
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 用 :not(.is-active) 而不是直接写 display:none ——
+   各视图自己的类（`.el-chat-page{display:flex}`）跟 `.el-page` 同特异性，
+   后加载的 chat.css 会把 display:none 盖掉，结果被压在下层的页面照样显示，
+   全屏页叠在聊天页上面能看到气泡透出来（踩过）。加一个 :not 提到 0,2,0 就压得住。 */
+.el-page:not(.is-active) {
+  display: none;
+}
+
+.el-page.is-active {
+  display: flex;
+}
+
+.el-page.el-scroll-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(23 * var(--u)) calc(20 * var(--u)) calc(24 * var(--u));
+}
+
+.el-page-title {
+  margin: 0 0 calc(4 * var(--u));
+  font-size: calc(26 * var(--u));
+  line-height: calc(37.7 * var(--u));
+  letter-spacing: calc(0.78 * var(--u));
+  font-weight: 400;
+  color: var(--el-ink);
+}
+
+.ellen-app[data-theme='dark'] .el-page-title {
+  color: var(--el-text);
+}
+
+.el-page-subtitle {
+  margin: 0 0 calc(18 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(22.8 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.85;
+}
+
+/* —— 底栏 —— */
+.el-nav {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  gap: calc(2 * var(--u));
+  padding: calc(6 * var(--u)) calc(8 * var(--u));
+  padding-bottom: calc(6 * var(--u) + var(--el-safe-bottom));
+  border-top: 1px solid var(--el-line);
+  background: var(--el-bg);
+}
+
+.el-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  padding: calc(4 * var(--u)) 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+.el-nav-item.is-active {
+  color: var(--el-pink);
+  opacity: 1;
+}
+
+/* 未读小圆点：她主动说话、你没停在聊天页时亮 */
+.el-nav-item .el-nav-icon {
+  position: relative;
+}
+
+.el-nav-item.has-unread .el-nav-icon::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--u));
+  right: calc(-2 * var(--u));
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 50%;
+  background: var(--el-pink);
+  box-shadow: 0 0 0 calc(1.6 * var(--u)) var(--el-bg);
+}
+
+.el-nav-item .el-nav-icon {
+  font-size: calc(20 * var(--u));
+  line-height: calc(22 * var(--u));
+}
+
+/* —— 图标（旧包同款线框 SVG：viewBox 24 / stroke=currentColor / width 1.6）—— */
+.el-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  flex: 0 0 auto;
+}
+
+.el-icon svg {
+  display: block;
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+}
+
+/* 底栏图标旧包实测 21×21 */
+.el-nav-item .el-nav-icon svg {
+  width: calc(21 * var(--u));
+  height: calc(21 * var(--u));
+}
+
+/* —— 通用小件 —— */
+.el-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(12 * var(--u));
+  font-size: calc(14 * var(--u));
+  line-height: calc(24.5 * var(--u));
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+}
+
+.el-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  padding: calc(8 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(10 * var(--u));
+  font-size: calc(13 * var(--u));
+  line-height: calc(22.75 * var(--u));
+  background: var(--el-raised);
+  color: var(--el-text);
+  border: 1px solid var(--el-line);
+}
+
+.ellen-app[data-theme='light'] .el-secondary {
+  background: #efedf0;
+  color: #343039;
+}
+
+#ellen-boot-error {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  padding: calc(24 * var(--u));
+  background: var(--el-bg);
+  color: var(--el-error);
+  font-size: calc(13 * var(--u));
+  line-height: calc(20 * var(--u));
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+/* 轻提示：语音失败这种一句话反馈，从底部浮上来 2.6 秒 */
+.el-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96*var(--u));
+  transform: translate(-50%, calc(8*var(--u)));
+  max-width: calc(320*var(--u));
+  padding: calc(9*var(--u)) calc(14*var(--u));
+  border-radius: calc(12*var(--u));
+  background: var(--el-raised);
+  color: var(--el-text);
+  font-size: calc(13*var(--u));
+  line-height: 1.45;
+  text-align: center;
+  box-shadow: 0 calc(6*var(--u)) calc(20*var(--u)) rgba(0, 0, 0, .28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.el-toast.is-on {
+  opacity: .97;
+  transform: translate(-50%, 0);
+}

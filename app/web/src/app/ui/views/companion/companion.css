@@ -1,0 +1,292 @@
+/* 相处页。尺寸一律 calc(N * var(--u))，基准屏 432 CSS 宽（老大真机 864 物理 ÷ DPR2）。
+   纵向尺寸用 vmin 换算出的 --u，不用 vw —— 横屏 vw 会放大 4 倍（老 bug ⑫）。 */
+
+.el-companion-page {
+  gap: 0;
+}
+
+/* 页面是 flex column，块默认 flex-shrink:1 —— 内容超高时最后一个块（点线块）
+   会被压扁，`overflow:hidden` 再把里面的字裁掉。全部锁成不缩，页自己滚。 */
+.el-companion-page > * {
+  flex: 0 0 auto;
+}
+
+/* ── 上半：WITH YOU + 大字 + 立绘 ───────────────────────────── */
+.el-companion-hero {
+  position: relative;
+  padding-bottom: calc(6 * var(--u));
+}
+
+.el-companion-title {
+  margin: calc(6 * var(--u)) 0 0 0;
+  font-size: calc(34 * var(--u));
+  line-height: calc(48 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  font-weight: 400;
+  color: var(--el-ink);
+}
+
+.ellen-app[data-theme='dark'] .el-companion-title {
+  color: var(--el-text);
+}
+
+/* 立绘：圆形裁切，右侧出血一点，压在标题下半部 */
+.el-companion-portrait {
+  position: absolute;
+  top: calc(22 * var(--u));
+  right: calc(-24 * var(--u));
+  width: calc(190 * var(--u));
+  height: calc(190 * var(--u));
+  border-radius: 50%;
+  overflow: hidden;
+  border: calc(1.6 * var(--u)) solid var(--el-paper);
+  box-shadow: 0 calc(6 * var(--u)) calc(30 * var(--u)) rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.el-companion-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ellen-app[data-theme='light'] .el-companion-portrait {
+  border-color: #fff;
+  box-shadow: 0 calc(6 * var(--u)) calc(24 * var(--u)) rgba(99, 70, 87, 0.16);
+}
+
+/* ── 艾莲的此刻 ──────────────────────────────────────────── */
+.el-companion-mood {
+  position: relative;
+  margin-top: calc(30 * var(--u));
+}
+
+.el-companion-label {
+  margin: 0 0 calc(2 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-companion-mood-word {
+  margin: 0;
+  font-size: calc(26 * var(--u));
+  line-height: calc(38 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  color: var(--el-pink);
+}
+
+.el-companion-mood-word.is-empty {
+  color: var(--el-text);
+  opacity: 0.9;
+}
+
+.el-companion-mood-note {
+  display: inline-block;
+  max-width: calc(230 * var(--u));
+  margin: calc(8 * var(--u)) 0 0 0;
+  padding: calc(9 * var(--u)) calc(13 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--el-raised);
+  font-size: calc(12 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-muted);
+}
+
+/* 模型真给了一句便签时，这行就退成普通说明，不再包成气泡 */
+.el-companion-mood-note.is-note {
+  display: block;
+  max-width: none;
+  padding: 0;
+  background: none;
+  color: var(--el-muted);
+  opacity: 0.9;
+}
+
+/* display:inline-block 会盖掉 [hidden]，得单独压回来 */
+.el-companion-mood-note[hidden] {
+  display: none;
+}
+
+/* ── 艾莲的便签（米白纸）──────────────────────────────────── */
+.el-companion-note {
+  margin-top: calc(18 * var(--u));
+  padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(5 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u));
+  background: var(--el-paper);
+  color: var(--el-ink);
+  box-shadow: calc(3 * var(--u)) calc(4 * var(--u)) calc(12 * var(--u)) rgba(201, 174, 212, 0.16);
+}
+
+.el-companion-note-label {
+  margin: 0 0 calc(10 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: #8d7183;
+}
+
+.el-companion-note-body {
+  margin: 0;
+  font-size: calc(17 * var(--u));
+  line-height: calc(30 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.el-companion-note-body.is-empty {
+  opacity: 0.55;
+}
+
+/* ── 我们之间 ────────────────────────────────────────────── */
+.el-companion-between {
+  position: relative;
+  margin-top: calc(20 * var(--u));
+}
+
+.el-companion-between-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+}
+
+.el-companion-between-title {
+  margin: 0;
+  font-size: calc(17 * var(--u));
+  line-height: calc(26 * var(--u));
+  font-weight: 400;
+  color: var(--el-text);
+}
+
+.el-companion-level {
+  flex: 0 0 auto;
+  padding: calc(5 * var(--u)) calc(13 * var(--u));
+  border-radius: calc(9 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+  cursor: pointer;
+}
+
+.el-companion-level:active {
+  opacity: 0.7;
+}
+
+.el-companion-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8 * var(--u));
+  margin-top: calc(10 * var(--u));
+}
+
+.el-companion-levels[hidden] {
+  display: none;
+}
+
+.el-companion-level-option {
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(9 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  color: var(--el-muted);
+  cursor: pointer;
+}
+
+.el-companion-level-option.is-active {
+  border-color: var(--el-pink);
+  color: var(--el-pink);
+}
+
+.el-companion-between-hint {
+  margin: calc(10 * var(--u)) 0 0 0;
+  font-size: calc(12 * var(--u));
+  line-height: calc(22 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.85;
+}
+
+.el-companion-mail {
+  display: flex;
+  margin: calc(10 * var(--u)) 0 0 auto;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  border-radius: 50%;
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-muted);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.el-companion-mail .el-icon svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+
+/* ── OUR DAYS, OUR STORY（点线块）──────────────────────────── */
+.el-companion-days {
+  position: relative;
+  margin-top: calc(22 * var(--u));
+  padding: calc(18 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u));
+  border-radius: calc(16 * var(--u));
+  overflow: hidden;
+  background-image: radial-gradient(var(--el-line) calc(1 * var(--u)), transparent calc(1 * var(--u)));
+  background-size: calc(11 * var(--u)) calc(11 * var(--u));
+  background-color: var(--el-surface);
+}
+
+.el-companion-days-title {
+  margin: calc(8 * var(--u)) 0 calc(16 * var(--u));
+  font-size: calc(24 * var(--u));
+  line-height: calc(34 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  font-weight: 400;
+  color: var(--el-text);
+}
+
+.el-companion-days-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(4 * var(--u));
+  margin: 0;
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(8 * var(--u));
+  background: var(--el-self);
+  color: var(--el-primary-ink);
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+}
+
+.el-companion-days-pill b {
+  font-size: calc(18 * var(--u));
+  font-weight: 400;
+}
+
+/* 右下角探出半个立绘（旧包也是这样收尾的） */
+.el-companion-peek {
+  position: absolute;
+  right: calc(-14 * var(--u));
+  bottom: calc(-46 * var(--u));
+  width: calc(120 * var(--u));
+  height: calc(120 * var(--u));
+  border-radius: 50%;
+  overflow: hidden;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.el-companion-peek img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
