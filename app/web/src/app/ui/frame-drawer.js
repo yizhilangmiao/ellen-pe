@@ -73,6 +73,9 @@ export function createDrawer({ root, onChange } = {}) {
       openName = name;
       panel.hidden = false;
       scrim.hidden = false;
+      panel.classList.remove('is-closing');
+      scrim.classList.remove('is-closing');
+      scrim.classList.add('is-open');
       panel.classList.add('is-open');
       root.dataset.drawer = name;
       // 视图画完才可能有可聚焦元素（paint 会替换子节点），延一帧再抢焦点
@@ -107,9 +110,23 @@ export function createDrawer({ root, onChange } = {}) {
     const name = openName;
     openName = null;
     panel.classList.remove('is-open');
-    panel.hidden = true;
-    scrim.hidden = true;
+    scrim.classList.remove('is-open');
     delete root.dataset.drawer;
+    // 退场 = 进入 × 0.8（144ms），遮罩 120ms；降级时直接拔掉不播
+    const reduced = root.classList.contains('reduce-ui-motion');
+    const finishHide = () => {
+      panel.hidden = true;
+      scrim.hidden = true;
+      panel.classList.remove('is-closing');
+      scrim.classList.remove('is-closing');
+    };
+    if (reduced) {
+      finishHide();
+    } else {
+      panel.classList.add('is-closing');
+      scrim.classList.add('is-closing');
+      window.setTimeout(finishHide, 150);
+    }
     if (node) {
       dispose(node);
       node = null;

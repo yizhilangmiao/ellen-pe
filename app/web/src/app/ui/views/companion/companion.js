@@ -174,6 +174,14 @@ export function createCompanionView({ state }) {
       const unit = document.createElement('span');
       unit.textContent = s('companion.daysUnit');
       pill.append(label, num, unit);
+      // 节拍 6：里程碑（每 100 天）才给一次 glitch，单屏一次，别每天抖
+      if (days > 0 && days % 100 === 0) {
+        pill.classList.remove('zz-anim-glitch');
+        // 强制重排，让同名动画能重播（一天最多一次，代价可忽略）
+        void pill.offsetWidth;
+        pill.classList.add('zz-anim-glitch');
+        window.setTimeout(() => pill.classList.remove('zz-anim-glitch'), 320);
+      }
     };
     return box;
   }

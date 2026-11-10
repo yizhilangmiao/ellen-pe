@@ -121,9 +121,10 @@ export function createChatView() {
         return btn;
       }
 
-      function renderMessage(msg) {
+      function renderMessage(msg, enter) {
         const node = document.createElement('div');
         node.className = 'el-msg';
+        if (enter) node.classList.add('zz-anim-pop');
         node.dataset.role = msg.role === 'user' ? 'user' : 'assistant';
         if (msg.pending) node.dataset.pending = '1';
         if (msg.failed) node.dataset.failed = '1';
@@ -171,13 +172,20 @@ export function createChatView() {
         }
       }
 
+      let painted = false;
+
       function render() {
         stream.innerHTML = '';
         if (!state.messages.length) {
           stream.append(renderEmpty());
           return;
         }
-        for (const msg of state.messages) stream.append(renderMessage(msg));
+        // 只有「新到的最后两条」播入场；历史不重播（否则每次切页都像下暴雨）
+        const last = state.messages.length - 1;
+        state.messages.forEach((msg, i) => {
+          stream.append(renderMessage(msg, painted && i >= last - 1));
+        });
+        painted = true;
         stream.scrollTop = stream.scrollHeight;
       }
 
@@ -278,7 +286,7 @@ export function createChatView() {
         },
         appendMessage(msg) {
           state.messages.push(msg);
-          const node = renderMessage(msg);
+          const node = renderMessage(msg, true);
           const empty = stream.querySelector('.el-chat-empty');
           if (empty) empty.remove();
           stream.append(node);

@@ -60,6 +60,14 @@ function activate(node) {
   }
   activeNode = node;
   node.el.classList.add('is-active');
+  // 入场帧标记：样式层只认 .is-entering（旧页在这一步已经被 display:none 直拔）。
+  // 两帧后再摘，保证动画从第一帧开始播而不是被同帧样式覆盖。
+  node.el.classList.add('is-entering');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.setTimeout(() => node.el.classList.remove('is-entering'), 200);
+    });
+  });
   if (activeNode.handle && typeof activeNode.handle.resume === 'function') {
     try {
       activeNode.handle.resume();

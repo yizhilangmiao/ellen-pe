@@ -1,0 +1,167 @@
+/* 动效层（批 4 · 方案 §5）。全站只允许这几条，新增动效先看 §5.1 有没有位置。
+   铁律：只动 transform / opacity / filter / background-position；
+   禁动 box-shadow / width / height / top / left / margin / padding。
+   曲线不用 ease / ease-in-out；linear 只给「按下反馈」和「无限循环」。 */
+
+/* —— 节拍 1 页面切换（tab / push）：旧页直拔，新页 4u 上浮 + 淡入 180ms —— */
+@keyframes zz-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(4 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ellen-app[data-skin='zzz'] .el-page.is-entering {
+  animation: zz-page-in 180ms var(--z-e-out, cubic-bezier(0.25, 0.46, 0.45, 0.94)) both;
+}
+
+/* —— 节拍 2 抽屉：开 180ms / 关 144ms（= 180×0.8），遮罩 120ms linear —— */
+@keyframes zz-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes zz-drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes zz-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes zz-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.el-drawer.is-closing {
+  animation: zz-drawer-out 144ms var(--z-e-in, cubic-bezier(0.55, 0.085, 0.68, 0.53)) both;
+  pointer-events: none;
+}
+.el-drawer.is-open {
+  animation: zz-drawer-in 180ms var(--z-e-out, cubic-bezier(0.25, 0.46, 0.45, 0.94)) both;
+}
+.el-drawer-scrim.is-open {
+  animation: zz-scrim-in 120ms linear both;
+}
+.el-drawer-scrim.is-closing {
+  animation: zz-scrim-out 120ms linear both;
+  pointer-events: none;
+}
+
+/* —— 节拍 3 新气泡入场：6u 上浮 + 淡入 120ms（只给最后两条，历史不重播） —— */
+@keyframes zz-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(6 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ellen-app[data-skin='zzz'] .el-msg.zz-anim-pop {
+  animation: zz-msg-in 120ms var(--z-e-out, ease-out) both;
+}
+
+/* —— 节拍 4 按钮按下：位移 1u、硬影收没了（视觉上「按进纸面」）80ms linear —— */
+.ellen-app[data-skin='zzz'] button,
+.ellen-app[data-skin='zzz'] .el-nav-item {
+  transition: transform 80ms linear;
+  touch-action: manipulation;
+}
+.ellen-app[data-skin='zzz'] button:active,
+.ellen-app[data-skin='zzz'] .el-nav-item:active {
+  transform: translate(calc(1 * var(--u)), calc(1 * var(--u)));
+}
+/* 硬影跟着收：只在这里允许碰 filter（不是 box-shadow），合成层友好 */
+.ellen-app[data-skin='zzz'] button:active {
+  filter: brightness(0.96);
+}
+
+/* —— 节拍 5 tab 选中：只过渡颜色，不位移 120ms linear —— */
+.ellen-app[data-skin='zzz'] .el-nav-item,
+.ellen-app[data-skin='zzz'] .el-nav-item .el-nav-icon svg,
+.ellen-app[data-skin='zzz'] .el-segment,
+.ellen-app[data-skin='zzz'] .el-segment.is-active,
+.ellen-app[data-skin='zzz'] .el-settings-segment,
+.ellen-app[data-skin='zzz'] .el-settings-segment.is-active,
+.ellen-app[data-skin='zzz'] .el-settings-chip,
+.ellen-app[data-skin='zzz'] .el-settings-chip.is-active {
+  transition:
+    background-color 120ms linear,
+    border-color 120ms linear,
+    color 120ms linear,
+    fill 120ms linear;
+}
+
+/* —— 节拍 6 里程碑（A 档，单屏一次）：260ms glitch，仅相处天数达成时挂 .zz-anim-glitch —— */
+@keyframes zz-glitch {
+  0% {
+    transform: translateX(0);
+    filter: none;
+  }
+  8% {
+    transform: translateX(calc(-2 * var(--u)));
+    filter: hue-rotate(-18deg) saturate(1.4);
+  }
+  16% {
+    transform: translateX(calc(2 * var(--u)));
+    filter: hue-rotate(12deg) saturate(1.2);
+  }
+  28% {
+    transform: translateX(calc(-1 * var(--u)));
+    filter: none;
+  }
+  40% {
+    transform: translateX(calc(1 * var(--u)));
+    filter: hue-rotate(-8deg) saturate(1.6);
+  }
+  60% {
+    transform: translateX(0);
+    filter: saturate(2.2);
+  }
+  100% {
+    transform: translateX(0);
+    filter: none;
+  }
+}
+.ellen-app[data-skin='zzz'] .zz-anim-glitch {
+  animation: zz-glitch 260ms var(--z-e-glitch, cubic-bezier(0.36, 0, 0.66, -0.56)) both;
+}
+
+/* —— 节拍 7 抽屉内列表首屏：0ms，不做 stagger —— */
+
+/* —— 降级链（§5.3）：系统减弱动效 / 低端机自动降级 / 键盘弹起停循环 —— */
+@media (prefers-reduced-motion: reduce) {
+  .ellen-app * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.ellen-app.reduce-ui-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+.ellen-app[data-input='keyboard'] .zz-anim-float {
+  animation: none;
+}

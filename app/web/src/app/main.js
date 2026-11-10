@@ -16,12 +16,15 @@ import './styles/zz-parts.css';
 import './styles/zz-wall.css';
 // 批 3：抽屉外壳（记忆 / 相处 / 设置不再换根页面）
 import './styles/zz-drawer.css';
+// 批 4：动效层（七条节拍 + 降级链）
+import './styles/zz-motion.css';
 
 import { s } from './strings.zh.js';
 import { iconEl } from './ui/icons.js';
 import { call, isNative } from './core/native/bridge.js';
 import { defineView, mountRouter, show, push, pop, current, currentName } from './ui/router.js';
 import { createDrawer } from './ui/frame-drawer.js';
+import { initMotionGuard } from './ui/motion-guard.js';
 import { createChatView } from './ui/views/chat/chat.js';
 import { createPlaceholderView } from './ui/views/placeholder.js';
 import { createMemoryView } from './ui/views/memory/memory.js';
@@ -364,6 +367,9 @@ function sendMessage(text) {
     },
   });
 
+  // 动效降级收口：系统减弱动效 / 低端机探测 / 键盘弹起
+  const motion = initMotionGuard(root);
+
   const DRAWER_TABS = new Set(['memory', 'companion', 'settings']);
   const drawer = createDrawer({
     root,
@@ -542,6 +548,7 @@ function sendMessage(text) {
   // 暴露给验收脚本（只读快照，不参与业务）
   window.__ellen = {
     version: '0.3.0-m7',
+    motion: { reduce: () => motion.reduce(), isReduced: () => motion.isReduced() },
     drawer: {
       open: (name) => drawer.open(name),
       close: () => drawer.close(),
