@@ -57,6 +57,7 @@
 | `open` | `{uri}` | `{base64, bytes, name, mimeType}` | `DOCUMENT_INVALID_URI` / `DOCUMENT_NOT_FOUND` / `DOCUMENT_TOO_LARGE` / `DOCUMENT_READ_FAILED` |
 | `remove` | `{uri}` | `{removed:Boolean}` | `DOCUMENT_INVALID_URI` |
 | `stat` | `{uri}` | `{exists, bytes, mtime, name}` | `DOCUMENT_INVALID_URI` |
+| `list` | `{prefix?}` | `{files:[{name, bytes, mtime, uri}], count, totalBytes, skipped, truncated}` | 无（读目录失败回空表） |
 
 约束：
 
@@ -64,12 +65,25 @@
 2. 文件名 = 调用方 `name` 的净化前缀（非字母数字→`_`，截 40）+ 自生成 16 位 id + 原扩展名；**绝不拿 name 拼路径**。
 3. 读只认本机 fileprovider 的 `content://` 或纯文件名；带 `/`、反斜杠、`..` 的一律 `DOCUMENT_INVALID_URI`。
 4. 先写 `<name>.part` 再 `renameTo`，中途失败不留半个附件。
+5. `list()` 只列 `filesDir/attachments` **一层**（不递归），按 `mtime` 从新到旧，上限 5000 条；`*.part` 与子目录只计入 `skipped` 不返回；`prefix` 可选（如 `voice-`）。**排序和「删谁」的策略留 web**（原生只给数据），因为 200 MB 清理的阈值以后还会调。
 
 实测（模拟器 16448 / pid 2997 / CDP 9336）：
 
 | 探针 | 结果 |
 |---|---|
-| `Object.keys(window.Capacitor.Plugins)` | 18 = 14 自定义 + 4 core，`EllenDocuments` 在列，4 方法齐 |
+| `Object.keys(window.Capacitor.Plugins)` | 18 = 14 自定义 + 4 core，`EllenDocuments` 在列，4 方法齐（`list` 2026-11-11 追加后为 5，见下） |
 | `save({name:'../../evil 测试.txt', base64:'aGVsbG8…'})` | `…/attachments/______evil_测试-2659a3050f1d495e.txt`，23 B，`mimeType:text/plain` |
 | `stat` / `open` / `remove` / 再 `stat` | `exists:true,23` → 往返 base64 一致 → `removed:true` → `exists:false` |
 | `open({uri:'content://other.provider/x.txt'})` | 「这个 uri 不是本机附件。」 |
+
+`list()` 实测（2026-11-11 22:00 / APK 100,533,188 B / pid 35814 / CDP 9336）：
+
+| 探针 | 结果 |
+|---|---|
+| `run-as … echo partial > a-test.wav.part`、`b-test.wav.part`、`mkdir subdir-test` 后再 `list({})` | `{count:1, totalBytes:28204, skipped:3, truncated:false}` —— 两个 `.part` 与一个子目录都只进 `skipped`，不进 `files` |
+| `list({prefix:'voice-'})` | 只回 `voice-*`，`count`/`totalBytes` 与全量一致（附件目录里只有语音） |
+| 排序 | 新→旧（`voice-1794368378749` 在前、`voice-1794366212628` 在后）；`mtime` 是毫秒时间戳 |
+| `totalBytes` | 与 `files[].bytes` 求和逐条相等（lead 侧删 4→2→1 时 `2017584→53592→28204`，`freedBytes` 完全对上） |
+
+`truncated` 未实测（要 5,000 条）：逻辑是 `picked.size > MAX_LIST` 时 `subList(0, MAX_LIST)` 并置 `true`，只改返回值不改磁盘，不会删任何东西。
+

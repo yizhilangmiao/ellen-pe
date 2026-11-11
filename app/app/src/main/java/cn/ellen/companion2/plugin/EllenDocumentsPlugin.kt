@@ -8,11 +8,12 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import org.json.JSONArray
 import java.io.File
 import java.util.UUID
 
 /**
- * 聊天附件的落盘/读取。只做四件事：save / open / remove / stat。
+ * 聊天附件的落盘/读取。只做五件事：save / open / remove / stat / list。
  *
  * 落点是 context.filesDir/attachments，uri 由 `${applicationId}.fileprovider` 出
  * （res/xml/file_paths.xml 里 files-path 已经覆盖整个 filesDir）。
@@ -27,6 +28,9 @@ class EllenDocumentsPlugin : Plugin() {
 
     /** 32 MiB：够放一张原图或一段短录音，再大就该走别通道了。 */
     private val maxBytes = 32L * 1024 * 1024
+
+    /** list() 一次最多回多少条：5000 条 × 4 个字段，过桥体积还在几十 KB 量级。 */
+    private val MAX_LIST = 5000
 
     private fun dir(): File = File(context.filesDir, "attachments").apply { mkdirs() }
 
@@ -194,6 +198,55 @@ class EllenDocumentsPlugin : Plugin() {
         out.put("bytes", if (exists) file.length() else 0L)
         out.put("mtime", if (exists) file.lastModified() else 0L)
         out.put("name", file.name)
+        call.resolve(out)
+    }
+
+    /**
+     * list({prefix?}) → {files:[{name, bytes, mtime, uri}], count, totalBytes, skipped, truncated}
+     *
+     * 只列 filesDir/attachments 这一层，不递归；按 mtime 从新到旧；最多 5000 条。
+     * prefix 可选（例如 "voice-"），只回文件名以它开头的。
+     * 半成品（*.part）和子目录不计入，只加进 skipped。
+     * 排序与删谁由 web 侧决定，这里只给数据。
+     */
+    @PluginMethod
+    fun list(call: PluginCall) {
+        val prefix = call.getString("prefix").orEmpty()
+        val all = dir().listFiles() ?: emptyArray()
+        var skipped = 0
+        val picked = ArrayList<File>(all.size)
+        for (f in all) {
+            if (!f.isFile || f.name.endsWith(".part")) {
+                skipped++
+                continue
+            }
+            if (prefix.isNotEmpty() && !f.name.startsWith(prefix)) continue
+            picked.add(f)
+        }
+        picked.sortByDescending { it.lastModified() }
+        val truncated = picked.size > MAX_LIST
+        val capped = if (truncated) picked.subList(0, MAX_LIST) else picked
+        val arr = JSONArray()
+        var total = 0L
+        for (f in capped) {
+            val o = JSObject()
+            o.put("name", f.name)
+            o.put("bytes", f.length())
+            o.put("mtime", f.lastModified())
+            o.put("uri", try {
+                FileProvider.getUriForFile(context, authority(), f).toString()
+            } catch (e: Exception) {
+                ""
+            })
+            arr.put(o)
+            total += f.length()
+        }
+        val out = JSObject()
+        out.put("files", arr)
+        out.put("count", capped.size)
+        out.put("totalBytes", total)
+        out.put("skipped", skipped)
+        out.put("truncated", truncated)
         call.resolve(out)
     }
 
