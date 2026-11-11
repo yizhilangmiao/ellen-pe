@@ -3,6 +3,10 @@ package cn.ellen.companion2
 import android.content.Intent
 import android.os.Bundle
 import com.getcapacitor.BridgeActivity
+// App 插件管两件事：backButton 事件（我们的返回键裁决全靠它）与 minimizeApp()。
+// 少了它，web 侧 App.addListener('backButton') 会抛「not implemented on android」，
+// 结果是按一次返回键直接回桌面 —— 真机实测踩过，模拟器不炸只是运气。
+import com.capacitorjs.plugins.app.AppPlugin
 import cn.ellen.companion2.plugin.EllenAutonomyPlugin
 import cn.ellen.companion2.plugin.EllenBackgroundPlugin
 import cn.ellen.companion2.plugin.EllenModelHttpPlugin
@@ -24,6 +28,7 @@ import cn.ellen.companion2.plugin.EllenDocumentsPlugin
 class MainActivity : BridgeActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        registerPlugin(AppPlugin::class.java)
         registerPlugin(EchoPlugin::class.java)
         registerPlugin(EllenReleaseInfoPlugin::class.java)
         registerPlugin(EllenSecureConfigPlugin::class.java)

@@ -30,7 +30,10 @@
         </intent>
     </queries>
 
+    <!-- 关掉预测性返回：Android 13+ 默认走 OnBackInvokedCallback，Capacitor 的 backButton 事件在那条路上收不到，
+         真机上表现为「按一次返回就回桌面」。关掉后回到传统 onBackPressed → backButton 事件 → 我们的四层裁决。 -->
     <application
+        android:enableOnBackInvokedCallback="false"
         android:allowBackup="false"
         android:icon="@drawable/ic_ellen_launcher"
         android:roundIcon="@drawable/ic_ellen_launcher"
