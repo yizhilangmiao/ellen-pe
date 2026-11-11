@@ -11,6 +11,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import cn.ellen.companion2.proactive.EllenBackupWorker
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -190,6 +191,8 @@ class EllenArchivePlugin : Plugin() {
 
     private var backupWriter: Writer? = null
     private var directoryCall: PluginCall? = null
+    /** 后台提醒排期是否已按当前状态对过一次（App 起过一次就够，不必每次 state 都入队）。 */
+    private var backupArmed = false
 
     private fun prefs() = context.getSharedPreferences("ellen-backup-v1", android.content.Context.MODE_PRIVATE)
 
@@ -308,7 +311,14 @@ class EllenArchivePlugin : Plugin() {
         val method = call.getString("method").orEmpty()
         val value = call.getObject("value") ?: JSObject()
         when (method) {
-            "state" -> call.resolve(statePayload())
+            "state" -> {
+                // 每次启动 web 都会先读一次 state：顺手把后台提醒排上（老状态里可能根本没排过）
+                if (!backupArmed) {
+                    backupArmed = true
+                    EllenBackupWorker.scheduleNext(context)
+                }
+                call.resolve(statePayload())
+            }
             "configure" -> configure(call, value)
             "begin" -> backupBegin(call, value)
             "write" -> backupWrite(call, value)
@@ -328,6 +338,8 @@ class EllenArchivePlugin : Plugin() {
         }
         if (!json.optBoolean("enabled")) json.put("nextAt", 0L)
         writeState(json)
+        // 开关/间隔/nextAt 变了，后台提醒要跟着重排（关掉时 scheduleNext 会撤掉排期）
+        EllenBackupWorker.scheduleNext(context)
         call.resolve(statePayload())
     }
 
@@ -380,6 +392,7 @@ class EllenArchivePlugin : Plugin() {
         writeState(json)
         val out = statePayload()
         out.put("directoryName", name)
+        EllenBackupWorker.scheduleNext(context)
         target.resolve(out)
     }
 
@@ -558,6 +571,8 @@ class EllenArchivePlugin : Plugin() {
             writeState(json)
 
             val pruned = prune(json)
+            // 备份成功了：nextAt 已经推到下一次，后台提醒跟着重排
+            EllenBackupWorker.scheduleNext(context)
 
             val group = JSObject().apply {
                 put("name", writer.name)
