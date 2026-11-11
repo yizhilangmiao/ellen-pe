@@ -73,7 +73,7 @@ export async function todayJournal(at = Date.now()) {
   // 先只取最近 60 篇（快）；取不到再全量兜一次。
   // 为什么要有兜底：手记没有「按 day 查」的索引，只能按时间排序后截断，
   // 一旦库里手记超过 60 篇（写满两个月就到），今天那篇可能落在截断之外，
-  // 于是显示成「今天还没写」→ 又新开一篇，一天两篇（压测 502 篇时踩到）。
+  // 于是显示成「今天还没写」→ 又新开一篇，一天两篇（压测 503 篇时踩到，见 _verify\M8-回归.md）。
   const rows = await listLatest('journal', { limit: 60 });
   let hit = rows.find((r) => (r.value && r.value.day) === day);
   if (!hit) {
@@ -225,8 +225,10 @@ export async function writeJournal({ title, diary, thoughts = '', day = dayKey()
   };
   // 手记是全局的（不挂在某个会话线程下），threadId 传 null
   const rec = await appendRecord({ kind: 'journal', value, threadId: null, at });
-  return { headId: rec.headId, revisionId: rec.revisionId, day, revised: false };
+  // 写完要失效召回索引：手记也进检索池，不失效就要等 5 分钟 TTL 才看得见新写的那篇。
+  // （原来这行写在 return 后面 = 死代码，永远不会执行 —— 2026-11-11 修。）
   invalidateRecall();
+  return { headId: rec.headId, revisionId: rec.revisionId, day, revised: false };
 }
 
 function mergeIds(a, b) {

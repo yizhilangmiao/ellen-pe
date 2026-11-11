@@ -10,6 +10,9 @@ import './chat.css';
 
 // 语音态文案。lead 在改 strings.zh.js，这里先用本地常量，别两头改同一个文件。
 // 文案统一走 strings.zh.js 的 chat 段（getter：切换语言时立刻生效，不必重建视图）
+// arming 超过这个时长还没进 recording，就是卡在系统权限弹窗上了
+const ARMING_WAIT_MS = 600;
+
 const VT = {
   get hold() { return s('chat.voiceHold'); },
   get arming() { return s('chat.voiceArming'); },
@@ -183,7 +186,7 @@ export function createChatView() {
         if (phase === 'transcribing') hudHint.textContent = VT.writing;
         else if (cancel) hudHint.textContent = VT.releaseCancel;
         else if (phase === 'recording') hudHint.textContent = VT.releaseSend;
-        else if (arming) hudHint.textContent = VT.arming;
+        else if (arming) hudHint.textContent = (Number(st && st.ms) || 0) > ARMING_WAIT_MS ? s('chat.voiceArmingWait') : VT.arming;
         else hudHint.textContent = VT.slideCancel;
       }
 
@@ -635,10 +638,22 @@ export function createChatView() {
       // 多一条订阅通道（老版本 main.js 还没接 onState 时不至于完全没有反馈）。
       if (voice && typeof voice.subscribe === 'function') {
         voice.subscribe((st) => {
-          if (st && st.phase === 'error') setVoiceError(st);
+          // 控制器把失败也顺着 state 广播一份（st.error）：权限被拒、录音器起不来
+          // 的时候浮层要变红说话，否则界面一声不吭，看着像按钮坏了。
+          if (st && st.error) setVoiceError(st.error);
+          else if (st && st.phase === 'error') setVoiceError(st);
           else setVoiceState(st);
         });
       }
+
+      // 页面切走 / Activity 暂停时把正在录的那段收掉：
+      // 手指滑出元素还能补 lostpointercapture，人按 Home 键就没 pointerup 可等了。
+      const onHidden = () => {
+        if (document.visibilityState !== 'hidden' || !voice) return;
+        const st = typeof voice.state === 'function' ? voice.state() : null;
+        if (st && st.phase !== 'idle' && st.phase !== 'transcribing') voice.cancel();
+      };
+      document.addEventListener('visibilitychange', onHidden);
 
       const api = {
         setVoiceState,
@@ -649,6 +664,7 @@ export function createChatView() {
         // 语音条 / 语音消息的 blob URL 只在当前这棵 stream 上还有用；视图销毁就全撤掉。
         // 不撤的话 1/7 概率攒下来的 blob 会一直常驻（聊 700 句就是 100 个 URL）。
         destroy() {
+          document.removeEventListener('visibilitychange', onHidden);
           clipCache.forEach((url) => {
             try {
               URL.revokeObjectURL(url);

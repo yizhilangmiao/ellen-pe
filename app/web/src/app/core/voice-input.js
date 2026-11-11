@@ -13,6 +13,8 @@ export const MIN_MS = 700;
 export const MAX_MS = 60000;
 export const CANCEL_DY = 48;
 export const CANCEL_HYST = 8;
+/** 系统权限弹窗可能一直没人点：等这么久还没开录，就当成「没拿到权限」收场，别在 arming 装死。 */
+export const START_TIMEOUT_MS = 8000;
 
 export function createVoiceInput(options = {}) {
   const onState = typeof options.onState === 'function' ? options.onState : () => {};
@@ -32,6 +34,8 @@ export function createVoiceInput(options = {}) {
   let armTimer = null;
   let tickTimer = null;
   let maxTimer = null;
+  let startGuard = null;
+  let startPending = false;
   let runId = 0;
 
   function elapsed() {
@@ -42,18 +46,31 @@ export function createVoiceInput(options = {}) {
     return { phase, ms: elapsed(), cancel: cancelArmed };
   }
 
-  function emit() {
-    const st = snapshot();
+  function emit(extra) {
+    const st = extra ? Object.assign(snapshot(), extra) : snapshot();
     onState(st);
     for (const fn of listeners) {
       try { fn(st); } catch (err) { console.error('[voice-input] 订阅回调失败', err); }
     }
   }
 
+  /**
+   * 失败统一从这里出门：既给 app 层 onError（弹一句 flash），
+   * 也顺着 state 广播一份 error —— 视图的录音浮层靠这个变红，
+   * 否则权限被拒时界面会一声不吭，看着像按钮坏了。
+   */
+  function fail(code, message) {
+    const err = { code, message };
+    phase = 'idle';
+    onError(err);
+    emit({ error: err });
+  }
+
   function clearTimers() {
     if (armTimer) { clearTimeout(armTimer); armTimer = null; }
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     if (maxTimer) { clearTimeout(maxTimer); maxTimer = null; }
+    if (startGuard) { clearTimeout(startGuard); startGuard = null; }
   }
 
   function dropRecording() {
@@ -65,8 +82,20 @@ export function createVoiceInput(options = {}) {
 
   async function begin() {
     const id = runId;
+    // recorder.start() 在没授权时会先把系统权限弹窗挂起来，Promise 既不 resolve 也不 reject。
+    // 没有这道守卫，界面会一直停在 arming（看着像按钮坏了）。
+    if (startGuard) clearTimeout(startGuard);
+    startGuard = setTimeout(() => {
+      startGuard = null;
+      if (id !== runId || phase !== 'arming') return;
+      runId += 1;
+      fail('AUDIO_PERMISSION', '等不到系统录音权限');
+    }, START_TIMEOUT_MS);
+    startPending = true;
     try {
       const res = await recorder.start({ maxDurationMs: MAX_MS });
+      startPending = false;
+      if (startGuard) { clearTimeout(startGuard); startGuard = null; }
       if (id !== runId) {
         // 权限/启动这 100ms 里用户已经松手或取消了
         recorder.cancel().catch(() => {});
@@ -77,15 +106,11 @@ export function createVoiceInput(options = {}) {
       startedAt = now();
       phase = 'recording';
       emit();
-      tickTimer = setInterval(() => {
-        if (phase === 'recording' || phase === 'cancelling') emit();
-      }, 200);
       maxTimer = setTimeout(() => { finalize(); }, MAX_MS);
     } catch (err) {
+      startPending = false;
       clearTimers();
-      phase = 'idle';
-      emit();
-      onError({ code: (err && err.code) || 'AUDIO_FAILED', message: String((err && err.message) || err) });
+      fail((err && err.code) || 'AUDIO_FAILED', String((err && err.message) || err));
     }
   }
 
@@ -97,6 +122,11 @@ export function createVoiceInput(options = {}) {
     startY = Number.isFinite(y) ? y : 0;
     cancelArmed = false;
     fileId = '';
+    // arming 也要走表：界面靠 ms 判断「按下半天还没开录 = 卡在权限弹窗」
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(() => {
+      if (phase === 'arming' || phase === 'recording' || phase === 'cancelling') emit();
+    }, 200);
     emit();
     armTimer = setTimeout(() => {
       armTimer = null;
@@ -146,7 +176,7 @@ export function createVoiceInput(options = {}) {
         phase = 'idle';
         dropRecording();
         emit();
-        onError({ code: (err && err.code) || 'AUDIO_FAILED', message: String((err && err.message) || err) });
+        fail((err && err.code) || 'AUDIO_FAILED', String((err && err.message) || err));
         return;
       }
     }
@@ -155,7 +185,7 @@ export function createVoiceInput(options = {}) {
       phase = 'idle';
       emit();
       dropRecording();
-      onError({ code: 'VOICE_TOO_SHORT', message: '太短了，再说一遍呗' });
+      fail('VOICE_TOO_SHORT', '太短了，再说一遍呗');
       return;
     }
 
@@ -170,7 +200,7 @@ export function createVoiceInput(options = {}) {
       phase = 'idle';
       dropRecording();
       emit();
-      onError({ code: (err && err.code) || 'AUDIO_READ_FAILED', message: String((err && err.message) || err) });
+      fail((err && err.code) || 'AUDIO_READ_FAILED', String((err && err.message) || err));
       return;
     }
     // 录音文件只是转写的原料，读出来就能删（真正的语音条会另存到 attachments）
@@ -179,14 +209,14 @@ export function createVoiceInput(options = {}) {
     if (!base64) {
       phase = 'idle';
       emit();
-      onError({ code: 'AUDIO_EMPTY', message: '这段录音是空的。' });
+      fail('AUDIO_EMPTY', '这段录音是空的。');
       return;
     }
 
     try {
       await onCommit({ base64, durationMs });
     } catch (err) {
-      onError({ code: (err && err.code) || 'VOICE_COMMIT_FAILED', message: String((err && err.message) || err) });
+      fail((err && err.code) || 'VOICE_COMMIT_FAILED', String((err && err.message) || err));
     } finally {
       if (id === runId) {
         phase = 'idle';
@@ -197,10 +227,17 @@ export function createVoiceInput(options = {}) {
 
   function release() {
     if (phase === 'arming') {
-      // < 300ms 当误触：不出提示，不转写
+      // 按下去超过 arming 却还没开录：多半是系统权限弹窗挂着没人点。
+      // 这时候当「误触」静默收场最坑人——手指明明按了好久，界面一声不吭。
+      const blocked = startPending && elapsed() >= ARM_MS;
       runId += 1;
       clearTimers();
+      startPending = false;
       phase = 'idle';
+      if (blocked) {
+        fail('AUDIO_PERMISSION', '没拿到系统录音权限');
+        return snapshot();
+      }
       emit();
       return snapshot();
     }
