@@ -162,6 +162,12 @@
   margin-bottom: calc(4 * var(--u));
 }
 
+/* 卡片底是米白纸：绝区零皮肤把 --jr-rose 换成了霓虹粉（#ff6e96），
+   落在纸上太浅，日期改深玫瑰。 */
+.ellen-app[data-skin='zzz'] .el-journal-day {
+  color: #8a4a63;
+}
+
 .el-memory-more {
   appearance: none;
   border: 0;

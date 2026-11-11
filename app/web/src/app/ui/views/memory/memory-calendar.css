@@ -52,7 +52,7 @@
   font-size: calc(10.5 * var(--u));
   line-height: calc(18 * var(--u));
   color: var(--jr-muted);
-  opacity: 0.75;
+  opacity: 1;
 }
 
 .el-journal-grid {
@@ -74,8 +74,10 @@
   font-family: inherit;
   font-size: calc(12.5 * var(--u));
   line-height: 1;
-  color: var(--el-ink);
-  opacity: 0.42;
+  /* 底是米白纸，字必须是深的：以前用 --el-ink + opacity .42，
+     在浅底上等于浅灰（用户反馈「看着费劲」）。空日给中间灰，有手记的给墨色。 */
+  color: var(--el-paper-muted);
+  opacity: 1;
   cursor: default;
   border-radius: calc(9 * var(--u));
 }
@@ -85,8 +87,9 @@
 }
 
 .el-journal-day-cell.has-entry {
-  opacity: 1;
   background: var(--jr-soft);
+  color: var(--el-ink);
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -102,14 +105,15 @@
 }
 
 .el-journal-day-cell.is-today {
-  box-shadow: inset 0 0 0 calc(1 * var(--u)) var(--jr-rose);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--jr-rose);
+  color: var(--jr-rose);
 }
 
 .el-journal-all-head {
   margin: calc(14 * var(--u)) 0 calc(2 * var(--u));
   font-size: calc(11 * var(--u));
   letter-spacing: calc(0.6 * var(--u));
-  color: var(--el-muted);
+  color: var(--el-paper-muted);
 }
 
 .el-journal-cards {
@@ -129,37 +133,49 @@
   font-family: inherit;
 }
 
-/* 绝区零皮肤（批 5 · B 档）：日历表头网点 + 今天用荧光描边。 */
+/* 绝区零皮肤（批 5 · B 档）：纸面日历。这里所有颜色都必须是「纸上墨色」——
+   之前照抄了深底用的 --z-ink / --z-ink-3（近白 + 浅灰），落在米白纸上几乎看不见。 */
+.ellen-app[data-skin='zzz'] .el-journal-cal {
+  border-radius: var(--z-r-2);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+}
+
 .ellen-app[data-skin='zzz'] .el-journal-cal-head,
 .ellen-app[data-skin='zzz'] .el-journal-week {
-  background-image: radial-gradient(#ffffff 1px, transparent 1px);
+  background-image: radial-gradient(rgba(18, 16, 15, 0.07) 1px, transparent 1px);
   background-size: calc(9 * var(--u)) calc(9 * var(--u));
-  background-blend-mode: overlay;
   border-radius: var(--z-r-2);
 }
 
 .ellen-app[data-skin='zzz'] .el-journal-cal-title {
   font-family: var(--z-font-display);
-  color: var(--z-ink);
+  color: var(--z-ink-paper);
+}
+
+.ellen-app[data-skin='zzz'] .el-journal-month-arrow {
+  color: var(--z-ink-paper-2);
 }
 
 .ellen-app[data-skin='zzz'] .el-journal-week-cell {
   font-size: clamp(9.5px, calc(10 * var(--u)), 11px);
-  color: var(--z-ink-3);
+  color: var(--z-ink-paper-2);
 }
 
 .ellen-app[data-skin='zzz'] .el-journal-day-cell {
   border-radius: var(--z-r-3);
-  color: var(--z-ink-2);
+  color: var(--z-ink-paper-2);
 }
 
 .ellen-app[data-skin='zzz'] .el-journal-day-cell.has-entry {
-  color: var(--z-ink);
+  color: var(--z-ink-paper);
 }
 
 .ellen-app[data-skin='zzz'] .el-journal-day-cell.is-today {
-  box-shadow: inset 0 0 0 1px var(--z-signal);
-  color: var(--z-signal);
+  /* --jr-rose 在绝区零皮肤里是霓虹粉（给深底用的），落在米白纸上对比不够，
+     这里换成纸上能读的深玫瑰。 */
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--z-ink-paper-2);
+  color: var(--z-ink-paper);
+  background: rgba(149, 85, 113, 0.16);
 }
 
 /* 五个页签必须是一行：原来是两排（三段 + 三胶囊），合并后 360 宽放不下，会折行。
@@ -177,3 +193,10 @@
 
 .el-memory-tabs::-webkit-scrollbar { display: none; }
 .el-memory-tabs .el-segment { flex: 0 0 auto; }
+
+/* 备忘录页是 flex column + overflow auto，子项默认 flex-shrink:1——
+   内容比一屏高时页签行会被压成「只剩 padding」（实测高 5px，五个页签全看不见）。
+   页签行/日历/卡片都不许被压扁，让页面自己滚。 */
+.el-memory-page > * {
+  flex: 0 0 auto;
+}
