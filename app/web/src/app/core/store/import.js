@@ -4,7 +4,8 @@
 //   容器 = "ELLENPK1\n"(9B) + int32 大端 manifest 字节长 + manifest(UTF-8) + 各文件字节
 //   manifest v1 = { format:'ellen-companion-archive', version:1, package, files }            恰好 4 键
 //   manifest v2 = { ...v1, version:2, selection, groupId, checksum }                        恰好 7 键
-//   files[]     = { id, sha256, sizeBytes, mimeType }                                       恰好 4 键
+//   files[]     = { id, sha256, sizeBytes, mimeType } 或 { id, name, sha256, sizeBytes, mimeType }
+//                 （后者带 name，语音附件用：name 就是 filesDir/attachments 里的文件名）
 //   package     = { content, checksum }
 //   content     = { format:'ellen-companion-transfer', formatVersion:1, packageId,
 //                   origin:{deviceId,platform}, exportedAt, snapshot, media }               恰好 7 键
@@ -91,8 +92,16 @@ export function parseManifest(raw) {
   }
   const seen = new Set();
   for (const f of m.files) {
-    if (!keysAre(f, ['id', 'sha256', 'sizeBytes', 'mimeType'])) {
+    // 两种形状都收：
+    //   旧 {id,sha256,sizeBytes,mimeType}
+    //   新 {id,name,sha256,sizeBytes,mimeType}（语音附件：name 就是附件文件名，id 与之一致）
+    const legacyKeys = keysAre(f, ['id', 'sha256', 'sizeBytes', 'mimeType']);
+    const namedKeys = keysAre(f, ['id', 'name', 'sha256', 'sizeBytes', 'mimeType']);
+    if (!legacyKeys && !namedKeys) {
       throw fail('INVALID_ARCHIVE_FILES', '文件清单字段无效。');
+    }
+    if (namedKeys && (typeof f.name !== 'string' || !f.name)) {
+      throw fail('INVALID_ARCHIVE_FILES', '文件名为空。');
     }
     if (typeof f.id !== 'string' || !f.id) throw fail('INVALID_ARCHIVE_FILES', '文件标识为空。');
     if (seen.has(f.id)) throw fail('INVALID_ARCHIVE_FILES', '文件标识重复。');

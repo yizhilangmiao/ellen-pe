@@ -9,6 +9,7 @@
 //
 // 召回到的记忆由 chat/session.js 拼进 system 段，不进聊天记录。
 import { listLatest } from '../store/library.js';
+import { openDb, STORE_HEADS, STORE_REVISIONS } from '../store/db.js';
 
 /** 中文按二元组切，英文/数字按整词。返回 Set。 */
 export function tokens(text) {
@@ -80,20 +81,108 @@ export function invalidateRecall() {
   indexCache = null;
 }
 
+// 「一个事务读完一类记录」的旁路读法。
+//
+// 为什么不用 listLatest：它在 store/library.js:51 对**每条 head 各起一个事务**
+// （`await getOne(STORE_REVISIONS, last)`）。压测 5,020 条记忆时实测：
+// 逐条独立事务外推 2,333 ms，同样的读收进一个事务只要 446 ms —— 差 5 倍，
+// 慢的原因就是事务个数，不是数据量。
+//
+// 为什么不直接改 library.js：它是公共读路径（记忆页、备份、聊天历史都走），
+// 改它要连带动一大片回归。召回只需要「全量 + 末条 revision」，足够自己读，
+// 所以在这里开个旁路，library.js 一个字不动。
+//
+// 顺带的好处：按 revisionId 精确取，不会扫到库里那些没有 head 的孤儿 revision。
+//
+// 返回结构和 listLatest 逐字段一致；失败时抛出去，由 buildIndex 回退老路。
+function readLatestOneTx(kinds) {
+  return openDb().then((db) => new Promise((resolve, reject) => {
+    let tx;
+    try {
+      tx = db.transaction([STORE_HEADS, STORE_REVISIONS], 'readonly');
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    const headStore = tx.objectStore(STORE_HEADS);
+    const revStore = tx.objectStore(STORE_REVISIONS);
+    const byKind = new Map();
+
+    for (const kind of kinds) {
+      byKind.set(kind, []);
+      const req = headStore.index('kind').getAll(kind);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const heads = (req.result || []).filter(
+          (h) => h && !h.deleted && Array.isArray(h.revisions) && h.revisions.length,
+        );
+        heads.sort((a, b) => {
+          const ta = Number.isFinite(a.messageTime) ? a.messageTime : a.createdAt || 0;
+          const tb = Number.isFinite(b.messageTime) ? b.messageTime : b.createdAt || 0;
+          return tb - ta;
+        });
+        const bucket = byKind.get(kind);
+        for (const h of heads) {
+          const last = h.revisions[h.revisions.length - 1];
+          const r = revStore.get(last);
+          r.onsuccess = () => {
+            const rev = r.result;
+            if (!rev || rev.deleted) return;
+            bucket.push({
+              headId: h.id,
+              kind: h.kind,
+              threadId: h.threadId,
+              revisionId: rev.revisionId,
+              at: rev.at,
+              value: rev.value,
+              refs: rev.refs || [],
+              createdAt: h.createdAt,
+            });
+          };
+        }
+      };
+    }
+
+    // 事务只在「没有挂起请求」时才提交，所以 heads 回调里追加的 get 都算数。
+    tx.oncomplete = () => {
+      const out = [];
+      for (const kind of kinds) out.push(...(byKind.get(kind) || []));
+      resolve(out);
+    };
+    tx.onerror = () => reject(tx.error || new Error('[recall] 批量读事务失败'));
+    tx.onabort = () => reject(tx.error || new Error('[recall] 批量读事务被中止'));
+  }));
+}
+
 async function buildIndex(sources) {
   const entries = [];
-  for (const kind of sources) {
-    let list = [];
-    try {
-      list = await listLatest(kind, { limit: 0 });
-    } catch (err) {
-      console.warn('[recall] 读不到', kind, err);
-      continue;
+  let all = null;
+  try {
+    all = await readLatestOneTx(sources);
+  } catch (err) {
+    console.warn('[recall] 单事务批量读失败，回退 listLatest：', err);
+    all = null;
+  }
+
+  if (all) {
+    for (const entry of all) {
+      entries.push({ kind: entry.kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
     }
-    for (const entry of list) {
-      entries.push({ kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
+  } else {
+    for (const kind of sources) {
+      let list = [];
+      try {
+        list = await listLatest(kind, { limit: 0 });
+      } catch (err) {
+        console.warn('[recall] 读不到', kind, err);
+        continue;
+      }
+      for (const entry of list) {
+        entries.push({ kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
+      }
     }
   }
+
   if (entries.length > INDEX_MAX_ENTRIES) {
     console.warn('[recall] 索引条目过多，按时间保留最近的', INDEX_MAX_ENTRIES, '条，共', entries.length);
     entries.sort((a, b) => b.at - a.at);

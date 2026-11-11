@@ -3,8 +3,10 @@ package cn.ellen.companion2.plugin
 import android.Manifest
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.util.Base64
+import androidx.core.content.ContextCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.Plugin
@@ -67,6 +69,64 @@ class EllenAudioPlugin : Plugin() {
         out.put("bytes", bytesWritten)
         out.put("lastError", lastError)
         call.resolve(out)
+    }
+
+    /**
+     * 预先要麦克风权限。web 在「切到语音输入」那一刻就调一次，用户真按下时就不必等弹窗。
+     *
+     * 返回体固定 `{granted, asked, blocked}`：
+     * - `asked` = 这次有没有真弹窗；
+     * - `blocked` = 系统已经不会再弹了（Android 15 上连拒两次会置 USER_FIXED，再问是空窗），
+     *   这种情况只能引导用户去系统设置里开，web 侧据此决定给不给「去设置」按钮。
+     *
+     * **被拒也 resolve，不 reject** —— 拒了要不要提示是界面的事，reject 只会逼调用方再写一个 catch，
+     * 而且会让「第一次用」和「真出错」混在一个分支里。
+     */
+    @PluginMethod
+    fun requestPermission(call: PluginCall) {
+        if (alreadyGranted()) {
+            call.resolve(JSObject().put("granted", true).put("asked", false).put("blocked", false))
+            return
+        }
+        requestPermissionForAlias("microphone", call, "permissionResult")
+    }
+
+    @PermissionCallback
+    private fun permissionResult(call: PluginCall) {
+        val granted = alreadyGranted()
+        call.resolve(
+            JSObject()
+                .put("granted", granted)
+                .put("asked", true)
+                .put("blocked", !granted && !canAskAgain()),
+        )
+    }
+
+    /** 只看系统授权位，不碰 Capacitor 的权限缓存。 */
+    private fun alreadyGranted(): Boolean = try {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    } catch (e: Exception) {
+        // 拿不到就按「没授权」走弹窗，别把调用方卡在异常路径上
+        lastError = "读权限状态失败：${e.javaClass.simpleName}"
+        false
+    }
+
+    /**
+     * 系统还会不会再弹这个窗。
+     *
+     * `shouldShowRequestPermissionRationale` 为 false 且未授权，只有两种可能：连拒两次被置 USER_FIXED，
+     * 或者策略层禁掉了 —— 两种都是「再问没用」。读不到 activity 时按 true 处理（宁可多弹一次，
+     * 也别把还能问的人直接推去设置页）。
+     */
+    private fun canAskAgain(): Boolean = try {
+        val act = activity ?: return true
+        androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+            act,
+            Manifest.permission.RECORD_AUDIO,
+        )
+    } catch (e: Exception) {
+        true
     }
 
     @PluginMethod

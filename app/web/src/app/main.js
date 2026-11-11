@@ -297,6 +297,20 @@ function sendMessage(text, extra = null) {
   //   落盘 → 转写（失败不抛）→ 算波形 → 带着转写文本发出去，气泡只显示波形。
   // 转写失败也要发：不能让一次识别失败把你说的那句话吞掉；她收到「没听清」会反问。
   let voiceBusy = false;
+  // 切到语音态就把麦克风权限要到：否则第一次按下去会先卡在「在等系统弹权限…」，
+  // 要等人点完弹窗才开始录。只问一次（问过就记住，避免每次切页都弹）。
+  let micAsked = false;
+  async function ensureMicPermission() {
+    if (micAsked || !isNative()) return;
+    micAsked = true;
+    try {
+      const res = await call('EllenAudio', 'requestPermission');
+      if (res && res.granted === false) flash('要在系统里给录音权限，才能按住说话。');
+    } catch (err) {
+      // 原生还没上这个方法（老包）就静默退回「按下时再问」，不影响功能
+      console.warn('[main] 预请求麦克风权限失败', err);
+    }
+  }
 
   async function commitVoice({ base64, durationMs }) {
     if (!base64 || voiceBusy) return;
@@ -373,6 +387,7 @@ function sendMessage(text, extra = null) {
           onVoiceMode: (mode) => {
             // 语音态切走 / 切回来都别留半段录音
             if (mode !== 'voice') voiceInput.cancel();
+            else ensureMicPermission();
           },
           onRequestModel: openSettings,
         });

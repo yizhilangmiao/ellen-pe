@@ -56,15 +56,30 @@ class EllenArchivePlugin : Plugin() {
         }
         try {
             val file = pendingFile()
+            // 附件字节由原生按清单从 filesDir/attachments 读，不过 JS 桥（100 MB base64 过桥会 OOM）。
+            val plan = planAttachments(declaredFiles(manifestText))
+            val finalText = if (plan.missing.isEmpty()) manifestText else manifestWith(manifestText, plan.files)
+            val manifestBytes = finalText.toByteArray(Charsets.UTF_8)
+            var attached = 0L
             file.outputStream().use { out ->
                 out.write(magic)
-                writeInt(out, manifestText.toByteArray(Charsets.UTF_8).size)
-                out.write(manifestText.toByteArray(Charsets.UTF_8))
+                writeInt(out, manifestBytes.size)
+                out.write(manifestBytes)
+                attached = appendAttachments(out, plan.files, null)
             }
             val out = JSObject()
             out.put("handle", file.name)
             out.put("bytes", file.length())
+            out.put("files", plan.files.length())
+            out.put("attachments", attached)
+            out.put("missing", names(plan.missing))
             call.resolve(out)
+        } catch (e: FileMismatch) {
+            pendingFile().delete()
+            call.reject(e.message ?: "附件校验失败。", "ARCHIVE_FILE_MISMATCH")
+        } catch (e: TooLarge) {
+            pendingFile().delete()
+            call.reject(e.message ?: "附件太大。", "ARCHIVE_TOO_LARGE")
         } catch (e: Exception) {
             call.reject("打包失败：${e.javaClass.simpleName}", "ARCHIVE_WRITE_FAILED")
         }
@@ -119,7 +134,12 @@ class EllenArchivePlugin : Plugin() {
         }
     }
 
-    /** 让用户挑一个 .ellenpack，只读清单（媒体字节不读）。 */
+    /**
+     * 让用户挑一个 .ellenpack：读清单，并把清单里声明的附件字节写回 `filesDir/attachments`。
+     *
+     * 正文（manifest）交给 web 解析；附件字节不过桥 —— 由原生直接落盘，名字就是清单里的 `name`，
+     * 库里 `audio.uri` 存的是同一个名字，文件回来后点语音条自然能播。
+     */
     @PluginMethod
     fun pickImport(call: PluginCall) {
         importCall = call
@@ -149,6 +169,9 @@ class EllenArchivePlugin : Plugin() {
             return
         }
         try {
+            var restored = 0
+            val missing = mutableListOf<String>()
+            val kept = mutableListOf<String>()
             val manifestText = context.contentResolver.openInputStream(uri)?.use { input ->
                 val head = ByteArray(magic.size)
                 if (input.read(head) != magic.size || !head.contentEquals(magic)) {
@@ -163,11 +186,75 @@ class EllenArchivePlugin : Plugin() {
                     if (n <= 0) break
                     read += n
                 }
-                String(buf, 0, read, Charsets.UTF_8)
+                val text = String(buf, 0, read, Charsets.UTF_8)
+
+                // 附件区紧接在 manifest 之后、按 files 顺序排列，长度由 sizeBytes 定（没有分隔符）。
+                // 逐个写回 filesDir/attachments，名字用清单里的 name —— 库里 audio.uri 存的就是这个名字，
+                // 文件回来了，点语音条自然就能播。
+                val files = try {
+                    declaredFiles(text)
+                } catch (_: Exception) {
+                    JSONArray() // 清单不合规也照样把正文交给 web，附件一个都不还原
+                }
+                for (i in 0 until files.length()) {
+                    val f = files.getJSONObject(i)
+                    val name = f.optString("name").ifEmpty { f.optString("id") }
+                    val sizeBytes = f.optLong("sizeBytes", 0L)
+                    val expected = f.optString("sha256").lowercase()
+                    if (name.isEmpty() || sizeBytes <= 0L) {
+                        missing.add(name)
+                        continue
+                    }
+                    val dest = File(attachmentsDir(), name)
+                    val part = File(attachmentsDir(), "$name.part")
+                    attachmentsDir().mkdirs()
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    var left = sizeBytes
+                    var complete = true
+                    part.outputStream().use { out ->
+                        val chunk = ByteArray(ATTACH_CHUNK)
+                        while (left > 0) {
+                            val n = input.read(chunk, 0, minOf(left, chunk.size.toLong()).toInt())
+                            if (n <= 0) {
+                                complete = false
+                                break
+                            }
+                            out.write(chunk, 0, n)
+                            digest.update(chunk, 0, n)
+                            left -= n
+                        }
+                    }
+                    if (!complete) {
+                        part.delete()
+                        missing.add(name)
+                        continue
+                    }
+                    val actual = hexOf(digest.digest())
+                    if (!actual.equals(expected, ignoreCase = true)) {
+                        part.delete()
+                        missing.add(name)
+                        continue
+                    }
+                    // 同名已存在就不覆盖：库里可能正指着这份旧语音，覆盖等于改历史
+                    if (dest.isFile) {
+                        val same = sha256Of(dest).equals(expected, ignoreCase = true)
+                        part.delete()
+                        if (same) restored++ else kept.add(name)
+                        continue
+                    }
+                    if (part.renameTo(dest)) restored++ else {
+                        part.delete()
+                        missing.add(name)
+                    }
+                }
+                text
             } ?: throw IllegalStateException("打不开这个文件。")
 
             val out = JSObject()
             out.put("manifestText", manifestText)
+            out.put("restoredFiles", restored)
+            out.put("missingFiles", names(missing))
+            out.put("keptFiles", names(kept))
             out.put("cancelled", false)
             target.resolve(out)
         } catch (e: Exception) {
@@ -187,6 +274,8 @@ class EllenArchivePlugin : Plugin() {
         var fileIndex = 0
         var fileSha = MessageDigest.getInstance("SHA-256")
         var fileWritten = 0L
+        /** 清单里有、磁盘上没有的附件（已从写进容器的清单里剔除，只用来回报）。 */
+        val missing = mutableListOf<String>()
     }
 
     private var backupWriter: Writer? = null
@@ -410,29 +499,21 @@ class EllenArchivePlugin : Plugin() {
         }
 
         // 清单里声明的附件清单：附件区字节必须按这个顺序、按这些 sha256 落盘。
-        // 先校验清单再建文件，免得建出一个注定要删的空壳。
-        val declared = JSONArray()
+        // 先校验清单、先对一遍磁盘，再建文件，免得建出一个注定要删的空壳。
+        val plan: Attachments
         try {
-            val manifest = JSONObject(manifestText)
-            val arr = manifest.optJSONArray("files") ?: JSONArray()
-            for (i in 0 until arr.length()) {
-                val f = arr.optJSONObject(i) ?: throw IllegalStateException("files[$i] 不是对象")
-                val id = f.optString("id")
-                val sha = f.optString("sha256").lowercase()
-                val size = f.optLong("sizeBytes", 0L)
-                if (id.isEmpty()) throw IllegalStateException("files[$i] 缺 id")
-                if (!hex64.matches(sha)) throw IllegalStateException("files[$i] 的 sha256 不合法")
-                if (size <= 0L) throw IllegalStateException("files[$i] 的 sizeBytes 不合法")
-                declared.put(JSONObject().apply {
-                    put("id", id)
-                    put("sha256", sha)
-                    put("sizeBytes", size)
-                })
-            }
+            plan = planAttachments(declaredFiles(manifestText))
+        } catch (e: FileMismatch) {
+            call.reject(e.message ?: "附件校验失败。", "ARCHIVE_FILE_MISMATCH")
+            return
+        } catch (e: TooLarge) {
+            call.reject(e.message ?: "附件太大。", "ARCHIVE_TOO_LARGE")
+            return
         } catch (e: Exception) {
             call.reject("备份清单读不出来：${e.message ?: e.javaClass.simpleName}", "ARCHIVE_MANIFEST_INVALID")
             return
         }
+        val declared = plan.files
 
         backupWriter?.let {
             // 上一份没收尾：先当失败处理，免得两份写同一个文件
@@ -456,19 +537,38 @@ class EllenArchivePlugin : Plugin() {
                 ?: throw IllegalStateException("openOutputStream 返回 null")
             writer.out = stream
 
-            val manifestBytes = manifestText.toByteArray(Charsets.UTF_8)
+            // 缺附件时清单要跟着缩：容器里没有那些字节，manifest 就不能再声明它们，
+            // 否则导入侧「按 files 顺序切 blob」会从缺的那个开始整体错位。
+            val finalText = if (plan.missing.isEmpty()) manifestText else manifestWith(manifestText, plan.files)
+            val manifestBytes = finalText.toByteArray(Charsets.UTF_8)
             stream.write(magic)
             writeInt(stream, manifestBytes.size)
             stream.write(manifestBytes)
             writer.sha.update(manifestBytes)
             writer.bytes = magic.size + 4L + manifestBytes.size
+            writer.missing.addAll(plan.missing)
             backupWriter = writer
+
+            // 附件区：按清单顺序从磁盘读，边读边写边校 sha256
+            try {
+                appendAttachments(stream, plan.files, writer)
+            } catch (e: FileMismatch) {
+                failWriter(writer, e.message ?: "附件校验失败")
+                call.reject(e.message ?: "附件校验失败。", "ARCHIVE_FILE_MISMATCH")
+                return
+            } catch (e: TooLarge) {
+                failWriter(writer, e.message ?: "附件太大")
+                call.reject(e.message ?: "附件太大。", "ARCHIVE_TOO_LARGE")
+                return
+            }
 
             val out = JSObject()
             out.put("handle", name)
             out.put("name", name)
             out.put("bytes", writer.bytes)
             out.put("files", declared.length())
+            out.put("attachments", writer.offset)
+            out.put("missing", names(plan.missing))
             call.resolve(out)
         } catch (e: Exception) {
             call.reject("备份没开起来：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
@@ -479,6 +579,12 @@ class EllenArchivePlugin : Plugin() {
         val writer = backupWriter
         if (writer == null) {
             call.reject("没有正在进行的备份。", "BACKUP_NOT_STARTED")
+            return
+        }
+        // 附件字节现在由原生在 begin 里按清单从磁盘读完写完，web 不该再喂 ——
+        // 再喂就是往容器尾巴上多追加字节，包会坏。给个明确的码，别让它变成「附件比清单多」的报错。
+        if (writer.fileIndex >= writer.files.length()) {
+            call.reject("清单里的附件已经全部写完，没有待写字节。", "BACKUP_NOTHING_PENDING")
             return
         }
         val expected = value.optLong("offset", -1L)
@@ -582,6 +688,8 @@ class EllenArchivePlugin : Plugin() {
             val out = JSObject()
             out.put("group", group)
             out.put("pruned", pruned)
+            out.put("files", writer.files.length())
+            out.put("missing", names(writer.missing))
             out.put("state", statePayload())
             call.resolve(out)
         } catch (e: Exception) {
@@ -653,6 +761,163 @@ class EllenArchivePlugin : Plugin() {
     /** 附件 sha256 不符：单独一类，好和「磁盘写不进去」区分开。 */
     private class FileMismatch(message: String) : Exception(message)
 
+    /** 附件合计超过 100 MB：清单算错了，不写。 */
+    private class TooLarge(message: String) : Exception(message)
+
+    // —— 附件区：按清单从磁盘读字节 ——
+
+    /**
+     * 从清单里取 `files` 并逐条校验（缺 id / sha256 不是 64 位 hex / sizeBytes <= 0 直接抛）。
+     *
+     * **原样返回那些对象**，不重建成规整结构 —— 写进容器的清单要和 web 给的逐字节一致，
+     * 少一个键（比如 `mimeType`）导入侧就会判清单不合规。
+     */
+    private fun declaredFiles(manifestText: String): JSONArray {
+        val manifest = JSONObject(manifestText)
+        val arr = manifest.optJSONArray("files") ?: JSONArray()
+        val out = JSONArray()
+        for (i in 0 until arr.length()) {
+            val f = arr.optJSONObject(i) ?: throw IllegalStateException("files[$i] 不是对象")
+            val id = f.optString("id")
+            val sha = f.optString("sha256").lowercase()
+            val size = f.optLong("sizeBytes", 0L)
+            if (id.isEmpty()) throw IllegalStateException("files[$i] 缺 id")
+            if (!hex64.matches(sha)) throw IllegalStateException("files[$i] 的 sha256 不合法")
+            if (size <= 0L) throw IllegalStateException("files[$i] 的 sizeBytes 不合法")
+            out.put(f)
+        }
+        return out
+    }
+
+    /** 名字列表转 JSON 数组（返回体里给 web 看）。 */
+    private fun names(list: List<String>): JSONArray {
+        val arr = JSONArray()
+        list.forEach { arr.put(it) }
+        return arr
+    }
+
+    /** 磁盘上某个文件的 sha256。 */
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buf = ByteArray(ATTACH_CHUNK)
+        file.inputStream().use { input ->
+            while (true) {
+                val n = input.read(buf)
+                if (n <= 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        return hexOf(digest.digest())
+    }
+
+    /** 附件目录：`EllenDocuments.save` 把聊天附件落在这里（`voice-<ts>.wav` 等）。 */
+    private fun attachmentsDir(): File = File(context.filesDir, "attachments")
+
+    /** 清单里筛出来的「磁盘上真有」的附件。 */
+    private class Attachments(
+        /** 要写进容器的那一段清单（顺序不变，缺的已剔除）。 */
+        val files: JSONArray,
+        /** 磁盘上没有的附件名，按清单顺序。 */
+        val missing: MutableList<String>,
+        /** 这些附件字节合计。 */
+        val bytes: Long,
+    )
+
+    /**
+     * 按清单顺序对一遍磁盘：谁在、谁不在、合计多大。
+     *
+     * 缺的**不让整包失败** —— 语音文件可能早被 200 MB 清理删掉了，为这个让整次备份失败不值。
+     * 但清单必须跟着改：容器里没有这些字节，manifest 就不能再声明它们，
+     * 否则导入侧「按 files 顺序切 blob」会从缺的那一个开始整体错位。
+     *
+     * 大小与清单不符也在这里挡：磁盘上被截断/追加过，比 sha256 不符更好懂。
+     */
+    private fun planAttachments(declared: JSONArray): Attachments {
+        val dir = attachmentsDir()
+        val files = JSONArray()
+        val missing = mutableListOf<String>()
+        var total = 0L
+        for (i in 0 until declared.length()) {
+            val f = declared.getJSONObject(i)
+            val name = f.optString("name").ifEmpty { f.optString("id") }
+            val file = File(dir, name)
+            if (name.isEmpty() || !file.isFile) {
+                missing.add(name.ifEmpty { f.optString("id") })
+                continue
+            }
+            val size = file.length()
+            val declaredSize = f.optLong("sizeBytes", 0L)
+            if (size != declaredSize) {
+                throw FileMismatch("附件 $name 的大小与清单不符（清单 $declaredSize B，磁盘 $size B）。")
+            }
+            total += size
+            if (total > MAX_ATTACH_BYTES) {
+                throw TooLarge("附件合计超过 100 MB（已数到 $total B），这份包不写了。")
+            }
+            files.put(f)
+        }
+        return Attachments(files, missing, total)
+    }
+
+    /**
+     * 缺附件时把清单里的 `files` 换成「实际写进去的那几个」，其余原样。
+     *
+     * `package.checksum` 只盖 content，不动它 —— 所以改 files 不会让清单自相矛盾。
+     */
+    private fun manifestWith(manifestText: String, keep: JSONArray): String {
+        val json = JSONObject(manifestText)
+        json.put("files", keep)
+        return json.toString()
+    }
+
+    /**
+     * 把附件字节按顺序追加到 out，边写边算 sha256 与清单比对。
+     *
+     * `writer` 非空时顺手更新进度字段（`offset` / `fileIndex` / `bytes`），`state()` 直接读它。
+     * 返回实际写入的附件字节数。
+     */
+    private fun appendAttachments(out: OutputStream, files: JSONArray, writer: Writer?): Long {
+        val dir = attachmentsDir()
+        val buf = ByteArray(ATTACH_CHUNK)
+        var total = 0L
+        for (i in 0 until files.length()) {
+            val f = files.getJSONObject(i)
+            val name = f.optString("name").ifEmpty { f.optString("id") }
+            val expected = f.optString("sha256").lowercase()
+            val digest = MessageDigest.getInstance("SHA-256")
+            var perFile = 0L
+            val source = File(dir, name)
+            if (!source.isFile) {
+                // plan 之后被删了（清理任务正好跑到）：按内容对不上处理，别静默跳过
+                throw FileMismatch("附件 $name 在写入过程中不见了。")
+            }
+            source.inputStream().use { input ->
+                while (true) {
+                    val n = input.read(buf)
+                    if (n <= 0) break
+                    out.write(buf, 0, n)
+                    digest.update(buf, 0, n)
+                    perFile += n
+                    total += n
+                    if (total > MAX_ATTACH_BYTES) {
+                        throw TooLarge("附件合计超过 100 MB（已写 $total B），这份包不写了。")
+                    }
+                    writer?.let {
+                        it.offset = total
+                        it.bytes += n
+                        it.fileWritten = perFile
+                    }
+                }
+            }
+            val actual = hexOf(digest.digest())
+            if (!actual.equals(expected, ignoreCase = true)) {
+                throw FileMismatch("附件 $name 的 sha256 不符（期望 ${expected.take(12)}…，实际 ${actual.take(12)}…）。")
+            }
+            writer?.fileIndex = i + 1
+        }
+        return total
+    }
+
     private fun hexOf(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 
     /** 写坏了：关流 + 删掉半成品，再把错误记进 state。 */
@@ -712,5 +977,9 @@ class EllenArchivePlugin : Plugin() {
         const val BACKUP_RETAIN = 3
         const val DAY = 24L * 60 * 60 * 1000
         const val MAX_MANIFEST = 0x1100000
+        /** 附件合计上限 100 MB：语音条攒一年也就几十 MB，再多说明清单算错了。 */
+        const val MAX_ATTACH_BYTES = 100L * 1024 * 1024
+        /** 读附件用的块大小：64 KB 是闪存顺序读的甜点，太小系统调用多，太大占内存。 */
+        const val ATTACH_CHUNK = 64 * 1024
     }
 }

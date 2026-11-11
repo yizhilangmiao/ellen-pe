@@ -138,7 +138,13 @@ async function collectAttachments(records) {
         continue;
       }
       bytes += real;
-      files.push({ id: item.name, name: item.name, sha256: hex, sizeBytes: real });
+      files.push({
+        id: item.name,
+        name: item.name,
+        sha256: hex,
+        sizeBytes: real,
+        mimeType: mimeOf(item.name),
+      });
     } catch (err) {
       // 文件被清理/读不出：跳过，不整包失败（备份不该因为一条语音读不出就断）
       console.warn('[export] 附件读不出来，跳过', item.name, err);
@@ -146,6 +152,16 @@ async function collectAttachments(records) {
     }
   }
   return { files, bytes, skipped };
+}
+
+/** 附件扩展名 → MIME（导入侧会校验，空串会被拒）。目前只有语音。 */
+function mimeOf(name) {
+  const ext = String(name).toLowerCase().split('.').pop();
+  if (ext === 'wav') return 'audio/wav';
+  if (ext === 'mp3') return 'audio/mpeg';
+  if (ext === 'ogg') return 'audio/ogg';
+  if (ext === 'm4a') return 'audio/mp4';
+  return 'application/octet-stream';
 }
 
 async function sha256Base64(base64) {
