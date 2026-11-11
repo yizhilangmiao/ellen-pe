@@ -200,3 +200,7 @@
 .el-memory-page > * {
   flex: 0 0 auto;
 }
+
+/* 记忆列表分页容器：与手记卡片列表同样的竖向间隔 */
+.el-memory-cards { display: flex; flex-direction: column; gap: calc(10 * var(--u)); }
+.el-memory-cards > * { flex: 0 0 auto; }

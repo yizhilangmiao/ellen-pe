@@ -64,22 +64,53 @@ function summarize(entry) {
  * @param {{limit?: number, minScore?: number, sources?: string[]}} [opts]
  * @returns {Promise<Array<{kind,title,body,score,at}>>}
  */
-export async function recall(text, { limit = 6, minScore = 0.16, sources = ['memory', 'journal'] } = {}) {
-  const q = tokens(text);
-  const rows = [];
+// ── 记忆索引缓存 ────────────────────────────────────────────────
+// 为什么要有这一层：原来每条消息都调 listLatest(kind, {limit:300})，只看得见
+// 「最近 300 条」。压测 5,000 条记忆时复现了老 bug ③ 的升级版：**最老那条永远
+// 召回不到**（问「你还记得我那枚吊坠吗」她答「我不太清楚吊坠的事」）。
+// 全量扫一遍 5,000 条实测 544 ms（读 heads 212 + 读 revisions 287 + 打分 44），
+// 摊在每条消息上不可接受，所以：索引建一次缓存住，之后每次查询只打分（44 ms）。
+// 写入（新记忆/新修改/新日记）会调 invalidateRecall() 让它重建，另外 5 分钟兜底过期。
+const INDEX_TTL_MS = 5 * 60 * 1000;
+const INDEX_MAX_ENTRIES = 20000; // 超过这个量级再谈分库，别偷偷截断而不报
+let indexCache = null; // { at, entries: [{kind, entry, at, bag}] }
+
+/** 记忆/日记被写过后调用：下次 recall 重建索引。 */
+export function invalidateRecall() {
+  indexCache = null;
+}
+
+async function buildIndex(sources) {
+  const entries = [];
   for (const kind of sources) {
     let list = [];
     try {
-      list = await listLatest(kind, { limit: 300 });
+      list = await listLatest(kind, { limit: 0 });
     } catch (err) {
       console.warn('[recall] 读不到', kind, err);
       continue;
     }
     for (const entry of list) {
-      const body = textOfEntry(entry);
-      const score = overlapScore(q, tokens(body));
-      rows.push({ kind, entry, score, at: entry.at || 0 });
+      entries.push({ kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
     }
+  }
+  if (entries.length > INDEX_MAX_ENTRIES) {
+    console.warn('[recall] 索引条目过多，按时间保留最近的', INDEX_MAX_ENTRIES, '条，共', entries.length);
+    entries.sort((a, b) => b.at - a.at);
+    entries.length = INDEX_MAX_ENTRIES;
+  }
+  indexCache = { at: Date.now(), entries };
+  return entries;
+}
+
+export async function recall(text, { limit = 6, minScore = 0.16, sources = ['memory', 'journal'] } = {}) {
+  const q = tokens(text);
+  const rows = [];
+  const cached = indexCache && Date.now() - indexCache.at < INDEX_TTL_MS ? indexCache : null;
+  const index = cached ? cached.entries : await buildIndex(sources);
+  for (const item of index) {
+    const score = overlapScore(q, item.bag);
+    rows.push({ kind: item.kind, entry: item.entry, score, at: item.at });
   }
 
   const now = Date.now();

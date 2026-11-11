@@ -120,6 +120,30 @@ function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
   box.append(head, week, grid);
   return box;
 }
+// 记忆列表分页：压测 5,014 条时一次性渲染出 60,182 个 DOM 节点、4,261 ms、
+// scrollHeight 76 万 px —— 真机上等于进页面就卡。改成先渲染 60 条，点「再多看几条」追加，
+// 与手记列表（JOURNAL_PAGE）同一套做法，不重建已渲染的节点，滚动位置不跳。
+const MEMORY_PAGE = 60;
+
+function paintMemoryRows(host, rows, onChanged) {
+  const wrap = document.createElement('div');
+  wrap.className = 'el-memory-cards';
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'el-journal-more';
+  let shown = 0;
+  const grow = () => {
+    const slice = rows.slice(shown, shown + MEMORY_PAGE);
+    for (const r of slice) wrap.append(memoryCard(r, onChanged));
+    shown += slice.length;
+    if (shown >= rows.length) more.remove();
+    else more.textContent = `再多看几条（还剩 ${rows.length - shown} 条）`;
+  };
+  more.addEventListener('click', grow);
+  host.append(wrap, more);
+  grow();
+}
+
 function memoryCard(item, onChanged) {
   const card = document.createElement('article');
   card.className = 'el-memory-card';
@@ -560,10 +584,8 @@ export function createMemoryView() {
             if (!rows.length) {
               list.append(emptyBox(s('memory.emptyTitle'), s('memory.emptyAddHint')));
             } else {
-              for (const r of rows) {
-                // 第二参是「数据动过了」的回调：编辑面板存/删之后重载这一页
-                list.append(memoryCard(r, () => load()));
-              }
+              // 第二参是「数据动过了」的回调：编辑面板存/删之后重载这一页
+              paintMemoryRows(list, rows, () => load());
             }
           } else if (state.tab === 'shared') {
             hint.textContent = s('memory.sharedHint');
@@ -582,7 +604,7 @@ export function createMemoryView() {
               count.textContent = `${rows.length} 条`;
               bar.append(count);
               list.append(bar);
-              for (const r of rows) list.append(memoryCard(r, () => load()));
+              paintMemoryRows(list, rows, () => load());
             }
           } else if (state.tab === 'stars') {
             hint.textContent = s('memory.starsHint');

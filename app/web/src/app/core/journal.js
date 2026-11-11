@@ -11,6 +11,7 @@
 import { ask, looseJson } from './chat/oneshot.js';
 import { appendRecord, reviseRecord } from './store/records.js';
 import { listLatest } from './store/library.js';
+import { invalidateRecall } from './chat/recall.js';
 
 const NS = 'ellen.journal';
 const VERSION = 1;
@@ -225,6 +226,7 @@ export async function writeJournal({ title, diary, thoughts = '', day = dayKey()
   // 手记是全局的（不挂在某个会话线程下），threadId 传 null
   const rec = await appendRecord({ kind: 'journal', value, threadId: null, at });
   return { headId: rec.headId, revisionId: rec.revisionId, day, revised: false };
+  invalidateRecall();
 }
 
 function mergeIds(a, b) {

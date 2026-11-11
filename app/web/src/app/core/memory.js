@@ -9,6 +9,7 @@
 //      否则聊一周会攒出十几条「豆豆是猫」；
 //   3) 模型调用与落库分开：先在内存里把整批算完，再一条一条短事务写。
 import { listLatest } from './store/library.js';
+import { invalidateRecall } from './chat/recall.js';
 import { appendRecord, reviseRecord } from './store/records.js';
 import { ask, stripFence, looseJson } from './chat/oneshot.js';
 
@@ -212,6 +213,8 @@ export async function write(items, at = Date.now()) {
     out.items.push({ action: 'add', headId: rec.headId, title: item.title });
     existing.unshift({ headId: rec.headId, kind: 'memory', value });
   }
+  // 记忆变了，召回索引要重建（否则「刚记下的事」要等 5 分钟缓存过期才召回得到）
+  if (out.added || out.revised) invalidateRecall();
   return out;
 }
 
@@ -280,6 +283,7 @@ export async function createMemory({ title, summary, tags, scope = 'shared', at 
     editedBy: 'user',
   };
   const res = await appendRecord({ kind: 'memory', value });
+  invalidateRecall();
   return { ...res, value };
 }
 
@@ -311,6 +315,7 @@ export async function updateMemory(headId, patch = {}, at = Date.now()) {
     editedBy: 'user',
   };
   const res = await reviseRecord(headId, value, { at });
+  invalidateRecall();
   return { ...res, value };
 }
 
@@ -324,5 +329,6 @@ export async function removeMemory(headId, at = Date.now()) {
     throw err;
   }
   const res = await reviseRecord(headId, row.value || {}, { at, deleted: true });
+  invalidateRecall();
   return { ...res, title: (row.value || {}).title || '' };
 }
