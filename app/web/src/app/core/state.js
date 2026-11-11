@@ -71,6 +71,11 @@ export function createAppState() {
       // 随机语音条：这一句带不带语音条要落库，不然重启回来条就没了
       if (local.voice) value.voice = true;
       else delete value.voice;
+      // 语音消息：audio 是文件指针+波形，speech 是只给模型看的转写。漏了这两个，重启回来语音条就空了
+      if (local.audio) value.audio = local.audio;
+      else delete value.audio;
+      if (local.speech) value.speech = local.speech;
+      else delete value.speech;
       local.value = value;
       await replaceMessage(local.headId, value);
     });
@@ -147,6 +152,10 @@ export function createAppState() {
         detail: msg.detail || '',
         createdAt: Date.now(),
       };
+      // 语音消息的附加字段必须原样透传：audio 决定气泡画不画波形，speech 决定模型听懂什么
+      if (msg.audio) local.audio = msg.audio;
+      if (msg.speech) local.speech = msg.speech;
+      if (msg.voice) local.voice = true;
       messages.push(local);
       emit();
       persist(local);
@@ -206,6 +215,9 @@ export function createAppState() {
           detail: m.detail || '',
           headId: m.headId || null,
           persisted: !!m.persisted,
+          // 语音消息：验收要看「气泡里没文字、重启后还在」，没有这两个字段就只能点屏幕
+          audio: m.audio || null,
+          speech: m.speech || null,
         })),
         configUsable: isUsable(config),
         recall: recall.map((r) => ({ kind: r.kind, title: r.title, score: r.score })),

@@ -417,3 +417,194 @@
   word-break: break-word;
 }
 .el-msg-clip-note[hidden] { display: none; }
+
+/* —— 语音输入：按住说话 —— */
+/* 语音态：输入框和发送键收起来，只留键盘键 + 按住说话的整条横条 */
+.el-chat-composer.is-voice {
+  align-items: center;
+}
+.el-composer-hold {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: calc(38 * var(--u));
+  padding: 0 calc(14 * var(--u));
+  border-radius: calc(10 * var(--u));
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(14.5 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+.el-composer-hold.is-pressed {
+  filter: brightness(0.92);
+  border-color: var(--el-primary);
+  color: var(--el-primary);
+}
+.el-composer-hold.is-cancel {
+  border-color: var(--el-error);
+  color: var(--el-error);
+  filter: brightness(0.92);
+}
+.el-composer-hold[disabled] {
+  opacity: 0.45;
+}
+.el-composer-keyboard {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  border-radius: calc(999 * var(--u));
+  color: var(--el-muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.el-composer-keyboard .el-icon svg {
+  width: calc(19 * var(--u));
+  height: calc(19 * var(--u));
+}
+
+/* 录音浮层：压在输入条上方，高于消息流，不挡点击（pointer-events:none） */
+.el-voice-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88 * var(--u) + var(--el-safe-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  min-width: calc(168 * var(--u));
+  padding: calc(12 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(16 * var(--u));
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  box-shadow: 0 calc(8 * var(--u)) calc(24 * var(--u)) rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+.el-voice-hud[hidden] { display: none; }
+.el-voice-hud-wave {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  height: calc(22 * var(--u));
+  color: var(--el-pink);
+}
+.el-voice-hud-wave i {
+  display: block;
+  width: calc(3 * var(--u));
+  height: 40%;
+  border-radius: calc(2 * var(--u));
+  background: currentColor;
+}
+.el-voice-hud-wave i:nth-child(2n) { height: 72%; }
+.el-voice-hud-wave i:nth-child(3n) { height: 28%; }
+.el-voice-hud-wave i:nth-child(5n) { height: 96%; }
+.el-voice-hud-wave i:nth-child(7n) { height: 54%; }
+.el-voice-hud.is-recording .el-voice-hud-wave i {
+  animation: el-voice-bounce 900ms ease-in-out infinite;
+}
+.el-voice-hud-wave i:nth-child(2n) { animation-delay: 90ms; }
+.el-voice-hud-wave i:nth-child(3n) { animation-delay: 180ms; }
+.el-voice-hud-wave i:nth-child(4n) { animation-delay: 270ms; }
+.el-voice-hud-wave i:nth-child(5n) { animation-delay: 360ms; }
+.el-voice-hud-time {
+  font-size: calc(12 * var(--u));
+  color: var(--el-text);
+  font-variant-numeric: tabular-nums;
+}
+.el-voice-hud-hint {
+  font-size: calc(11.5 * var(--u));
+  color: var(--el-muted);
+}
+.el-voice-hud.is-cancelling .el-voice-hud-hint,
+.el-voice-hud.is-cancelling .el-voice-hud-wave {
+  color: var(--el-error);
+}
+/* 按下但录音器还没就绪：浮层先出来给个准信，但别点亮「在录」 */
+.el-voice-hud.is-arming {
+  opacity: 0.72;
+}
+.el-voice-hud.is-arming .el-voice-hud-wave i {
+  animation: none;
+  transform: scaleY(0.5);
+}
+/* 听写中转圈：波形改成渐进闪烁，别让人以为「卡住了」 */
+.el-voice-hud.is-writing .el-voice-hud-wave i {
+  animation: el-clip-pulse 900ms ease-in-out infinite;
+}
+.el-voice-hud.is-error {
+  border-color: var(--el-error);
+  color: var(--el-error);
+}
+.el-voice-hud.is-error .el-voice-hud-wave { display: none; }
+.el-voice-hud.is-error .el-voice-hud-hint { color: var(--el-error); }
+
+@keyframes el-voice-bounce {
+  0%, 100% { transform: scaleY(0.6); opacity: 0.6; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* —— 语音消息气泡：只有波形和时长，没有字 —— */
+.el-msg-has-voice .el-msg-body[hidden] { display: none; }
+.el-msg-voice {
+  min-width: calc(128 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+}
+.el-msg[data-role='user'] .el-msg-voice {
+  margin-top: 0;
+  background: var(--el-primary);
+  border-color: transparent;
+  color: var(--el-primary-ink);
+}
+.el-msg[data-role='user'] .el-msg-voice .el-msg-clip-dot {
+  background: var(--el-primary-ink);
+}
+.el-msg[data-role='user'] .el-msg-voice .el-msg-clip-len {
+  color: var(--el-primary-ink);
+  opacity: 0.8;
+}
+/* 波形峰高：6 档，按 peaks 分档给 class（视图层不写内联 style） */
+.el-msg-clip-wave i.lv1 { height: 22%; }
+.el-msg-clip-wave i.lv2 { height: 36%; }
+.el-msg-clip-wave i.lv3 { height: 52%; }
+.el-msg-clip-wave i.lv4 { height: 68%; }
+.el-msg-clip-wave i.lv5 { height: 84%; }
+.el-msg-clip-wave i.lv6 { height: 100%; }
+.el-msg-voice .el-msg-clip-wave {
+  height: calc(18 * var(--u));
+  flex: 1 1 auto;
+}
+.el-msg-voice .el-msg-clip-wave i { opacity: 0.85; }
+.el-msg-clip.is-failed {
+  border-color: var(--el-error);
+  color: var(--el-error);
+}
+/* 附件被清理过：条留着（让人知道当时发过语音），但灰掉、点不动 */
+.el-msg-voice.is-missing {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.el-msg-voice.is-missing .el-msg-clip-wave i { height: 40%; opacity: 0.4; }
+/* 转写失败：条上点一个小灰点，内容照样能播 */
+.el-msg-voice.is-asr-failed .el-msg-clip-len::after {
+  content: '·';
+  margin-left: calc(3 * var(--u));
+  opacity: 0.6;
+}
+/* 正在准备（存附件/转写）：三点呼吸，先别让人点 */
+.el-msg-voice.is-preparing {
+  opacity: 0.75;
+  pointer-events: none;
+}
+.el-msg-voice.is-preparing .el-msg-clip-len::after {
+  content: '…';
+  margin-left: calc(2 * var(--u));
+}

@@ -41,6 +41,10 @@ function toView(rev) {
     detail: v.detail || '',
     createdAt: v.createdAt || rev.at,
     pending: false,
+    // 语音消息：audio 带 uri/bytes/durationMs/peaks（气泡只画波形），speech 只给模型看
+    audio: v.audio || null,
+    speech: v.speech || null,
+    voice: !!v.voice,
   };
 }
 
@@ -61,6 +65,9 @@ export async function appendMessage(msg, threadIdArg = null) {
   };
   if (msg.failed) value.failed = true;
   if (msg.detail) value.detail = msg.detail;
+  // 语音消息：这两个字段不写进去，「杀掉 App 重启语音条还在」就是假的
+  if (msg.audio) value.audio = msg.audio;
+  if (msg.speech) value.speech = msg.speech;
   const { headId } = await appendRecord({ kind: 'message', value, threadId, at: createdAt });
   await markFirstMessage(createdAt);
   // headId / value / threadId 交给上层保管，后续改这条消息要用

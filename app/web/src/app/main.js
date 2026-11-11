@@ -51,8 +51,9 @@ import { pushMaterial, takePending, readState as readProactiveState } from './co
 import { maybeCompose as maybeWriteJournal, dueFor as journalDue, todayJournal, dayKey } from './core/journal.js';
 import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs } from './core/memory.js';
 import { setThread as setBackgroundThread, takeChatReply } from './core/background.js';
-import * as recorder from './core/recorder.js';
 import { loadConfig as loadAsrConfig, isUsable as asrUsable, transcribe as transcribeAudio } from './core/asr.js';
+import { createVoiceInput } from './core/voice-input.js';
+import { prepareVoice } from './core/voice-message.js';
 import { readPersona, writePersona, buildSystemPrompt } from './core/persona.js';
 import { buildManifest } from './core/store/export.js';
 import { configure as backupConfigure } from './core/backup.js';
@@ -240,10 +241,10 @@ async function main() {
   const session = createChatSession({ state: appState, getSystemPrompt: currentSystemPrompt });
 
 // 发一句话（键盘回车和语音转写共用这一条路，别再复制一遍）
-function sendMessage(text) {
+function sendMessage(text, extra = null) {
   const clean = (text || '').trim();
   if (!clean) return Promise.resolve();
-  return session.send(clean).then(() => {
+  return session.send(clean, extra).then(() => {
     // 每轮聊完顺手看看该不该写手记；不 await 到界面路径上，失败也不影响聊天
     maybeWriteJournal({ config: appState.getConfig(), messages: appState.getMessages() }).catch((err) =>
       console.warn('[main] 手记没写成', err)
@@ -291,82 +292,58 @@ function sendMessage(text) {
     toastTimer = setTimeout(() => node.classList.remove('is-on'), 2600);
   }
 
-  // —— 语音输入：点麦克风开始录，再点一下结束 → 转写 → 填进输入框（不自动发）——
-  let recordingVoice = false;
+  // —— 语音输入（按住说话）+ 语音消息 ——
+  // 手势与状态机全在 core/voice-input.js；这里只负责「录完这段怎么处理」：
+  //   落盘 → 转写（失败不抛）→ 算波形 → 带着转写文本发出去，气泡只显示波形。
+  // 转写失败也要发：不能让一次识别失败把你说的那句话吞掉；她收到「没听清」会反问。
+  let voiceBusy = false;
 
-  // 按住说话：按下 = 开始，松手 = 结束并转写；单击（无障碍/鼠标）仍然当开关用
-  async function handleMic(action) {
-    if (!chatHandle) return;
-    if (action === 'start') {
-      if (!recordingVoice) await toggleVoice();
-      return;
-    }
-    if (action === 'stop') {
-      if (recordingVoice) await toggleVoice();
-      return;
-    }
-    await toggleVoice();
-  }
-
-  async function toggleVoice() {
-    if (!chatHandle) return;
-    if (recordingVoice) {
-      recordingVoice = false;
-      chatHandle.setRecording(false);
-      let result = null;
-      try {
-        result = await recorder.stop();
-      } catch (err) {
-        flash(`${s('chat.voiceFailed')}${(err && err.message) || ''}`);
-        return;
-      }
-      if (!result || !result.bytes) {
-        flash(s('chat.voiceTooShort'));
-        return;
-      }
-      if ((result.durationMs || 0) < 700) {
-        recorder.release(result.fileId);
-        flash(s('chat.voiceTooShort'));
-        return;
-      }
-      try {
-        const file = await recorder.readBase64(result.fileId);
-        const { text } = await transcribeAudio({ fileId: result.fileId, base64: file && file.base64 });
-        chatHandle.setDictation(text);
-        const cfgNow = await loadAsrConfig();
-        if (cfgNow && cfgNow.autoSend) {
-          chatHandle.setDictation('');
-          sendMessage(text);
-        }
-      } catch (err) {
-        const message = (err && err.message) || '';
-        if (err && err.code === 'ASR_NOT_CONFIGURED') {
-          flash(s('chat.voiceNeedConfig'));
-          openSettings();
-        } else {
-          flash(`${s('chat.voiceFailed')}${(err && err.message) || ''}`);
-        }
-      } finally {
-        recorder.release(result.fileId);
-      }
-      return;
-    }
-
-    const cfg = await loadAsrConfig();
-    if (!asrUsable(cfg)) {
-      flash(s('chat.voiceNeedConfig'));
-      openSettings();
-      return;
-    }
+  async function commitVoice({ base64, durationMs }) {
+    if (!base64 || voiceBusy) return;
+    voiceBusy = true;
     try {
-      await recorder.start({ maxDurationMs: 120000 });
-      recordingVoice = true;
-      chatHandle.setRecording(true);
-    } catch (err) {
-      const message = (err && err.message) || '';
-      flash(message === 'AUDIO_PERMISSION' || /权限/.test(message) ? '要在系统里给录音权限。' : `${s('chat.voiceFailed')}${message}`);
+      if (!chatHandle) return;
+      chatHandle.setVoiceState({ phase: 'writing', ms: durationMs, cancel: false });
+      let prepared = null;
+      try {
+        prepared = await prepareVoice({ base64, durationMs });
+      } catch (err) {
+        const code = (err && err.code) || '';
+        flash(code === 'DOCUMENT_TOO_LARGE' ? '这段太长，存不下。' : `这条语音没存上：${(err && err.message) || ''}`);
+        return;
+      }
+      await sendMessage(prepared.speech.text, prepared);
+    } finally {
+      voiceBusy = false;
+      if (chatHandle) chatHandle.setVoiceState({ phase: 'idle', ms: 0, cancel: false });
     }
   }
+
+  const voiceInput = createVoiceInput({
+    onCommit: (payload) => {
+      commitVoice(payload).catch((err) => console.warn('[main] 语音消息没发出去', err));
+    },
+    onCancel: () => {
+      if (chatHandle) chatHandle.setVoiceState({ phase: 'idle', ms: 0, cancel: false });
+    },
+    onError: (err) => {
+      const code = (err && err.code) || '';
+      if (code === 'VOICE_TOO_SHORT') flash(s('chat.voiceTooShort'));
+      else if (code === 'AUDIO_PERMISSION') flash('要在系统里给录音权限。');
+      else flash(`${s('chat.voiceFailed')}${(err && err.message) || ''}`);
+    },
+  });
+
+  // 返回键第 60 层：录音/听写中按返回只取消，不导航（防误触把正在说的话弄丢）
+  registerBack(
+    () => {
+      const st = voiceInput.state();
+      if (!st || st.phase === 'idle') return false;
+      voiceInput.cancel();
+      return true;
+    },
+    { priority: 60, name: 'voice-input' },
+  );
 
   function maybeReadAloud() {
     if (!readVoicePrefs().auto) return;
@@ -392,7 +369,11 @@ function sendMessage(text) {
           model: appState.getModelName(),
           onSend: (text) => sendMessage(text),
           onStop: () => session.stop(),
-          onMic: (action) => handleMic(action),
+          voice: voiceInput,
+          onVoiceMode: (mode) => {
+            // 语音态切走 / 切回来都别留半段录音
+            if (mode !== 'voice') voiceInput.cancel();
+          },
           onRequestModel: openSettings,
         });
         chatHandle = handle;
@@ -699,7 +680,12 @@ function sendMessage(text) {
     exportPreview: () => buildManifest().then((r) => ({ stats: r.stats, manifestBytes: r.stats.manifestBytes, head: r.manifestText.slice(0, 200) })),
     recall: (text, opts) => recall(text, opts),
     asr: { load: () => loadAsrConfig(), transcribe: (input) => transcribeAudio(input), isUsable: (cfg) => asrUsable(cfg) },
-    voice: { toggle: () => toggleVoice(), recording: () => recordingVoice },
+    voice: {
+      // 验收口：录音状态机是唯一事实源，别再读一个局部布尔
+      state: () => voiceInput.state(),
+      cancel: () => voiceInput.cancel(),
+      commit: (payload) => commitVoice(payload),
+    },
   speech: {
     speak: (text, opts) => speakOut(plainVoice(text), opts),
     stop: () => stopSpeech(),

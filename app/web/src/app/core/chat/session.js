@@ -127,12 +127,17 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
     return text;
   }
 
-  async function send(text) {
+  /**
+   * 发一句话，等一条回复。
+   * @param {string} text 用户说的话（语音消息就是转写文本——模型看这个，界面不看）
+   * @param {{audio?: object, speech?: object}} [extra] 语音消息的附加字段，原样透传给这条用户消息
+   */
+  async function send(text, extra) {
     const trimmed = String(text || '').trim();
     if (!trimmed) return;
 
     const cfg = state.getConfig();
-    state.addMessage({ role: 'user', text: trimmed });
+    state.addMessage({ role: 'user', text: trimmed, ...(extra || {}) });
 
     const reply = state.addMessage({ role: 'assistant', text: '', pending: true });
     state.setError(null);
