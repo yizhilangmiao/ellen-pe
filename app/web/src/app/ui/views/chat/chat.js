@@ -286,6 +286,8 @@ export function createChatView() {
         btn.setAttribute('aria-label', '念出来');
         btn.append(iconEl('volume'));
         btn.addEventListener('click', async () => {
+          // 朗读和语音条共用一对耳朵：先按掉正在放的那条，再念
+          stopActiveBar();
           const same = speakingNode === node;
           if (speakingNode) {
             speakingNode.classList.remove('is-speaking');
@@ -323,6 +325,23 @@ export function createChatView() {
         return 6;
       }
 
+      // 同一时刻只许一条在放：语音条 / 语音消息 / 朗读按钮共用这一个「当前播放」槽。
+      // 不互斥的话，点第二条时第一条还在响，两条声音叠在一起（真机上很难听清是哪句）。
+      let activeBar = null;
+
+      function stopActiveBar() {
+        const cur = activeBar;
+        activeBar = null;
+        if (!cur) return;
+        cur.bar.classList.remove('is-playing');
+        if (!cur.audio) return;
+        try {
+          cur.audio.pause();
+        } catch (err) {
+          /* 已经结束/被回收，忽略 */
+        }
+      }
+
       /**
        * @param {{peaks?: number[], durationMs: number, label?: string, className?: string,
        *          bars?: number, onPlay?: () => Promise<string>}} opts
@@ -355,6 +374,7 @@ export function createChatView() {
           if (audio && !audio.paused) {
             audio.pause();
             bar.classList.remove('is-playing');
+            if (activeBar && activeBar.bar === bar) activeBar = null;
             return;
           }
           if (!opts.onPlay) return;
@@ -371,10 +391,21 @@ export function createChatView() {
             bar.classList.add('is-failed');
             return;
           }
+          // 换这条之前先把上一条按掉（合成/读盘是异步的，等回来时上一条可能已经在放了）
+          stopActiveBar();
+          // 她的朗读和气泡播放会打架：播放前先让她闭嘴
+          stopSpeaking().catch(() => {});
           audio = new Audio(url);
-          audio.addEventListener('ended', () => bar.classList.remove('is-playing'));
+          activeBar = { bar, audio };
+          audio.addEventListener('ended', () => {
+            bar.classList.remove('is-playing');
+            if (activeBar && activeBar.bar === bar) activeBar = null;
+          });
           bar.classList.add('is-playing');
-          audio.play().catch(() => bar.classList.remove('is-playing'));
+          audio.play().catch(() => {
+            bar.classList.remove('is-playing');
+            if (activeBar && activeBar.bar === bar) activeBar = null;
+          });
         });
 
         bar.append(dot, wave, len);
@@ -665,6 +696,8 @@ export function createChatView() {
         // 不撤的话 1/7 概率攒下来的 blob 会一直常驻（聊 700 句就是 100 个 URL）。
         destroy() {
           document.removeEventListener('visibilitychange', onHidden);
+          // 切页时正在放的那条要停：否则人已经离开聊天页，声音还在后面念
+          stopActiveBar();
           clipCache.forEach((url) => {
             try {
               URL.revokeObjectURL(url);
