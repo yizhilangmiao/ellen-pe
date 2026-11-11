@@ -24,6 +24,7 @@ import { iconEl } from './ui/icons.js';
 import { call, isNative } from './core/native/bridge.js';
 import { defineView, mountRouter, show, push, pop, current, currentName } from './ui/router.js';
 import { createDrawer } from './ui/frame-drawer.js';
+import { installAndroidBack, minimizeApp, registerBack, requestBack, backChain } from './core/back-stack.js';
 import { initMotionGuard } from './ui/motion-guard.js';
 import { createChatView } from './ui/views/chat/chat.js';
 import { createPlaceholderView } from './ui/views/placeholder.js';
@@ -516,12 +517,60 @@ function sendMessage(text) {
   shell.toolButtons.history.addEventListener('click', () => push('history'));
   shell.toolButtons.background.addEventListener('click', () => push('background'));
 
-  // 系统返回键：Android 上 pop 一层
+  // Escape 与系统返回键走同一条链（浮层 > 菜单 > 抽屉 > 页面栈 > 回聊天），
+  // 只是 Escape 不触发「再按一次退出」——桌面调试时按 Esc 不该弹退出提示。
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (drawer.isOpen()) return; // 抽屉自己处理（关抽屉，不 pop 页面）
-    pop();
+    requestBack({ from: 'ui' });
   });
+
+  // —— 返回键的其余三层 ——
+  // 40：顶栏「⋯」菜单开着先收菜单
+  registerBack(
+    () => {
+      if (shell.menu.hidden) return false;
+      shell.setMenu(false);
+      return true;
+    },
+    { priority: 40, name: 'header-menu' },
+  );
+  // 10：不在聊天页就回聊天（通知 / 背景这类全屏页退出后落回聊天，而不是直接退 App）
+  registerBack(
+    () => {
+      if (currentName() === 'chat') return false;
+      show('chat');
+      syncTabs('chat');
+      return true;
+    },
+    { priority: 10, name: 'back-to-chat' },
+  );
+
+  // 0：兜底 = 两秒内再按一次才回桌面（回桌面不杀进程，主动消息与备份闹钟要留着）
+  let exitHintAt = 0;
+  let exitHintTimer = 0;
+  const exitEl = document.createElement('div');
+  exitEl.className = 'el-exit-hint';
+  exitEl.setAttribute('role', 'status');
+  exitEl.setAttribute('aria-live', 'polite');
+  exitEl.textContent = s('common.exitHint');
+  shell.pages.append(exitEl);
+  function clearExitHint() {
+    window.clearTimeout(exitHintTimer);
+    exitHintAt = 0;
+    exitEl.classList.remove('is-on');
+  }
+  function onBackUnhandled() {
+    if (Date.now() - exitHintAt < 2000) {
+      clearExitHint();
+      minimizeApp();
+      return;
+    }
+    exitHintAt = Date.now();
+    exitEl.classList.add('is-on');
+    window.clearTimeout(exitHintTimer);
+    exitHintTimer = window.setTimeout(clearExitHint, 2000);
+  }
+  const backInstalled = installAndroidBack(onBackUnhandled);
 
   // 会话状态 → 聊天视图
   appState.subscribe(() => {
@@ -617,6 +666,23 @@ function sendMessage(text) {
   window.__ellen = {
     version: '0.3.0-m7',
     motion: { reduce: () => motion.reduce(), isReduced: () => motion.isReduced() },
+    back: {
+      // 验收口：不在真机上点屏幕坐标，直接看链上有谁、当前栈深、提示有没有亮
+      chain: () => backChain(),
+      probe: () => ({
+        drawerOpen: drawer.isOpen(),
+        drawerName: drawer.currentName(),
+        menuOpen: !shell.menu.hidden,
+        page: currentName(),
+        depth: (current() || {}).depth || 0,
+        hintOn: exitEl.classList.contains('is-on'),
+        installed: backInstalled,
+        native: isNative(),
+      }),
+      // 等价于按一次返回键（不触发退出）
+      fire: () => requestBack({ from: 'ui' }),
+      onBackUnhandled, // 只给验收用：模拟「按两次退出」的第一下
+    },
     drawer: {
       open: (name) => drawer.open(name),
       close: () => drawer.close(),

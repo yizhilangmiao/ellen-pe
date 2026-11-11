@@ -6,6 +6,7 @@
 // 结构：一层遮罩 + 一张卡片，卡片里 标题 / 内容 / 标签 三个输入 + 三个按钮。
 // 打开期间 焦点进标题框、Escape 关闭、点遮罩关闭；关闭时还原滚动锁。
 import { s } from '../strings.zh.js';
+import { registerBack } from '../core/back-stack.js';
 import './memory-editor.css';
 
 let opened = null;
@@ -130,9 +131,20 @@ export function openMemoryEditor({ item = null, onSave, onDelete } = {}) {
     titleInput.focus();
   });
 
+  // 返回键第 50 层：面板开着就只关面板，不动导航
+  const unregisterBack = registerBack(
+    () => {
+      if (!opened) return false;
+      close('cancelled');
+      return true;
+    },
+    { priority: 50, name: 'memory-editor' },
+  );
+
   function close(result) {
     if (!opened) return;
     opened = null;
+    unregisterBack();
     card.classList.remove('is-open');
     scrim.classList.remove('is-open');
     const done = () => {

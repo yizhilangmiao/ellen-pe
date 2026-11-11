@@ -341,3 +341,37 @@
 
 .el-header-menu-item .el-icon { width: calc(17 * var(--u)); height: calc(17 * var(--u)); color: var(--z-muted, #9aa1a6); }
 .el-header-menu-label { flex: 1 1 auto; }
+
+/* —— 返回键兜底提示：两秒内再按一次才回桌面 ——
+   位置在输入条上方、与系统条同一层；z-index 必须高于 .el-chat-stream（它自己 z-index:1
+   且气泡溢出盒子，不抬层就会被盖住 —— 系统条踩过同一个坑）。 */
+.el-exit-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(78 * var(--u));
+  z-index: 45;
+  transform: translate(-50%, calc(6 * var(--u)));
+  max-width: calc(220 * var(--u));
+  padding: calc(8 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border: 1px solid #ffffff29;
+  background: #2b2229;
+  color: #f2e7ec;
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms linear,
+    transform 140ms linear;
+}
+
+.el-exit-hint.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.ellen-app.reduce-ui-motion .el-exit-hint {
+  transition: none;
+}

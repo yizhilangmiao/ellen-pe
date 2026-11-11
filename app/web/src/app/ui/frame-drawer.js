@@ -9,6 +9,7 @@
 // 不把三份 view 常驻在 DOM 里 —— 首屏 DOM 已经三千节点，再加三页编码就掉帧。
 
 import { mountInto, dispose } from './router.js';
+import { registerBack } from '../core/back-stack.js';
 
 const HARD_CUT = 30; // 换内容时的遮挡时长（ms）；0 = 立即换
 
@@ -37,10 +38,21 @@ export function createDrawer({ root, onChange } = {}) {
 
   let node = null; // mountInto 的产物
   let openName = null;
-  let guard = false; // 我们压了一条 history，返回键先关抽屉
   let opener = null; // 打开它的那个按钮，关上时焦点还回去
   let swipe = null;
   let closing = false;
+
+  // 返回键：抽屉是第 30 层（浮层与菜单都要先吃掉）。
+  // 以前这里压了一条 history 并监听 popstate，与页面栈会一次按掉两层 —— 已改由
+  // core/back-stack.js 统一裁决，抽屉不再碰 history。
+  registerBack(
+    () => {
+      if (!openName) return false;
+      close();
+      return true;
+    },
+    { priority: 30, name: 'drawer' },
+  );
 
   function notify() {
     if (onChange) onChange(openName);
@@ -94,14 +106,6 @@ export function createDrawer({ root, onChange } = {}) {
     } else {
       swap();
     }
-    if (!guard) {
-      guard = true;
-      try {
-        history.pushState({ ellenDrawer: name }, '');
-      } catch {
-        guard = false;
-      }
-    }
   }
 
   function close({ silent } = {}) {
@@ -139,14 +143,6 @@ export function createDrawer({ root, onChange } = {}) {
       }
     }
     opener = null;
-    if (guard && !silent) {
-      guard = false;
-      try {
-        history.back();
-      } catch {
-        /* 无 history（首次进入直接开抽屉）时忽略 */
-      }
-    }
     closing = false;
     notify();
     return name;
@@ -158,14 +154,6 @@ export function createDrawer({ root, onChange } = {}) {
   }
 
   scrim.addEventListener('click', () => close());
-
-  // 返回键：我们压过一条 history，先吃掉这一下
-  window.addEventListener('popstate', () => {
-    if (guard) {
-      guard = false;
-      close({ silent: true });
-    }
-  });
 
   window.addEventListener('keydown', (e) => {
     if (!openName) return;

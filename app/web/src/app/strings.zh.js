@@ -444,6 +444,7 @@ export const strings = {
     delete: '删除',
     close: '关闭',
     retry: '重试',
+    exitHint: '再按一次就退出哦',
   },
 };
 

@@ -7,11 +7,15 @@
 //   pop()           出栈回上一层；栈底时返回 false（交给系统返回键）
 // 视图契约：mount(el, props) → 可返回 { destroy() }，切换时自动调用。
 
+import { registerBack } from '../core/back-stack.js';
+
+
 const views = new Map();
 const stack = [];
 let hostEl = null;
 let onChange = null;
 let activeNode = null;
+let backRegistered = false;
 
 export function defineView(name, factory) {
   views.set(name, factory);
@@ -20,6 +24,15 @@ export function defineView(name, factory) {
 export function mountRouter(host, { onNavigate } = {}) {
   hostEl = host;
   onChange = onNavigate || null;
+  // 返回键的第 20 层：栈里还有全屏页就 pop 一层。
+  // 注册在这里而不是 main.js —— 「栈深」只有 router 自己知道。
+  if (!backRegistered) {
+    backRegistered = true;
+    registerBack(
+      () => (stack.length > 1 ? pop() : false),
+      { priority: 20, name: 'router' },
+    );
+  }
 }
 
 function build(name, params) {
