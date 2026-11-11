@@ -1,0 +1,130 @@
+/* 记忆编辑面板：遮罩 + 卡片，尺寸全走 --u 标尺 */
+.el-editor-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: calc(10 * var(--u));
+  padding-bottom: calc(14 * var(--u) + var(--el-safe-bottom, 0px));
+  background: rgba(6, 8, 11, 0);
+  transition: background-color 140ms linear;
+}
+.el-editor-scrim.is-open { background: rgba(6, 8, 11, 0.72); }
+
+.el-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(9 * var(--u));
+  width: 100%;
+  max-width: calc(520 * var(--u));
+  max-height: 86%;
+  overflow-y: auto;
+  padding: calc(15 * var(--u)) calc(14 * var(--u)) calc(13 * var(--u));
+  background: var(--z-panel, var(--el-raised));
+  color: var(--el-text);
+  border: 1px solid var(--z-line, var(--el-line));
+  border-radius: calc(4 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u));
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) 0 rgba(0, 0, 0, 0.55);
+  transform: translateY(calc(14 * var(--u)));
+  opacity: 0;
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 140ms linear;
+}
+.el-editor-card.is-open { transform: translateY(0); opacity: 1; }
+
+.el-editor-head {
+  margin: 0;
+  font-size: calc(17 * var(--u));
+  line-height: 1.35;
+  color: var(--z-ink-paper, var(--el-text));
+}
+.el-editor-hint {
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: 1.6;
+  color: var(--el-muted);
+}
+
+.el-editor-label {
+  display: flex;
+  flex-direction: column;
+  gap: calc(5 * var(--u));
+  font-size: calc(11 * var(--u));
+  color: var(--el-muted);
+}
+.el-editor-input {
+  width: 100%;
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: 1.5;
+  color: var(--el-text);
+  background: var(--z-input, var(--el-bg));
+  border: 1px solid var(--el-line);
+  border-radius: calc(8 * var(--u));
+  outline: none;
+}
+.el-editor-input:focus { border-color: var(--el-pink); }
+.el-editor-textarea { min-height: calc(76 * var(--u)); resize: none; }
+
+.el-editor-scope { display: flex; flex-direction: column; gap: calc(5 * var(--u)); }
+.el-editor-segs { grid-template-columns: repeat(2, 1fr); }
+
+.el-editor-note {
+  min-height: calc(14 * var(--u));
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: 1.5;
+  color: var(--el-muted);
+}
+.el-editor-note.is-bad { color: var(--el-error); }
+
+.el-editor-actions {
+  display: flex;
+  gap: calc(8 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+.el-editor-actions > button { flex: 1 1 auto; }
+.el-editor-actions > .el-secondary.is-danger { color: var(--el-error); border-color: currentColor; }
+
+/* —— 「她的过去」顶部那条：条数 + 记一条 —— */
+.el-memory-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+  margin-bottom: calc(2 * var(--u));
+}
+.el-memory-count {
+  font-size: calc(11 * var(--u));
+  color: var(--el-paper-muted, var(--el-muted));
+}
+.el-memory-add {
+  padding: calc(6 * var(--u)) calc(11 * var(--u));
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  color: var(--el-ink);
+  background: var(--el-paper);
+  border: 1px solid var(--jr-line, var(--el-line));
+  border-radius: calc(999 * var(--u));
+  box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) 0 rgba(0, 0, 0, 0.35);
+}
+.el-memory-add:active { transform: translate(calc(1 * var(--u)), calc(1 * var(--u))); box-shadow: none; }
+
+/* —— 卡片右下角 改 / 删 —— */
+.el-memory-tools {
+  display: flex;
+  gap: calc(7 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+.el-memory-tool {
+  padding: calc(3 * var(--u)) calc(9 * var(--u));
+  font-family: inherit;
+  font-size: calc(11 * var(--u));
+  color: var(--el-ink);
+  background: rgba(18, 16, 15, 0.06);
+  border: 1px solid rgba(18, 16, 15, 0.14);
+  border-radius: calc(999 * var(--u));
+}
+.el-memory-tool.is-danger { color: #8a2436; border-color: rgba(138, 36, 54, 0.28); }

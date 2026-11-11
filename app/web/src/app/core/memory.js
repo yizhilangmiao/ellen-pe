@@ -241,3 +241,88 @@ export async function rememberNow({ config, messages, at = Date.now() } = {}) {
   const res = await write(items, at);
   return { ...res, candidates: items.length, raw: raw ? String(raw).slice(0, 400) : '' };
 }
+
+// —— 人工入口（改 / 删 / 手记一条）——
+// 自动抽出来的东西一定有错的时候，界面上得能改。
+// 删走软删（reviseRecord 的 deleted:true），不做物理删除：手记/记忆都是事件溯源结构，
+// 物理删会让「这一条曾被记过」这件事消失，日后回溯不了。
+
+function cleanText(value, max) {
+  return String(value == null ? '' : value).trim().slice(0, max);
+}
+
+function normTags(tags) {
+  const list = Array.isArray(tags) ? tags : String(tags || '').split(/[，,、\s]+/);
+  return list.map((t) => cleanText(t, 8)).filter(Boolean).slice(0, 4);
+}
+
+/** 手记一条（用户自己写）。返回 {headId, value}。 */
+export async function createMemory({ title, summary, tags, scope = 'shared', at = Date.now() } = {}) {
+  const t = cleanText(title, 12);
+  const s = cleanText(summary, 120);
+  if (!t && !s) {
+    const err = new Error('标题和内容都空着');
+    err.code = 'MEMORY_EMPTY';
+    throw err;
+  }
+  const value = {
+    namespace: 'ellen.memory',
+    version: 1,
+    title: t || s.slice(0, 12),
+    summary: s || t,
+    body: s || t,
+    tags: normTags(tags),
+    scope: scope === 'past' ? 'past' : 'shared',
+    at,
+    createdAt: at,
+    updatedAt: at,
+    sourceIds: [],
+    editedBy: 'user',
+  };
+  const res = await appendRecord({ kind: 'memory', value });
+  return { ...res, value };
+}
+
+/** 改一条：patch 里只带要动的字段，其余保持原样。 */
+export async function updateMemory(headId, patch = {}, at = Date.now()) {
+  const rows = await listLatest('memory', { limit: 0 });
+  const row = rows.find((r) => r.headId === headId);
+  if (!row) {
+    const err = new Error('这条记忆已经不在了');
+    err.code = 'MEMORY_MISSING';
+    throw err;
+  }
+  const old = row.value || {};
+  const title = patch.title === undefined ? old.title : cleanText(patch.title, 12);
+  const summary = patch.summary === undefined ? old.summary : cleanText(patch.summary, 120);
+  if (!title && !summary) {
+    const err = new Error('标题和内容都空着');
+    err.code = 'MEMORY_EMPTY';
+    throw err;
+  }
+  const value = {
+    ...old,
+    title: title || summary.slice(0, 12),
+    summary: summary || title,
+    body: summary || title,
+    tags: patch.tags === undefined ? normTags(old.tags) : normTags(patch.tags),
+    scope: patch.scope === undefined ? old.scope || 'shared' : patch.scope === 'past' ? 'past' : 'shared',
+    updatedAt: at,
+    editedBy: 'user',
+  };
+  const res = await reviseRecord(headId, value, { at });
+  return { ...res, value };
+}
+
+/** 删一条（软删，列表里不再出现）。 */
+export async function removeMemory(headId, at = Date.now()) {
+  const rows = await listLatest('memory', { limit: 0 });
+  const row = rows.find((r) => r.headId === headId);
+  if (!row) {
+    const err = new Error('这条记忆已经不在了');
+    err.code = 'MEMORY_MISSING';
+    throw err;
+  }
+  const res = await reviseRecord(headId, row.value || {}, { at, deleted: true });
+  return { ...res, title: (row.value || {}).title || '' };
+}

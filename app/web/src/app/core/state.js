@@ -68,6 +68,9 @@ export function createAppState() {
       else delete value.failed;
       if (local.detail) value.detail = local.detail;
       else delete value.detail;
+      // 随机语音条：这一句带不带语音条要落库，不然重启回来条就没了
+      if (local.voice) value.voice = true;
+      else delete value.voice;
       local.value = value;
       await replaceMessage(local.headId, value);
     });

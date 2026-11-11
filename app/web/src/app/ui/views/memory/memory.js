@@ -7,6 +7,10 @@
 // 数据来自本地库（`memory` / `journal` 两类记录），不再是空壳。
 import { s } from '../../../strings.zh.js';
 import { iconEl } from '../../icons.js';
+import { openMemoryEditor } from '../../memory-editor.js';
+import { createMemory, updateMemory, removeMemory } from '../../../core/memory.js';
+import { readUnderstanding, maybeRefresh as refreshUnderstanding } from '../../../core/understanding.js';
+import { loadModelConfig, isUsable } from '../../../core/config.js';
 import { listLatest } from '../../../core/store/library.js';
 import { push } from '../../router.js';
 import './memory.css';
@@ -116,7 +120,7 @@ function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
   box.append(head, week, grid);
   return box;
 }
-function memoryCard(item, onOpen) {
+function memoryCard(item, onChanged) {
   const card = document.createElement('article');
   card.className = 'el-memory-card';
   card.dataset.memoryId = item.headId;
@@ -138,12 +142,42 @@ function memoryCard(item, onOpen) {
   more.type = 'button';
   more.className = 'el-memory-more';
   more.innerHTML = `${s('memory.openMemory')}<span class="el-memory-arrow">→</span>`;
-  more.addEventListener('click', () => {
-    if (onOpen) onOpen(item);
-    else card.classList.toggle('is-expanded');
-  });
+  more.addEventListener('click', () => card.classList.toggle('is-expanded'));
 
-  card.append(mark, title, body, more);
+  // 改 / 删：自动抽出来的东西一定有错的时候，得能就地改。
+  // 用 stopPropagation 是因为卡片外层的「翻开这段回忆」是个 button，别让点击冒泡过去。
+  const tools = document.createElement('div');
+  tools.className = 'el-memory-tools';
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'el-memory-tool';
+  editBtn.textContent = s('memory.editMemory');
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'el-memory-tool is-danger';
+  delBtn.textContent = s('memory.deleteMemory');
+
+  editBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const res = await openMemoryEditor({
+      item,
+      onSave: (patch) => updateMemory(item.headId, patch),
+      onDelete: () => removeMemory(item.headId),
+    });
+    if (res !== 'cancelled' && typeof onChanged === 'function') onChanged();
+  });
+  delBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const res = await openMemoryEditor({
+      item,
+      onSave: (patch) => updateMemory(item.headId, patch),
+      onDelete: () => removeMemory(item.headId),
+    });
+    if (res !== 'cancelled' && typeof onChanged === 'function') onChanged();
+  });
+  tools.append(editBtn, delBtn);
+
+  card.append(mark, title, body, tools, more);
   return card;
 }
 
@@ -202,6 +236,79 @@ function journalCard(item, onOpen) {
   });
 
   card.append(day, title, body, more);
+  return card;
+}
+
+// 「我眼里的你」这几句文案没走 strings.zh.js：那个文件这一批不归我改（有人在动），
+// 数量少，就近放这里，省得两边版本对不上。
+const U_TEXT = {
+  title: '我眼里的你',
+  emptyTitle: '还没有足够的回忆',
+  emptySub: '再聊几天，我才知道该怎么写你。想让我现在就试试也可以。',
+  thinkNow: '现在就想一想',
+  thinkAgain: '再想一想',
+  thinking: '正在想…',
+  when: '写于',
+  noConfig: '还没填聊天模型，填完再来。',
+  noData: '记忆和手记都还是空的，先聊几句吧。',
+  failed: '这次没写出来，过会儿再试。',
+  tagPrefix: '',
+};
+
+function shortDate(at) {
+  const d = new Date(at || Date.now());
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * 「我眼里的你」正文卡：沿用 `.el-memory-card` 的米白纸与硬影，
+ * 里面换成一段第二人称的话 + 标签 + 一行「写于 / 再想一想」。
+ */
+function understandingCard(rec, onAgain) {
+  const v = rec.value || {};
+  const card = document.createElement('article');
+  card.className = 'el-memory-card el-understanding-card';
+  card.dataset.understandingId = rec.headId;
+
+  const mark = document.createElement('div');
+  mark.className = 'el-memory-mark';
+  mark.append(iconEl('book'));
+
+  const title = document.createElement('h2');
+  title.className = 'el-memory-title';
+  title.textContent = U_TEXT.title;
+
+  const body = document.createElement('p');
+  body.className = 'el-understanding-body';
+  body.textContent = v.body || '';
+
+  card.append(mark, title, body);
+
+  if (Array.isArray(v.tags) && v.tags.length) {
+    const tags = document.createElement('div');
+    tags.className = 'el-understanding-tags';
+    for (const t of v.tags) {
+      const chip = document.createElement('span');
+      chip.className = 'el-understanding-tag';
+      chip.textContent = String(t);
+      tags.append(chip);
+    }
+    card.append(tags);
+  }
+
+  const foot = document.createElement('div');
+  foot.className = 'el-understanding-foot';
+  const when = document.createElement('span');
+  when.className = 'el-understanding-when';
+  when.textContent = `${U_TEXT.when} ${shortDate(v.updatedAt || rec.at)}`;
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'el-understanding-again';
+  again.textContent = U_TEXT.thinkAgain;
+  again.addEventListener('click', onAgain);
+  foot.append(when, again);
+  card.append(foot);
   return card;
 }
 
@@ -341,6 +448,76 @@ export function createMemoryView() {
         grow();
       }
 
+      /**
+       * 「我眼里的你」：有记录就画那张纸卡，没有就给「还没有足够的回忆」+ 一个立刻生成的按钮。
+       * 生成走 core/understanding.js 的 maybeRefresh（force 越过 24h 门槛），
+       * 模型调用与落库在那边是分开的两步，这里只负责把结果画出来。
+       */
+      async function paintUnderstanding() {
+        hint.textContent = s('memory.understandingHint');
+        const rec = await readUnderstanding();
+        list.replaceChildren();
+        if (rec && rec.value && rec.value.body) {
+          hint.textContent = '';
+          list.append(understandingCard(rec, () => think('again')));
+          return;
+        }
+        const box = emptyBox(U_TEXT.emptyTitle, U_TEXT.emptySub);
+        const cta = document.createElement('button');
+        cta.type = 'button';
+        cta.className = 'el-understanding-cta';
+        cta.textContent = U_TEXT.thinkNow;
+        cta.addEventListener('click', () => think('now'));
+        box.append(cta);
+        list.append(box);
+      }
+
+      async function think(kind) {
+        const btn = list.querySelector(kind === 'again' ? '.el-understanding-again' : '.el-understanding-cta');
+        const label = kind === 'again' ? U_TEXT.thinkAgain : U_TEXT.thinkNow;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = U_TEXT.thinking;
+        }
+        try {
+          const config = await loadModelConfig();
+          if (!isUsable(config)) {
+            hint.textContent = U_TEXT.noConfig;
+            return;
+          }
+          const [memories, journals] = await Promise.all([
+            listLatest('memory', { limit: 0 }),
+            listLatest('journal', { limit: 0 }),
+          ]);
+          if (!memories.length && !journals.length) {
+            hint.textContent = U_TEXT.noData;
+            return;
+          }
+          hint.textContent = U_TEXT.thinking;
+          const res = await refreshUnderstanding({
+            config,
+            memories,
+            journals,
+            at: Date.now(),
+            force: true,
+          });
+          if (res.status !== 'written') {
+            hint.textContent = res.reason === 'noConfig' ? U_TEXT.noConfig : U_TEXT.failed;
+            return;
+          }
+          await load();
+        } catch (err) {
+          console.warn('[memory] 生成我眼里的你失败', err);
+          hint.textContent = U_TEXT.failed;
+        } finally {
+          // load() 成功会重建整棵树，按钮已经不在文档里；只兜住提前 return 的那些分支
+          if (btn && btn.isConnected) {
+            btn.disabled = false;
+            btn.textContent = label;
+          }
+        }
+      }
+
       async function load() {
         if (state.loading) return;
         state.loading = true;
@@ -354,16 +531,54 @@ export function createMemoryView() {
         try {
           if (state.tab === 'past') {
             hint.textContent = s('memory.pastHint');
-            const rows = await listLatest('memory', { limit: 50 });
+            const rows = await listLatest('memory', { limit: 0 });
             list.replaceChildren();
+
+            const bar = document.createElement('div');
+            bar.className = 'el-memory-bar';
+            const count = document.createElement('span');
+            count.className = 'el-memory-count';
+            count.textContent = rows.length ? `${rows.length} 条` : '';
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'el-memory-add';
+            addBtn.textContent = `+ ${s('memory.addMemory')}`;
+            addBtn.addEventListener('click', async () => {
+              const res = await openMemoryEditor({
+                onSave: (patch) => createMemory(patch),
+              });
+              if (res === 'saved') load();
+            });
+            bar.append(count, addBtn);
+            list.append(bar);
+
             if (!rows.length) {
-              list.append(emptyBox(s('memory.empty'), s('memory.emptyHint')));
+              list.append(emptyBox(s('memory.emptyTitle'), s('memory.emptyAddHint')));
             } else {
-              for (const r of rows) list.append(memoryCard(r));
+              for (const r of rows) {
+                // 第二参是「数据动过了」的回调：编辑面板存/删之后重载这一页
+                list.append(memoryCard(r, () => load()));
+              }
             }
           } else if (state.tab === 'shared') {
             hint.textContent = s('memory.sharedHint');
-            list.replaceChildren(emptyBox(s('memory.empty'), s('memory.sharedHint')));
+            // 共同经历 = scope 标记为 shared 的记忆（两人一起经历过的），
+            // 卡片直接复用 memoryCard()：改/删那一套（.el-memory-tools）只实现一次。
+            const all = await listLatest('memory', { limit: 0 });
+            const rows = all.filter((r) => ((r.value || {}).scope || '') === 'shared');
+            list.replaceChildren();
+            if (!rows.length) {
+              list.append(emptyBox(s('memory.empty'), s('memory.sharedHint')));
+            } else {
+              const bar = document.createElement('div');
+              bar.className = 'el-memory-bar';
+              const count = document.createElement('span');
+              count.className = 'el-memory-count';
+              count.textContent = `${rows.length} 条`;
+              bar.append(count);
+              list.append(bar);
+              for (const r of rows) list.append(memoryCard(r, () => load()));
+            }
           } else if (state.tab === 'stars') {
             hint.textContent = s('memory.starsHint');
             list.replaceChildren(emptyBox(s('memory.empty'), s('memory.starsHint')));
@@ -376,8 +591,7 @@ export function createMemoryView() {
             state.journalShown = 0; // 由 paintDaily 里的 grow() 从 0 开始铺第一批
             paintDaily();
           } else {
-            hint.textContent = s('memory.understandingHint');
-            list.replaceChildren(emptyBox(s('memory.empty'), s('memory.understandingHint')));
+            await paintUnderstanding();
           }
         } catch (err) {
           console.error('[memory] 读取失败', err);

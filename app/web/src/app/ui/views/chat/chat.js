@@ -4,7 +4,7 @@
 import { s } from '../../../strings.zh.js';
 import { iconEl } from '../../icons.js';
 import { renderRichText } from '../../richtext.js';
-import { speak, stop as stopSpeaking, plain } from '../../../core/speech.js';
+import { speak, stop as stopSpeaking, plain, synthesizeUrl } from '../../../core/speech.js';
 import './chat.css';
 
 export function createChatView() {
@@ -152,6 +152,53 @@ export function createChatView() {
         return btn;
       }
 
+
+      // 随机语音条：她偶尔「发一条语音」。条上是时长和波形感，点一下才合成播放
+      // （合成要花 minimax 的钱，没人点就别花）。
+      const clipCache = new Map();
+      function clipBar(msg, node) {
+        const bar = document.createElement('button');
+        bar.type = 'button';
+        bar.className = 'el-msg-clip';
+        bar.setAttribute('aria-label', '语音条');
+        const dot = document.createElement('span');
+        dot.className = 'el-msg-clip-dot';
+        const wave = document.createElement('span');
+        wave.className = 'el-msg-clip-wave';
+        // 高度全交给 CSS 的 nth-child（视图层不许写内联 style）
+        for (let i = 0; i < 12; i += 1) wave.append(document.createElement('i'));
+        const len = document.createElement('span');
+        len.className = 'el-msg-clip-len';
+        const chars = plain(msg.text).length;
+        len.textContent = `${Math.max(2, Math.round(chars / 5))}″`;
+
+        let audio = null;
+        bar.addEventListener('click', async () => {
+          if (audio && !audio.paused) {
+            audio.pause();
+            bar.classList.remove('is-playing');
+            return;
+          }
+          let url = clipCache.get(msg.id);
+          if (!url) {
+            bar.classList.add('is-loading');
+            const res = await synthesizeUrl(msg.text).catch((err) => ({ error: String((err && err.message) || err) }));
+            bar.classList.remove('is-loading');
+            if (!res || res.error) {
+              node.classList.add('is-clip-failed');
+              return;
+            }
+            url = res.url;
+            clipCache.set(msg.id, url);
+          }
+          audio = new Audio(url);
+          audio.addEventListener('ended', () => bar.classList.remove('is-playing'));
+          bar.classList.add('is-playing');
+          audio.play().catch(() => bar.classList.remove('is-playing'));
+        });
+        bar.append(dot, wave, len);
+        return bar;
+      }
       function renderMessage(msg, enter) {
         const node = document.createElement('div');
         node.className = 'el-msg';
@@ -165,6 +212,7 @@ export function createChatView() {
         node.append(body);
         // 只有她说的话带朗读按钮（自己说的话自己知道）
         if (msg.role !== 'user' && !msg.pending && !msg.failed && String(msg.text || '').trim()) {
+          if (msg.voice) node.append(clipBar(msg, node));
           node.append(speakButton(msg, node));
         }
         return node;

@@ -344,3 +344,58 @@
   color: var(--z-signal);
   border-color: var(--z-signal);
 }
+
+/* 随机语音条：一条可点的窄条，点开才合成播放（合成要花钱，没人点就别花） */
+.el-msg-clip {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  width: fit-content;
+  min-width: calc(112 * var(--u));
+  margin-top: calc(5 * var(--u));
+  padding: calc(5 * var(--u)) calc(9 * var(--u));
+  font-family: inherit;
+  color: var(--el-text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--el-line);
+  border-radius: calc(999 * var(--u));
+}
+.el-msg-clip-dot {
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  border-radius: 50%;
+  background: var(--el-pink);
+}
+.el-msg-clip.is-playing .el-msg-clip-dot,
+.el-msg-clip.is-loading .el-msg-clip-dot {
+  animation: el-clip-pulse 900ms ease-in-out infinite;
+}
+.el-msg-clip.is-loading { opacity: 0.7; }
+.el-msg-clip-wave {
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  height: calc(15 * var(--u));
+}
+.el-msg-clip-wave i {
+  display: block;
+  width: calc(2 * var(--u));
+  height: 44%;
+  border-radius: calc(1 * var(--u));
+  background: currentColor;
+  opacity: 0.55;
+}
+.el-msg-clip-wave i:nth-child(2n) { height: 78%; }
+.el-msg-clip-wave i:nth-child(3n) { height: 30%; }
+.el-msg-clip-wave i:nth-child(5n) { height: 96%; }
+.el-msg-clip-wave i:nth-child(7n) { height: 58%; }
+.el-msg-clip-len {
+  font-size: calc(10 * var(--u));
+  color: var(--el-muted);
+}
+.el-msg.is-clip-failed .el-msg-clip { border-color: var(--el-error); color: var(--el-error); }
+
+@keyframes el-clip-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}

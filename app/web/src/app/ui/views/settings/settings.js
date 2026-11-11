@@ -90,83 +90,54 @@ export function createSettingsView({ state, onChange } = {}) {
       voiceHint.className = 'el-settings-card-hint';
       voiceHint.textContent = s('settings.voiceHint');
 
-      const speedLabel = document.createElement('div');
-      speedLabel.className = 'el-settings-label';
-      speedLabel.textContent = s('settings.voiceSpeed');
-      const speedSegs = document.createElement('div');
-      speedSegs.className = 'el-settings-segments';
-      const speedDefs = [
-        ['0.85', s('settings.voiceSlow')],
-        ['1', s('settings.voiceNormal')],
-        ['1.2', s('settings.voiceFast')],
-      ];
-      const speedButtons = speedDefs.map(([rate, label]) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'el-settings-segment';
-        b.dataset.rate = rate;
-        b.textContent = label;
-        speedSegs.append(b);
-        return b;
-      });
+      // —— 第一步：去领 key（给超链接；WebView 里点不动就把网址复制走）——
+      const step1 = document.createElement('div');
+      step1.className = 'el-wiz-step-block';
+      const step1Label = document.createElement('div');
+      step1Label.className = 'el-settings-label';
+      step1Label.textContent = s('settings.voiceStep1');
+      const VKEY_URL = 'https://platform.minimaxi.com/user-center/basic-information/interface-key';
+      const link = document.createElement('a');
+      link.className = 'el-wiz-link';
+      link.href = VKEY_URL;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      link.textContent = s('settings.voiceSignupLink');
+      const linkRow = document.createElement('div');
+      linkRow.className = 'el-settings-row';
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'el-settings-btn is-ghost';
+      copyBtn.textContent = s('settings.voiceCopyUrl');
+      linkRow.append(copyBtn);
+      const step1Steps = document.createElement('ol');
+      step1Steps.className = 'el-wiz-steps';
+      for (const line of [s('settings.voiceStep1a'), s('settings.voiceStep1b'), s('settings.voiceStep1c')]) {
+        const li = document.createElement('li');
+        li.textContent = line;
+        step1Steps.append(li);
+      }
+      step1.append(step1Label, link, linkRow, step1Steps);
 
-      const voiceRow = document.createElement('div');
-      voiceRow.className = 'el-settings-row';
-      const autoBtn = document.createElement('button');
-      autoBtn.type = 'button';
-      autoBtn.className = 'el-settings-btn';
-      const sampleBtn = document.createElement('button');
-      sampleBtn.type = 'button';
-      sampleBtn.className = 'el-settings-btn is-ghost';
-      sampleBtn.textContent = s('settings.voiceSample');
-      voiceRow.append(autoBtn, sampleBtn);
-
-      const voiceNote = document.createElement('div');
-      voiceNote.className = 'el-settings-note';
-
-      // 朗读方式：系统 TTS（离线） vs minimax 云端音色（要 key）
-      const providerLabel = document.createElement('div');
-      providerLabel.className = 'el-settings-label';
-      providerLabel.textContent = s('settings.voiceProvider');
-      const voiceProviderSegs = document.createElement('div');
-      voiceProviderSegs.className = 'el-settings-segments';
-      const providerDefs = [
-        ['system', s('settings.voiceProviderSystem')],
-        ['minimax', s('settings.voiceProviderCloud')],
-      ];
-      const providerButtons = providerDefs.map(([id, label]) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'el-settings-segment';
-        b.dataset.provider = id;
-        b.textContent = label;
-        voiceProviderSegs.append(b);
-        return b;
-      });
-
-      const cloudField = document.createElement('div');
-      cloudField.className = 'el-settings-cloud-field';
-
-      const vkeyLabel = document.createElement('div');
-      vkeyLabel.className = 'el-settings-label';
-      vkeyLabel.textContent = s('settings.voiceCloudKey');
+      // —— 第二步：粘 key ——
+      const step2 = document.createElement('div');
+      step2.className = 'el-wiz-step-block';
+      const step2Label = document.createElement('div');
+      step2Label.className = 'el-settings-label';
+      step2Label.textContent = s('settings.voiceStep2');
+      const vkeyRowWrap = document.createElement('div');
+      vkeyRowWrap.className = 'el-wiz-key-wrap';
       const vkeyInput = document.createElement('input');
       vkeyInput.className = 'el-settings-input';
       vkeyInput.type = 'password';
       vkeyInput.autocomplete = 'off';
       vkeyInput.spellcheck = false;
-      vkeyInput.placeholder = 'eyJ…（minimax 控制台的 API Key）';
-
-      const voiceIdLabel = document.createElement('div');
-      voiceIdLabel.className = 'el-settings-label';
-      voiceIdLabel.textContent = s('settings.voiceCloudVoiceId');
-      const voiceIdInput = document.createElement('input');
-      voiceIdInput.className = 'el-settings-input';
-      voiceIdInput.type = 'text';
-      voiceIdInput.autocomplete = 'off';
-      voiceIdInput.spellcheck = false;
-      voiceIdInput.placeholder = 'female-shaonv';
-
+      vkeyInput.placeholder = s('settings.voiceKeyPlaceholder');
+      const eye = document.createElement('button');
+      eye.type = 'button';
+      eye.className = 'el-wiz-eye';
+      eye.textContent = s('wiz.show');
+      vkeyRowWrap.append(vkeyInput, eye);
       const vkeyRow = document.createElement('div');
       vkeyRow.className = 'el-settings-row';
       const vkeySave = document.createElement('button');
@@ -178,111 +149,129 @@ export function createSettingsView({ state, onChange } = {}) {
       vkeyClear.className = 'el-settings-btn is-ghost';
       vkeyClear.textContent = s('settings.asrClear');
       vkeyRow.append(vkeySave, vkeyClear);
+      step2.append(step2Label, vkeyRowWrap, vkeyRow);
 
-      // 一键复刻：内置素材 + 用户自己的 key → minimax voice_clone → 自动填音色 id。
-      // 复刻过一次就把 voice_id 存住，同一个 key 再点只复用，不重复扣费。
+      // —— 第三步：复刻她的声音（内置素材，不用你录）——
+      const step3 = document.createElement('div');
+      step3.className = 'el-wiz-step-block';
+      const step3Label = document.createElement('div');
+      step3Label.className = 'el-settings-label';
+      step3Label.textContent = s('settings.voiceStep3');
       const cloneRow = document.createElement('div');
       cloneRow.className = 'el-settings-row';
       const cloneBtn = document.createElement('button');
       cloneBtn.type = 'button';
       cloneBtn.className = 'el-settings-btn';
       cloneBtn.textContent = s('settings.voiceCloneBtn');
-      cloneRow.append(cloneBtn);
-
+      const sampleBtn = document.createElement('button');
+      sampleBtn.type = 'button';
+      sampleBtn.className = 'el-settings-btn is-ghost';
+      sampleBtn.textContent = s('settings.voiceSample');
+      cloneRow.append(cloneBtn, sampleBtn);
       const cloneNote = document.createElement('div');
       cloneNote.className = 'el-settings-note';
       cloneNote.textContent = s('settings.voiceCloneNote');
+      step3.append(step3Label, cloneRow, cloneNote);
 
-      cloudField.append(vkeyLabel, vkeyInput, voiceIdLabel, voiceIdInput, vkeyRow, cloneRow, cloneNote);
+      // —— 两个开关：文字加语音朗读 / 随机语音条 ——
+      function toggleRow(titleKey, descKey) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'el-settings-toggle-row';
+        const copy = document.createElement('div');
+        copy.className = 'el-settings-toggle-copy';
+        const name = document.createElement('div');
+        name.className = 'el-settings-toggle-title';
+        name.textContent = s(titleKey);
+        const desc = document.createElement('div');
+        desc.className = 'el-settings-toggle-desc';
+        desc.textContent = s(descKey);
+        copy.append(name, desc);
+        const sw = document.createElement('span');
+        sw.className = 'el-settings-switch';
+        row.append(copy, sw);
+        return { row, sw };
+      }
 
-      voiceCard.append(voiceHead, voiceHint, providerLabel, voiceProviderSegs, cloudField, speedLabel, speedSegs, voiceRow, voiceNote);
+      const readT = toggleRow('settings.voiceReadTitle', 'settings.voiceReadDesc');
+      const clipT = toggleRow('settings.voiceClipTitle', 'settings.voiceClipDesc');
+      const toggleBlock = document.createElement('div');
+      toggleBlock.className = 'el-settings-toggles';
+      toggleBlock.append(readT.row, clipT.row);
+
+      const voiceNote = document.createElement('div');
+      voiceNote.className = 'el-settings-note';
+
+      voiceCard.append(voiceHead, voiceHint, step1, step2, step3, toggleBlock, voiceNote);
       el.append(voiceCard);
 
-      let voicePrefs = readVoicePrefs();
-
       function paintVoice() {
-        voicePrefs = readVoicePrefs();
-        const isCloud = voicePrefs.provider === 'minimax';
-        for (const b of providerButtons) {
-          b.classList.toggle('is-active', b.dataset.provider === voicePrefs.provider);
-        }
-        cloudField.classList.toggle('is-hidden', !isCloud);
-        voiceIdInput.value = voicePrefs.voiceId || 'female-shaonv';
+        const prefs = readVoicePrefs();
+        readT.row.classList.toggle('is-on', !!prefs.auto);
+        readT.sw.classList.toggle('is-on', !!prefs.auto);
+        clipT.row.classList.toggle('is-on', !!prefs.clip);
+        clipT.sw.classList.toggle('is-on', !!prefs.clip);
         readVoiceKey()
           .then((key) => {
             if (!vkeyInput.value) vkeyInput.value = key || '';
           })
           .catch(() => {});
-        voiceHint.textContent = isCloud ? s('settings.voiceCloudHint') : s('settings.voiceSystemHint');
-        paintVoiceStatus(null);
-        autoBtn.textContent = voicePrefs.auto ? s('settings.voiceAutoOn') : s('settings.voiceAutoOff');
-        autoBtn.classList.toggle('is-on', voicePrefs.auto);
-        for (const b of speedButtons) {
-          const same = Math.abs(Number(b.dataset.rate) - Number(voicePrefs.rate)) < 0.01;
-          b.classList.toggle('is-active', same);
+        const cloned = prefs.voiceId && prefs.voiceId !== 'female-shaonv';
+        voiceStatus.textContent = s(cloned ? 'settings.voiceCloudCloned' : 'settings.voiceCloudBuiltin');
+      }
+
+      function note(text, bad) {
+        voiceNote.className = bad ? 'el-settings-note is-error' : 'el-settings-note';
+        voiceNote.textContent = text || '';
+      }
+
+      async function copyKeyUrl() {
+        try {
+          await navigator.clipboard.writeText(VKEY_URL);
+          note(s('settings.voiceUrlCopied'));
+        } catch (_) {
+          note(s('settings.voiceUrlCopyFail'), true);
         }
       }
 
-      // 状态行按「正在用哪种朗读」说话：云端音色时不必再报系统引擎缺失（那台模拟器就没有 TTS，
-      // 但云端照样能念，写「没有中文朗读引擎」会让人以为念不了）。
-      let lastSystemVoiceState = null;
-      function paintVoiceStatus(st) {
-        if (st) lastSystemVoiceState = st;
-        const prefs = readVoicePrefs();
-        if (prefs.provider === 'minimax') {
-          const cloned = voicePrefs.voiceId && voicePrefs.voiceId !== 'female-shaonv';
-          voiceStatus.textContent = s(cloned ? 'settings.voiceCloudCloned' : 'settings.voiceCloudBuiltin');
-          return;
-        }
-        const sys = lastSystemVoiceState;
-        if (!sys) {
-          voiceStatus.textContent = '';
-          return;
-        }
-        voiceStatus.textContent = sys.available ? s('settings.voiceReady') : s('settings.voiceUnavailable');
-      }
-
-      for (const b of providerButtons) {
-        b.addEventListener('click', () => {
-          writeVoicePrefs({ provider: b.dataset.provider, voiceId: voiceIdInput.value.trim() || 'female-shaonv' });
-          paintVoice();
-          voiceNote.className = 'el-settings-note';
-          voiceNote.textContent = b.dataset.provider === 'minimax' ? s('settings.voiceCloudHint') : s('settings.voiceSystemHint');
-        });
-      }
+      eye.addEventListener('click', () => {
+        const shown = vkeyInput.type === 'text';
+        vkeyInput.type = shown ? 'password' : 'text';
+        eye.textContent = shown ? s('wiz.show') : s('wiz.hide');
+      });
+      // WebView 默认不开外部跳转，点了大概率停在原地 —— 顺手把网址复制好
+      link.addEventListener('click', () => {
+        copyKeyUrl();
+      });
+      copyBtn.addEventListener('click', copyKeyUrl);
 
       vkeySave.addEventListener('click', async () => {
         const key = vkeyInput.value.trim();
         if (!key) {
-          voiceNote.className = 'el-settings-note is-error';
-          voiceNote.textContent = s('settings.voiceCloudNeedKey');
+          note(s('settings.voiceCloudNeedKey'), true);
           return;
         }
         try {
           await writeVoiceKey(key);
-          writeVoicePrefs({ provider: 'minimax', voiceId: voiceIdInput.value.trim() || 'female-shaonv' });
+          writeVoicePrefs({ provider: 'minimax' });
           paintVoice();
-          voiceNote.className = 'el-settings-note';
-          voiceNote.textContent = s('settings.asrSaved');
+          note(s('settings.asrSaved'));
         } catch (err) {
-          voiceNote.className = 'el-settings-note is-error';
-          voiceNote.textContent = (err && err.message) || '存不下';
+          note((err && err.message) || s('settings.voiceCloudNeedKey'), true);
         }
       });
 
       vkeyClear.addEventListener('click', async () => {
         await clearVoiceKey().catch(() => {});
         vkeyInput.value = '';
-        voiceNote.className = 'el-settings-note';
-        voiceNote.textContent = '';
+        note('');
       });
 
       cloneBtn.addEventListener('click', async () => {
         if (cloneBtn.dataset.busy === '1') return;
         const key = vkeyInput.value.trim() || (await readVoiceKey().catch(() => ''));
         if (!key) {
-          cloneNote.className = 'el-settings-note is-error';
-          cloneNote.textContent = s('settings.voiceCloneNeedKey');
+          note(s('settings.voiceCloneNeedKey'), true);
           return;
         }
         if (!vkeyInput.value.trim()) await writeVoiceKey(key).catch(() => {});
@@ -290,8 +279,7 @@ export function createSettingsView({ state, onChange } = {}) {
         cloneBtn.disabled = true;
         const label = s('settings.voiceCloneBtn');
         cloneBtn.textContent = s('settings.voiceCloneBusy');
-        cloneNote.className = 'el-settings-note';
-        cloneNote.textContent = s('settings.voiceCloneWorking');
+        note(s('settings.voiceCloneWorking'));
         try {
           const res = await cloneVoice({
             apiKey: key,
@@ -300,16 +288,12 @@ export function createSettingsView({ state, onChange } = {}) {
             },
           });
           const voiceId = (res && res.voiceId) || clonedVoiceId();
-          if (voiceId) {
-            voiceIdInput.value = voiceId;
-            writeVoicePrefs({ provider: 'minimax', voiceId });
-          }
-          cloneNote.className = 'el-settings-note';
-          cloneNote.textContent = res && res.reused ? s('settings.voiceCloneReused') : s('settings.voiceCloneDone');
+          if (voiceId) writeVoicePrefs({ provider: 'minimax', voiceId });
+          cloneNote.textContent = s('settings.voiceCloneNote');
+          note(res && res.reused ? s('settings.voiceCloneReused') : s('settings.voiceCloneDone'));
           paintVoice();
         } catch (err) {
-          cloneNote.className = 'el-settings-note is-error';
-          cloneNote.textContent = s('settings.voiceCloneFail') + String((err && err.message) || err);
+          note(s('settings.voiceCloneFail') + String((err && err.message) || err), true);
         } finally {
           cloneBtn.dataset.busy = '';
           cloneBtn.disabled = false;
@@ -317,37 +301,29 @@ export function createSettingsView({ state, onChange } = {}) {
         }
       });
 
-      autoBtn.addEventListener('click', () => {
+      readT.row.addEventListener('click', () => {
         writeVoicePrefs({ auto: !readVoicePrefs().auto });
         paintVoice();
-        voiceNote.className = 'el-settings-note';
-        voiceNote.textContent = readVoicePrefs().auto ? s('settings.voiceAutoOnHint') : s('settings.voiceAutoOffHint');
+        note(readVoicePrefs().auto ? s('settings.voiceAutoOnHint') : s('settings.voiceAutoOffHint'));
       });
 
-      for (const b of speedButtons) {
-        b.addEventListener('click', async () => {
-          writeVoicePrefs({ rate: Number(b.dataset.rate) });
-          paintVoice();
-          await stopVoice().catch(() => {});
-          await speakVoice(s('settings.voiceSampleText')).catch(() => {});
-        });
-      }
+      clipT.row.addEventListener('click', () => {
+        writeVoicePrefs({ clip: !readVoicePrefs().clip });
+        paintVoice();
+        note(readVoicePrefs().clip ? s('settings.voiceClipOnHint') : s('settings.voiceClipOffHint'));
+      });
 
       sampleBtn.addEventListener('click', async () => {
         const res = await speakVoice(s('settings.voiceSampleText')).catch((err) => ({ error: String(err) }));
-        if (res && res.error) {
-          voiceNote.className = 'el-settings-note is-error';
-          voiceNote.textContent = `${s('settings.voiceFailed')}${res.error}`;
-        } else {
-          voiceNote.className = 'el-settings-note';
-          voiceNote.textContent = s('settings.voicePlaying');
-        }
+        if (res && res.error) note(s('settings.voiceFailed') + res.error, true);
+        else note(s('settings.voicePlaying'));
       });
 
       paintVoice();
       voiceState()
-        .then(paintVoiceStatus)
-        .catch(() => paintVoiceStatus(null));
+        .then(() => paintVoice())
+        .catch(() => paintVoice());
+
       // —— 语音输入（转写）——
       const asrCard = document.createElement('div');
       asrCard.className = 'el-settings-card';

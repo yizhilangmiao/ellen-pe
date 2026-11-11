@@ -31,7 +31,7 @@ import { createMemoryView } from './ui/views/memory/memory.js';
 import { createHistoryView } from './ui/views/history/history.js';
 import { createJournalView } from './ui/views/journal/journal.js';
 import { createFeedbackView } from './ui/views/feedback/feedback.js';
-import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakOut, stop as stopSpeech, plain as plainVoice } from './core/speech.js';
+import { readPrefs as readVoicePrefs, maybeClip, writePrefs as writeVoicePrefs, speak as speakOut, stop as stopSpeech, plain as plainVoice } from './core/speech.js';
 import { createCompanionView } from './ui/views/companion/companion.js';
 import { createAppState } from './core/state.js';
 import { createChatSession } from './core/chat/session.js';
@@ -253,8 +253,24 @@ function sendMessage(text) {
     );
     // 开了「她说完就念」就把这一句读出来（读不出来不影响聊天）
     maybeReadAloud();
+    // 开了「随机语音条」，偶尔给这一条挂个语音条（1/7）
+    maybeAttachClip();
   });
 }
+
+  // 随机语音条：把最后一条她说的话标上 voice，聊天页据此画一条可点的语音条
+  function maybeAttachClip() {
+    if (!maybeClip()) return;
+    const list = appState.getMessages();
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const m = list[i];
+      if (m.role !== 'assistant' || m.pending || m.failed) continue;
+      if (!String(m.text || '').trim()) return;
+      if (m.voice) return;
+      appState.updateMessage(m.id, { voice: true });
+      return;
+    }
+  }
 
   // —— 朗读 ——
   // 只念她的话，不念自己的；纯文本化后再喂引擎，省得念出星号。

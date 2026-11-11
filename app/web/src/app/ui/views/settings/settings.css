@@ -318,3 +318,87 @@
 /* 横屏不做特殊版式：manifest 里 screenOrientation="portrait"，真机上横屏根本不会出现，
    唯一能造出横屏的是 CDP Emulation，而它会把 .el-settings-context 量成 900 宽却让
    卡片按 330 排版（截图里字被切）。评审提的「横屏留白」在真机不存在，这里只留说明。 */
+
+/* —— 声音：三步引导（第一步超链接、第二步 key、第三步复刻）+ 两个开关 —— */
+.el-wiz-step-block {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  padding-top: calc(2 * var(--u));
+}
+.el-wiz-link {
+  display: block;
+  font-size: calc(12 * var(--u));
+  line-height: 1.5;
+  color: var(--el-settings-accent, var(--el-pink));
+  text-decoration: underline;
+  text-underline-offset: calc(2 * var(--u));
+  word-break: break-all;
+}
+.el-wiz-steps {
+  margin: 0;
+  padding-left: calc(16 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: 1.7;
+  color: var(--el-settings-muted, var(--el-muted));
+}
+.el-wiz-key-wrap { position: relative; display: flex; }
+.el-wiz-key-wrap .el-settings-input { padding-right: calc(52 * var(--u)); }
+.el-wiz-eye {
+  position: absolute;
+  top: 0;
+  right: calc(4 * var(--u));
+  height: 100%;
+  padding: 0 calc(6 * var(--u));
+  font-family: inherit;
+  font-size: calc(11 * var(--u));
+  color: var(--el-settings-accent, var(--el-pink));
+  background: transparent;
+  border: 0;
+}
+
+.el-settings-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  margin-top: calc(4 * var(--u));
+}
+.el-settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  padding: calc(9 * var(--u)) calc(11 * var(--u));
+  font-family: inherit;
+  text-align: left;
+  color: var(--el-settings-ink, var(--el-text));
+  background: var(--el-settings-input, var(--el-bg));
+  border: 1px solid var(--el-settings-line, var(--el-line));
+  border-radius: calc(12 * var(--u));
+}
+.el-settings-toggle-copy { display: flex; flex-direction: column; gap: calc(2 * var(--u)); }
+.el-settings-toggle-title { font-size: calc(13 * var(--u)); }
+.el-settings-toggle-desc { font-size: calc(10 * var(--u)); color: var(--el-settings-muted, var(--el-muted)); }
+.el-settings-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(38 * var(--u));
+  height: calc(22 * var(--u));
+  background: var(--el-settings-control-line, var(--el-line));
+  border-radius: calc(999 * var(--u));
+  transition: background-color 140ms linear;
+}
+.el-settings-switch::after {
+  content: '';
+  position: absolute;
+  top: calc(2 * var(--u));
+  left: calc(2 * var(--u));
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  background: var(--el-settings-page, var(--el-bg));
+  border-radius: 50%;
+  transition: transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+.el-settings-switch.is-on { background: var(--el-settings-accent, var(--el-pink)); }
+.el-settings-switch.is-on::after { transform: translateX(calc(16 * var(--u))); }

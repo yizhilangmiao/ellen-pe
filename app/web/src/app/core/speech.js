@@ -1,14 +1,16 @@
 // 朗读（她说话）。
 //
-// 两条路，用户在设置里选：
-//   system  —— Android 系统 TTS（`EllenSpeech.speak`）：零配置、离线，音色一般
-//   minimax —— 云端音色（`EllenSpeech.synthesize` → mp3 → Audio 播放）：好听，要 key
+// 只用 minimax 云端音色（`EllenSpeech.synthesize` → mp3 → Audio 播放）。
+// 系统 TTS 那条路已经不在界面上出现（用户 2026-11-11 要求删掉：模拟器没有引擎、
+// 真机音色也不像她）。代码里保留 `speak()` 的原生分支只作为云端彻底失败时的兜底。
 //
 // 为什么云端音色走「原生拿字节、web 播放」而不是原生播放：
 // WebView 的 <audio> 播 mp3 是系统能力，省掉一套 MediaPlayer 状态机（旧包为此写了
 // `EllenAudio` 的 play/pause/setVolume/setLoop 五个方法 + 一个通话 PCM 通道）。
 //
-// 偏好存 localStorage（不是密钥）：{ auto, rate, provider, model, voiceId }
+// 偏好存 localStorage（不是密钥）：{ auto, clip, rate, provider, model, voiceId }
+//   auto —— 文字加语音朗读（她说完了就念）
+//   clip —— 随机语音条（偶尔只给一条语音条，点开才听）
 // minimax 的 key 走 EllenSecureConfig（scope `tts`），明文不落 localStorage。
 import { call, listen } from './native/bridge.js';
 
@@ -16,9 +18,10 @@ const PREFS_KEY = 'ellen.voice.v1';
 const TTS_SCOPE = 'tts';
 const DEFAULTS = {
   auto: false,
+  clip: false,
   rate: 1.0,
   voice: '',
-  provider: 'system',
+  provider: 'minimax',
   model: 'speech-2.8-hd',
   voiceId: 'female-shaonv',
   endpoint: 'https://api.minimax.cn/v1/t2a_v2',
@@ -216,6 +219,43 @@ export async function onSpeech(cb) {
 }
 
 /** 只念纯文本：把 Markdown 的强调符号与代码围栏剥掉，别让引擎念出星号。 */
+/** 随机语音条：把一句话念成一条「语音条」挂在气泡里。
+ *  为什么按概率而不是全量：每条都合成既费钱又吵，偶尔一条才有「她随手发了条语音」的感觉。
+ *  概率固定 1/7，不做开关档位 —— 用户要的就是「开/关」两态。 */
+const CLIP_ODDS = 7;
+
+export function maybeClip() {
+  const prefs = readPrefs();
+  if (!prefs.clip) return false;
+  return Math.floor(Math.random() * CLIP_ODDS) === 0;
+}
+
+/** 合成一段可直接给 <audio> 用的 blob url（调用方负责在不用时 revoke）。 */
+export async function synthesizeUrl(text, opts = {}) {
+  const clean = plain(text).slice(0, 220);
+  if (!clean) {
+    const err = new Error('没有要念的内容');
+    err.code = 'SPEECH_EMPTY';
+    throw err;
+  }
+  const prefs = readPrefs();
+  const key = await readKey();
+  if (!key) {
+    const err = new Error('还没填 minimax 的 key');
+    err.code = 'NO_API_KEY';
+    throw err;
+  }
+  const res = await call('EllenSpeech', 'synthesize', {
+    text: clean,
+    apiKey: key,
+    endpoint: prefs.endpoint,
+    model: prefs.model,
+    voiceId: prefs.voiceId || 'female-shaonv',
+    speed: prefs.rate,
+  });
+  return { url: base64ToBlobUrl(res.base64, res.format || 'mp3'), bytes: res.bytes, ms: res.ms };
+}
+
 export function plain(text) {
   return String(text || '')
     .replace(/```[\s\S]*?```/g, ' ')
