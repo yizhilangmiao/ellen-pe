@@ -1579,6 +1579,16 @@ export function createSettingsView({ state, onChange } = {}) {
         }),
       );
 
+      // 横屏要两栏：多列流只能挂在块容器上（挂在 flex 页面上是无效的），
+      // 所以把卡片统一装进一个 flow 包装，标题/副标题留在外面通栏。
+      const flow = document.createElement('div');
+      flow.className = 'el-settings-flow';
+      for (const node of [...el.children]) {
+        if (node === title || node === subtitle) continue;
+        flow.append(node);
+      }
+      el.append(flow);
+
       return {
         destroy() {
           if (offUpdate) offUpdate();

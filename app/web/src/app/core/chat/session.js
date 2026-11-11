@@ -63,8 +63,13 @@ export function explainFailure(status, rawBody) {
   if (status >= 500) {
     return { text: '服务平台自己出错了（不是你的配置问题），过一会儿再试。', code };
   }
+  // 兜底：模型名不对这类 400 服务端会回一长串英文（还带 request_id），
+  // 原文只该进系统条，不该糊在她的话里。这里只给一句能干点什么的话。
+  if (status === 400) {
+    return { text: '这次请求被服务端退了。多半是模型名不对——回设置里挑一个平台推荐的模型再试。', code };
+  }
   if (message) {
-    return { text: `服务端拒绝了这次请求：${message.slice(0, 160)}`, code };
+    return { text: '服务端说这次请求不行，具体原因在下面那行。', code };
   }
   return { text: `服务端返回 ${status}，这次没成。`, code };
 }

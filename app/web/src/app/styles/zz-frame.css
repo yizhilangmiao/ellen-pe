@@ -297,3 +297,47 @@
 .ellen-app[data-skin='zzz'] .el-nav {
   background-image: radial-gradient(#ffffff8a 1px, transparent 1px);
 }
+
+/* —— 顶栏「⋯」与它的下拉菜单 —— */
+/* 五个 25u 图标在 360 宽下命中区太小，收进一个整行条目都 40u 高的菜单里。 */
+.el-header-tool.is-more { margin-left: auto; }
+.el-header-tool.is-more.is-open { background: color-mix(in srgb, var(--z-signal) 22%, transparent); color: var(--z-signal); }
+
+.el-header-menu {
+  position: absolute;
+  top: calc(46 * var(--u));
+  right: calc(8 * var(--u));
+  z-index: 40;
+  min-width: calc(150 * var(--u));
+  padding: calc(5 * var(--u));
+  border: 0.8px solid var(--z-line);
+  border-radius: calc(12 * var(--u));
+  background: var(--z-panel, #14171a);
+  box-shadow: 0 calc(6 * var(--u)) calc(18 * var(--u)) #000000a6;
+}
+
+.el-header-menu[hidden] { display: none; }
+
+.el-header-menu-list { display: flex; flex-direction: column; }
+
+.el-header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  padding: calc(9 * var(--u)) calc(10 * var(--u));
+  border: 0;
+  border-radius: calc(9 * var(--u));
+  background: transparent;
+  color: var(--z-ink, #e7e6e3);
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-header-menu-item:active {
+  background: color-mix(in srgb, var(--z-signal) 18%, transparent);
+}
+
+.el-header-menu-item .el-icon { width: calc(17 * var(--u)); height: calc(17 * var(--u)); color: var(--z-muted, #9aa1a6); }
+.el-header-menu-label { flex: 1 1 auto; }

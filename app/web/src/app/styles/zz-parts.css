@@ -435,3 +435,27 @@
     max-width: calc(560 * var(--u));
   }
 }
+
+/* —— 系统条：技术性失败只在这里出现一行 —— */
+.el-system-strip {
+  display: block;
+  width: calc(100% - calc(16 * var(--u)));
+  margin: 0 calc(8 * var(--u)) calc(6 * var(--u));
+  padding: calc(7 * var(--u)) calc(12 * var(--u));
+  border: 0;
+  border-left: calc(3 * var(--u)) solid #d6ff5c;
+  border-radius: calc(8 * var(--u));
+  background: #2b2229;
+  /* stream 有 z-index:1，且气泡会溢出自己的盒子画到底下：
+     不给系统条抬层，它就被气泡盖住（看起来像没画出来）。 */
+  position: relative;
+  z-index: 3;
+  color: #f2e7ec;
+  font-family: inherit;
+  font-size: calc(11 * var(--u));
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-system-strip[hidden] { display: none; }

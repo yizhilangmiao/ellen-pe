@@ -161,3 +161,19 @@
   box-shadow: inset 0 0 0 1px var(--z-signal);
   color: var(--z-signal);
 }
+
+/* 五个页签必须是一行：原来是两排（三段 + 三胶囊），合并后 360 宽放不下，会折行。
+   改成横向滚动——折成两排等于没合并。 */
+.el-memory-tabs {
+  /* 老样式是 grid 三列（三段时代），合并成五段后必须换成单行可滚的 flex */
+  display: flex;
+  grid-template-columns: none;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: calc(2 * var(--u));
+  scrollbar-width: none;
+}
+
+.el-memory-tabs::-webkit-scrollbar { display: none; }
+.el-memory-tabs .el-segment { flex: 0 0 auto; }

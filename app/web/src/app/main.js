@@ -96,8 +96,26 @@ function buildShell(root) {
   brand.textContent = s('app.name');
   brand.setAttribute('aria-label', s('header.back'));
 
+  // 顶栏只留一个「⋯」：五个工具收进下拉里。
+  // 为什么：五个 25u 图标在 360 CSS 宽下挤成一排，既难点（命中区 25px）又抢了标题的位置；
+  // 评审也指出「一排五个图标」是典型的 AI 味排法。收进菜单后每个条目是 40u 高的整行，好点也好认。
   const tools = document.createElement('div');
   tools.className = 'el-header-tools';
+
+  const moreBtn = document.createElement('button');
+  moreBtn.type = 'button';
+  moreBtn.className = 'el-round icon-only el-header-tool is-more';
+  moreBtn.dataset.act = 'more';
+  moreBtn.setAttribute('aria-label', s('header.more'));
+  moreBtn.append(iconEl('more'));
+  tools.append(moreBtn);
+
+  const menu = document.createElement('div');
+  menu.className = 'el-header-menu';
+  menu.hidden = true;
+  const menuList = document.createElement('div');
+  menuList.className = 'el-header-menu-list';
+  menu.append(menuList);
 
   const toolDefs = [
     { key: 'header.background', icon: 'background', act: 'background' },
@@ -110,12 +128,14 @@ function buildShell(root) {
   for (const def of toolDefs) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'el-round icon-only el-header-tool';
+    btn.className = 'el-header-menu-item';
     if (def.act === 'appearance') btn.classList.add('el-chat-palette');
     btn.dataset.act = def.act;
-    btn.setAttribute('aria-label', s(def.key));
-    btn.append(iconEl(def.icon));
-    tools.appendChild(btn);
+    const label = document.createElement('span');
+    label.className = 'el-header-menu-label';
+    label.textContent = s(def.key);
+    btn.append(iconEl(def.icon, 'el-icon'), label);
+    menuList.appendChild(btn);
     toolButtons[def.act] = btn;
   }
   header.append(brand, tools);
@@ -147,8 +167,34 @@ function buildShell(root) {
     tabButtons.set(def.name, btn);
   }
 
-  root.append(header, pages, nav);
-  return { header, pages, nav, brand, toolButtons, tabButtons };
+  root.append(header, pages, nav, menu);
+
+  function setMenu(open) {
+    menu.hidden = !open;
+    moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    moreBtn.classList.toggle('is-open', !!open);
+  }
+  moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setMenu(menu.hidden);
+  });
+  menu.addEventListener('click', (e) => {
+    // 条目自己会做事；点空白就关
+    if (e.target === menu) setMenu(false);
+  });
+  for (const btn of Object.values(toolButtons)) {
+    btn.addEventListener('click', () => setMenu(false));
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (menu.hidden) return;
+    if (menu.contains(e.target) || moreBtn.contains(e.target)) return;
+    setMenu(false);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) setMenu(false);
+  });
+
+  return { header, pages, nav, menu, brand, moreBtn, toolButtons, tabButtons, setMenu };
 }
 
 async function main() {

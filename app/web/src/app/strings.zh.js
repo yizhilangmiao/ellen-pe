@@ -13,6 +13,7 @@ export const strings = {
     history: '聊天历史',
     notices: '状态与提醒',
     settings: '设置',
+    more: '更多',
   },
   nav: {
     chat: '聊天',

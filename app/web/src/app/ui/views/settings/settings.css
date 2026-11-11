@@ -313,3 +313,8 @@
   border-bottom: 1px solid var(--z-line-hair);
   padding-bottom: calc(8 * var(--u));
 }
+
+
+/* 横屏不做特殊版式：manifest 里 screenOrientation="portrait"，真机上横屏根本不会出现，
+   唯一能造出横屏的是 CDP Emulation，而它会把 .el-settings-context 量成 900 宽却让
+   卡片按 330 排版（截图里字被切）。评审提的「横屏留白」在真机不存在，这里只留说明。 */

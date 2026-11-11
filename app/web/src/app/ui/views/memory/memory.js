@@ -222,39 +222,27 @@ export function createMemoryView() {
       subtitle.className = 'el-page-subtitle';
       subtitle.textContent = s('memory.subtitle');
 
-      // 三段
+      // 一排页签（原来分两排：三段页签 + 三条胶囊，同一件事摆了两次，还占两行高）。
+      // 现在五件事平铺成一行：日常 / 她的过去 / 共同经历 / 星图 / 我眼里的你。
       const pages = document.createElement('div');
-      pages.className = 'el-segments';
+      pages.className = 'el-segments el-memory-tabs';
       const pageDefs = [
         ['daily', s('memory.pageDaily')],
-        ['memories', s('memory.pageMemories')],
+        ['past', s('memory.past')],
+        ['shared', s('memory.shared')],
+        ['stars', s('memory.stars')],
         ['understanding', s('memory.pageUnderstanding')],
       ];
       const pageBtns = pageDefs.map(([id, label]) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'el-segment';
-        b.dataset.memoryPage = id;
+        b.dataset.memoryTab = id;
+        // 兼容老选择器与老验收脚本
+        b.dataset.memoryPage = id === 'past' || id === 'shared' || id === 'stars' ? 'memories' : id;
+        if (id === 'past' || id === 'shared' || id === 'stars') b.dataset.recallGroup = id;
         b.textContent = label;
         pages.append(b);
-        return b;
-      });
-
-      // 胶囊
-      const groups = document.createElement('div');
-      groups.className = 'el-recall-groups';
-      const groupDefs = [
-        ['past', s('memory.past')],
-        ['shared', s('memory.shared')],
-        ['stars', s('memory.stars')],
-      ];
-      const groupBtns = groupDefs.map(([id, label]) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'el-recall-group';
-        b.dataset.recallGroup = id;
-        b.textContent = label;
-        groups.append(b);
         return b;
       });
 
@@ -264,18 +252,16 @@ export function createMemoryView() {
       const list = document.createElement('div');
       list.className = 'el-memory-list';
 
-      el.append(eyebrow, title, subtitle, pages, groups, hint, list);
+      el.append(eyebrow, title, subtitle, pages, hint, list);
 
       // 手记列表分页：一次只往 DOM 里塞 60 张。
       // 为什么：500 篇的库里一次性渲染 401 张卡片，DOM 两千多个节点、页面高 61000 px，
       // 低端机上滚动会掉帧；而且原来写死 limit:400，超过 400 篇的老手记在列表里根本到不了。
       const JOURNAL_PAGE = 60;
-      const state = { page: 'memories', group: 'past', loading: false, month: null, journalRows: null, journalShown: 0 };
+      const state = { tab: 'daily', loading: false, month: null, journalRows: null, journalShown: 0 };
 
       function paintButtons() {
-        for (const b of pageBtns) b.classList.toggle('is-active', b.dataset.memoryPage === state.page);
-        for (const b of groupBtns) b.classList.toggle('is-active', b.dataset.recallGroup === state.group);
-        groups.hidden = state.page !== 'memories';
+        for (const b of pageBtns) b.classList.toggle('is-active', b.dataset.memoryTab === state.tab);
       }
 
       function emptyBox(text, sub) {
@@ -366,24 +352,22 @@ export function createMemoryView() {
         paintButtons();
 
         try {
-          if (state.page === 'memories') {
-            if (state.group === 'past') {
-              hint.textContent = s('memory.pastHint');
-              const rows = await listLatest('memory', { limit: 50 });
-              list.replaceChildren();
-              if (!rows.length) {
-                list.append(emptyBox(s('memory.empty'), s('memory.emptyHint')));
-              } else {
-                for (const r of rows) list.append(memoryCard(r));
-              }
-            } else if (state.group === 'shared') {
-              hint.textContent = s('memory.sharedHint');
-              list.replaceChildren(emptyBox(s('memory.empty'), s('memory.sharedHint')));
+          if (state.tab === 'past') {
+            hint.textContent = s('memory.pastHint');
+            const rows = await listLatest('memory', { limit: 50 });
+            list.replaceChildren();
+            if (!rows.length) {
+              list.append(emptyBox(s('memory.empty'), s('memory.emptyHint')));
             } else {
-              hint.textContent = s('memory.starsHint');
-              list.replaceChildren(emptyBox(s('memory.empty'), s('memory.starsHint')));
+              for (const r of rows) list.append(memoryCard(r));
             }
-          } else if (state.page === 'daily') {
+          } else if (state.tab === 'shared') {
+            hint.textContent = s('memory.sharedHint');
+            list.replaceChildren(emptyBox(s('memory.empty'), s('memory.sharedHint')));
+          } else if (state.tab === 'stars') {
+            hint.textContent = s('memory.starsHint');
+            list.replaceChildren(emptyBox(s('memory.empty'), s('memory.starsHint')));
+          } else if (state.tab === 'daily') {
             hint.textContent = '';
             // limit:0 = 全量。日历要标出「哪天有手记」，必须有全部日期；
             // DOM 只渲染前 state.journalShown 张（见 paintDaily）。
@@ -405,15 +389,8 @@ export function createMemoryView() {
 
       for (const b of pageBtns) {
         b.addEventListener('click', () => {
-          if (state.page === b.dataset.memoryPage) return;
-          state.page = b.dataset.memoryPage;
-          load();
-        });
-      }
-      for (const b of groupBtns) {
-        b.addEventListener('click', () => {
-          if (state.group === b.dataset.recallGroup) return;
-          state.group = b.dataset.recallGroup;
+          if (state.tab === b.dataset.memoryTab) return;
+          state.tab = b.dataset.memoryTab;
           load();
         });
       }

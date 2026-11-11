@@ -26,6 +26,7 @@ export const PATHS = {
     '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path>',
   // 通用
   back: '<path d="m15 18-6-6 6-6"></path>',
+  more: '<circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle>',
   close: '<path d="m6 6 12 12M18 6 6 18"></path>',
   send: '<path d="M12 19V5M5 12l7-7 7 7"></path>',
   stop: '<rect x="7" y="7" width="10" height="10" rx="1.5"></rect>',

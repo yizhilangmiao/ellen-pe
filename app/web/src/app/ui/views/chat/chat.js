@@ -54,7 +54,38 @@ export function createChatView() {
       stopBtn.hidden = true;
 
       composer.append(micBtn, field, stopBtn, sendBtn);
-      el.append(stream, composer);
+
+      // 系统条：技术性失败（HTTP 404 / 钥匙不对）只在这里出现一行，不塞进她的气泡里。
+      // 评审原话「404 进系统条」：错误不是她说的话，长得像气泡就会让人以为是她在推卸。
+      const systemStrip = document.createElement('button');
+      systemStrip.type = 'button';
+      systemStrip.className = 'el-system-strip';
+      systemStrip.hidden = true;
+      systemStrip.addEventListener('click', () => {
+        dismissedAt = state.messages.length;
+        paintSystemStrip();
+      });
+
+      el.append(stream, systemStrip, composer);
+
+      let dismissedAt = -1;
+
+      /** 找最后一条带 detail 的失败消息，把它挂到系统条上；点一下算「知道了」。 */
+      function paintSystemStrip() {
+        const msgs = state.messages || [];
+        let idx = -1;
+        // 只看最后两条：历史里的旧失败不该每次开 App 都挂一条在顶上。
+        for (let i = msgs.length - 1; i >= Math.max(0, msgs.length - 2); i -= 1) {
+          if (msgs[i] && msgs[i].detail) { idx = i; break; }
+        }
+        if (idx < 0 || idx <= dismissedAt) {
+          systemStrip.hidden = true;
+          systemStrip.textContent = '';
+          return;
+        }
+        systemStrip.hidden = false;
+        systemStrip.textContent = String(msgs[idx].detail);
+      }
 
       function renderEmpty() {
         const wrap = document.createElement('div');
@@ -136,12 +167,6 @@ export function createChatView() {
         if (msg.role !== 'user' && !msg.pending && !msg.failed && String(msg.text || '').trim()) {
           node.append(speakButton(msg, node));
         }
-        if (msg.detail) {
-          const d = document.createElement('div');
-          d.className = 'el-msg-detail';
-          d.textContent = msg.detail;
-          node.append(d);
-        }
         return node;
       }
 
@@ -159,17 +184,7 @@ export function createChatView() {
         else delete node.dataset.pending;
         if (last.failed) node.dataset.failed = '1';
         else delete node.dataset.failed;
-        let d = node.querySelector('.el-msg-detail');
-        if (last.detail) {
-          if (!d) {
-            d = document.createElement('div');
-            d.className = 'el-msg-detail';
-            node.append(d);
-          }
-          d.textContent = last.detail;
-        } else if (d) {
-          d.remove();
-        }
+        paintSystemStrip();
       }
 
       let painted = false;
@@ -186,6 +201,7 @@ export function createChatView() {
           stream.append(renderMessage(msg, painted && i >= last - 1));
         });
         painted = true;
+        paintSystemStrip();
         stream.scrollTop = stream.scrollHeight;
       }
 
