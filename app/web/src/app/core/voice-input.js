@@ -11,8 +11,8 @@ import * as defaultRecorder from './recorder.js';
 export const ARM_MS = 300;
 export const MIN_MS = 700;
 export const MAX_MS = 60000;
-export const CANCEL_DY = 48;
-export const CANCEL_HYST = 8;
+export const CANCEL_DY = 80;
+export const CANCEL_HYST = 24;
 /** 系统权限弹窗可能一直没人点：等这么久还没开录，就当成「没拿到权限」收场，别在 arming 装死。 */
 export const START_TIMEOUT_MS = 8000;
 
@@ -28,7 +28,10 @@ export function createVoiceInput(options = {}) {
 
   let phase = 'idle';
   let startedAt = 0;
+  let startX = 0;
   let startY = 0;
+  let lastX = 0;
+  let lastY = 0;
   let cancelArmed = false;
   let fileId = '';
   let armTimer = null;
@@ -105,6 +108,11 @@ export function createVoiceInput(options = {}) {
       // 计时从「真正开录」算，不含 300ms arming：语音条上的时长得对得上听到的长度
       startedAt = now();
       phase = 'recording';
+      // 原点重锚：arming 那 300ms 里键盘收起、输入条变高，整页会位移，
+      // 拿 pointerdown 时的 Y 当原点会算出假位移 —— 真机上「手一抖就取消」就是这么来的。
+      startX = lastX;
+      startY = lastY;
+      cancelArmed = false;
       emit();
       maxTimer = setTimeout(() => { finalize(); }, MAX_MS);
     } catch (err) {
@@ -119,7 +127,10 @@ export function createVoiceInput(options = {}) {
     runId += 1;
     phase = 'arming';
     startedAt = now();
+    startX = Number.isFinite(x) ? x : 0;
     startY = Number.isFinite(y) ? y : 0;
+    lastX = startX;
+    lastY = startY;
     cancelArmed = false;
     fileId = '';
     // arming 也要走表：界面靠 ms 判断「按下半天还没开录 = 卡在权限弹窗」
@@ -137,9 +148,19 @@ export function createVoiceInput(options = {}) {
 
   function move(x, y) {
     if (phase !== 'recording' && phase !== 'cancelling' && phase !== 'arming') return snapshot();
-    const dy = (Number.isFinite(y) ? y : startY) - startY;
-    // 进取消要滑过 48px；退回要滑到 40px 以内才算数（8px 迟滞，防阈值上抖红）
-    const next = cancelArmed ? dy <= -(CANCEL_DY - CANCEL_HYST) : dy <= -CANCEL_DY;
+    const nx = Number.isFinite(x) ? x : startX;
+    const ny = Number.isFinite(y) ? y : startY;
+    lastX = nx;
+    lastY = ny;
+    const dy = ny - startY;
+    const dx = nx - startX;
+    // 三条一起过才允许进取消，缺一条都会被「手一抖」误触发：
+    //   ① 往上滑够 CANCEL_DY（80 CSS px ≈ 4~5 mm）
+    //   ② 纵向位移至少是横向的 1.5 倍（斜着划、横向挪手指不算取消）
+    //   ③ 迟滞：已经进了取消态要退回 CANCEL_HYST 之内才解除
+    const vertical = Math.abs(dy) > Math.abs(dx) * 1.5;
+    const pass = vertical && dy <= -CANCEL_DY;
+    const next = cancelArmed ? vertical && dy <= -(CANCEL_DY - CANCEL_HYST) : pass;
     if (next !== cancelArmed) {
       cancelArmed = next;
       if (phase === 'cancelling' || phase === 'recording') phase = next ? 'cancelling' : 'recording';

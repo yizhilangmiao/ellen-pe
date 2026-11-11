@@ -402,3 +402,88 @@
 }
 .el-settings-switch.is-on { background: var(--el-settings-accent, var(--el-pink)); }
 .el-settings-switch.is-on::after { transform: translateX(calc(16 * var(--u))); }
+
+/* —— 设置首页的入口行（2026-11-11 拆页：首页只留一行一个入口）——
+   一行 52u，四个分组加标题在 360×616 里能一屏看到底；摘要右对齐前先吃掉剩余宽度。 */
+.el-settings-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  min-height: calc(52 * var(--u));
+  padding: calc(9 * var(--u)) calc(14 * var(--u));
+  border: 0;
+  border-radius: var(--el-current-radius);
+  background: var(--el-current-card);
+  box-shadow: var(--el-current-shadow);
+  color: var(--el-current-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-settings-entry + .el-settings-entry {
+  margin-top: calc(8 * var(--u));
+}
+
+.el-settings-entry:active {
+  filter: brightness(0.96);
+}
+
+.el-settings-entry-main {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.el-settings-entry-title {
+  font-size: calc(15 * var(--u));
+  line-height: calc(24 * var(--u));
+}
+
+.el-settings-entry-sum {
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-current-muted);
+  opacity: 0.9;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.el-settings-entry-arrow {
+  flex: 0 0 auto;
+  font-size: calc(18 * var(--u));
+  line-height: 1;
+  color: var(--el-current-muted);
+  opacity: 0.55;
+}
+
+.el-settings-entry-hint[hidden] {
+  display: none;
+}
+
+/* 首页要一屏到底：入口行压到 46u，分组标题的上下留白收一半。
+   只作用于 data-view="settings"（二级页标题不急）。 */
+section[data-view='settings'] .el-settings-group-title {
+  margin: calc(10 * var(--u)) 0 calc(6 * var(--u));
+}
+
+section[data-view='settings'] .el-settings-entry {
+  min-height: calc(46 * var(--u));
+  padding: calc(7 * var(--u)) calc(14 * var(--u));
+}
+
+section[data-view='settings'] .el-settings-entry + .el-settings-entry {
+  margin-top: calc(6 * var(--u));
+}
+
+/* 眼睛按钮压在 key 输入框右侧：zzz 皮肤那条 `.el-settings-input { padding: 0 12u }`
+   比 `.el-wiz-key-wrap .el-settings-input` 多一个选择器，会盖掉右内边距，
+   密文圆点就压到「看一眼」上。这里补一条同前缀的，把右边距抢回来。 */
+.ellen-app[data-skin='zzz'] .el-wiz-key-wrap .el-settings-input,
+.ellen-app .el-wiz-key-wrap .el-settings-input {
+  padding-right: calc(52 * var(--u));
+}

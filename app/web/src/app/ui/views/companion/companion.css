@@ -238,12 +238,25 @@
   padding: calc(18 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u));
   border-radius: calc(16 * var(--u));
   overflow: hidden;
+  /* 立绘不再用负偏移「探出半个」往下掉：改成两列，文字左、画右，整张人像待在块内。
+     老写法 `right:-14u; bottom:-46u` + overflow:hidden 只会把人像裁成半张，像坏了。 */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'eyebrow peek'
+    'title peek'
+    'pill peek';
+  column-gap: calc(14 * var(--u));
+  align-items: start;
   background-image: radial-gradient(var(--el-line) calc(1 * var(--u)), transparent calc(1 * var(--u)));
   background-size: calc(11 * var(--u)) calc(11 * var(--u));
   background-color: var(--el-surface);
 }
 
+.el-companion-days > .el-eyebrow { grid-area: eyebrow; margin: 0; }
+
 .el-companion-days-title {
+  grid-area: title;
   margin: calc(8 * var(--u)) 0 calc(16 * var(--u));
   font-size: calc(24 * var(--u));
   line-height: calc(34 * var(--u));
@@ -253,6 +266,9 @@
 }
 
 .el-companion-days-pill {
+  grid-area: pill;
+  justify-self: start;
+  align-self: end;
   display: inline-flex;
   align-items: baseline;
   gap: calc(4 * var(--u));
@@ -270,23 +286,27 @@
   font-weight: 400;
 }
 
-/* 右下角探出半个立绘（旧包也是这样收尾的） */
+/* 人像完整待在块内：右列、底对齐、高度不超过块高的九成 */
 .el-companion-peek {
-  position: absolute;
-  right: calc(-14 * var(--u));
-  bottom: calc(-46 * var(--u));
-  width: calc(120 * var(--u));
-  height: calc(120 * var(--u));
-  border-radius: 50%;
+  grid-area: peek;
+  position: static;
+  align-self: end;
+  justify-self: end;
+  width: calc(84 * var(--u));
+  height: calc(112 * var(--u));
+  max-height: 90%;
+  border-radius: calc(12 * var(--u));
   overflow: hidden;
-  opacity: 0.9;
+  opacity: 0.95;
   pointer-events: none;
 }
 
 .el-companion-peek img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: 50% 100%;
+  background: transparent;
   display: block;
 }
 

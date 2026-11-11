@@ -1,0 +1,12 @@
+# 统一行尾：仓库里一律 LF。Windows 上的编辑器/脚本很容易把整文件写成 CRLF，
+# 会让 diff 从 20 行涨到 1200 行（2026-11-12 真踩过）。
+* text=auto eol=lf
+
+# 二进制，别碰
+*.png  binary
+*.webp binary
+*.jpg  binary
+*.apk  binary
+*.aar  binary
+*.onnx binary
+*.ttf  binary

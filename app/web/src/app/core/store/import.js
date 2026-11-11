@@ -154,7 +154,11 @@ export function parsePackage(pkg) {
   if (!keysAre(content.origin, ['deviceId', 'platform'])) {
     throw fail('INVALID_ORIGIN', '资料包来源无效。');
   }
-  if (!keysAre(content.media, ['mode', 'requiredIds']) || content.media.mode !== 'metadata-only'
+  // media.mode 有两种：metadata-only（只带清单）/ include（附件字节也打进包里）。
+  // 这里以前只认 metadata-only，结果「导出带语音的包 → 导入」直接报「媒体清单无效」——
+  // 导出侧加了 include 却没同步改校验，是个真实的数据迁移死锁。
+  if (!keysAre(content.media, ['mode', 'requiredIds'])
+    || (content.media.mode !== 'metadata-only' && content.media.mode !== 'include')
     || !Array.isArray(content.media.requiredIds)) {
     throw fail('INVALID_MEDIA_MANIFEST', '媒体清单无效。');
   }

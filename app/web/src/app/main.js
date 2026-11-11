@@ -38,6 +38,11 @@ import { createAppState } from './core/state.js';
 import { createChatSession } from './core/chat/session.js';
 import { recall } from './core/chat/recall.js';
 import { createSettingsView } from './ui/views/settings/settings.js';
+import { createModelPage } from './ui/views/settings/page-model.js';
+import { createVoicePage } from './ui/views/settings/page-voice.js';
+import { createBackupPage } from './ui/views/settings/page-backup.js';
+import { createCompanionPage } from './ui/views/settings/page-companion.js';
+import { createAboutPage } from './ui/views/settings/page-about.js';
 import {
   importSnapshot,
   verifyImport,
@@ -404,6 +409,12 @@ function sendMessage(text, extra = null) {
   defineView('companion', () => createCompanionView({ state: appState }));
 
   defineView('settings', () => createSettingsView({ state: appState, onChange: () => session.refresh() }));
+  // 设置二级页（老大反馈「一整个平铺太长」）：首页只留入口行，重内容各自成页。
+  defineView('settings-model', () => createModelPage({ state: appState, onChange: () => session.refresh() }));
+  defineView('settings-voice', () => createVoicePage({ state: appState }));
+  defineView('settings-backup', () => createBackupPage({ state: appState, onChange: () => session.refresh() }));
+  defineView('settings-companion', () => createCompanionPage({ state: appState }));
+  defineView('settings-about', () => createAboutPage({ state: appState }));
 
   defineView('notices', () =>
     createPlaceholderView({
@@ -427,7 +438,18 @@ function sendMessage(text, extra = null) {
     onNavigate: (cur) => {
       // 抽屉里的视图 push 了全屏页（设置子页 / 手记详情）→ 抽屉让开，
       // 否则全屏页会被盖在抽屉下面，看起来像「点了没反应」。
-      if (cur && cur.depth > 1) drawer.yieldToPage();
+      // 抽屉页不在路由栈里（它是盖在聊天页上的一层），所以二级页 push 时
+      // 路由栈里只有 [chat, settings-model]。返回后 cur.name 会是 chat，
+      // 靠 cur.name 认不出「刚才在设置里」——必须把 push 前的抽屉页记下来。
+      if (cur && cur.depth > 1) {
+        const host = drawer.currentName();
+        if (host) drawerRootBeforePush = host;
+        drawer.yieldToPage();
+      } else if (cur && cur.depth === 1 && drawerRootBeforePush) {
+        const host = drawerRootBeforePush;
+        drawerRootBeforePush = null;
+        restoreDrawer(host);
+      }
       if (cur) syncTabs(cur.name);
       syncBack(cur);
     },
@@ -462,7 +484,38 @@ function sendMessage(text, extra = null) {
     else btn.textContent = s('app.name');
   }
 
-  function syncTabs(name) {
+  // 抽屉里的根页：返回/退出子页后要把抽屉重新打开到这一页
+  const DRAWER_ROOTS = new Set(['memory', 'companion', 'settings']);
+  let restoringDrawer = false;
+  let drawerRootBeforePush = null;
+  function restoreDrawer(name) {
+    if (!DRAWER_ROOTS.has(name) || drawer.isOpen() || restoringDrawer) return;
+    restoringDrawer = true;
+    window.setTimeout(() => {
+      try {
+        drawer.open(name, { from: null });
+      } finally {
+        restoringDrawer = false;
+      }
+    }, 0);
+  }
+
+  // 全屏子页不属于任何底栏 tab，但「我还在设置里」这件事得让人看得见：
+  // 子页 → 它所属的 tab。对不上就原样用（聊天/记忆/相处/设置四个根页照旧）。
+  const TAB_ALIAS = {
+    'settings-model': 'settings',
+    'settings-voice': 'settings',
+    'settings-backup': 'settings',
+    'settings-companion': 'settings',
+    'settings-about': 'settings',
+    notices: 'settings',
+    background: 'settings',
+    feedback: 'settings',
+    journal: 'memory',
+  };
+
+  function syncTabs(rawName) {
+    const name = TAB_ALIAS[rawName] || rawName;
     for (const [tab, btn] of shell.tabButtons) {
       btn.classList.toggle('is-active', tab === name);
     }

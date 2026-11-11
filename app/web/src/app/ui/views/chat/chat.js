@@ -632,8 +632,12 @@ export function createChatView() {
         else voice.release();
       };
       holdBtn.addEventListener('pointerup', (e) => endHold(e, false));
-      holdBtn.addEventListener('pointercancel', (e) => endHold(e, true));
-      holdBtn.addEventListener('lostpointercapture', (e) => endHold(e, true));
+      // pointercancel / lostpointercapture 一律当「松手」处理，不当「取消」：
+      // 手指稍微斜着走，浏览器可能把手势判给滚动条并发 pointercancel ——
+      // 这时已经录了你说的那句话，丢掉是最难解释的行为。真要取消请走「上滑」，
+      // 那条路会先置 cancelArmed，finalize() 里照样丢弃。
+      holdBtn.addEventListener('pointercancel', (e) => endHold(e, false));
+      holdBtn.addEventListener('lostpointercapture', (e) => endHold(e, false));
       holdBtn.addEventListener('contextmenu', (e) => e.preventDefault());
       // 键盘兜底：没有 pointer 事件的环境（无障碍开关/外接键盘）按一下就能录，
       // 再按一下收尾——状态机自己会处理 arming 阶段的误触。
@@ -642,7 +646,9 @@ export function createChatView() {
         e.preventDefault();
         if (holdPointer === null) {
           holdPointer = 'key';
-          voice.press(0, 0);
+          // 键盘兜底：原点取按钮中心，免得 (0,0) 让任何一次移动都被算成上滑
+          const box = holdBtn.getBoundingClientRect();
+          voice.press(box.left + box.width / 2, box.top + box.height / 2);
         } else {
           holdPointer = null;
           voice.release();

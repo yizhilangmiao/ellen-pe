@@ -16,12 +16,14 @@
 .el-editor-card {
   display: flex;
   flex-direction: column;
-  gap: calc(9 * var(--u));
-  width: 100%;
-  max-width: calc(520 * var(--u));
-  max-height: 86%;
+  gap: calc(10 * var(--u));
+  /* 宽：随屏走但不超过 420u；高：最多 80vh，超出在卡片内部滚，绝不顶出屏幕 */
+  width: min(92vw, calc(420 * var(--u)));
+  max-width: 92vw;
+  max-height: 80vh;
   overflow-y: auto;
-  padding: calc(15 * var(--u)) calc(14 * var(--u)) calc(13 * var(--u));
+  overscroll-behavior: contain;
+  padding: calc(18 * var(--u));
   background: var(--z-panel, var(--el-raised));
   color: var(--el-text);
   border: 1px solid var(--z-line, var(--el-line));
@@ -52,26 +54,36 @@
   display: flex;
   flex-direction: column;
   gap: calc(5 * var(--u));
-  font-size: calc(11 * var(--u));
+  font-size: max(calc(12 * var(--u)), 12px);
   color: var(--el-muted);
 }
 .el-editor-input {
   width: 100%;
-  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  /* max() 的 46px 是「手指按得下」的物理下限：本机 u=0.84，48u 只有 40px */
+  min-height: max(calc(48 * var(--u)), 46px);
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
   font-family: inherit;
-  font-size: calc(13 * var(--u));
+  font-size: max(calc(15 * var(--u)), 15px);
   line-height: 1.5;
   color: var(--el-text);
   background: var(--z-input, var(--el-bg));
   border: 1px solid var(--el-line);
-  border-radius: calc(8 * var(--u));
+  border-radius: calc(10 * var(--u));
   outline: none;
 }
 .el-editor-input:focus { border-color: var(--el-pink); }
-.el-editor-textarea { min-height: calc(76 * var(--u)); resize: none; }
+.el-editor-textarea {
+  min-height: max(calc(140 * var(--u)), 140px);
+  line-height: 1.6;
+  resize: none;
+}
 
 .el-editor-scope { display: flex; flex-direction: column; gap: calc(5 * var(--u)); }
 .el-editor-segs { grid-template-columns: repeat(2, 1fr); }
+.el-editor-segs .el-segment {
+  min-height: max(calc(44 * var(--u)), 46px);
+  font-size: calc(14 * var(--u));
+}
 
 .el-editor-note {
   min-height: calc(14 * var(--u));
@@ -86,8 +98,19 @@
   display: flex;
   gap: calc(8 * var(--u));
   margin-top: calc(2 * var(--u));
+  /* 卡片内部滚动（max-height:80vh），按钮条吸底，永远够得着 */
+  position: sticky;
+  bottom: calc(-1 * calc(18 * var(--u)));
+  z-index: 1;
+  padding-block: calc(8 * var(--u));
+  background: var(--z-panel, var(--el-raised));
 }
-.el-editor-actions > button { flex: 1 1 auto; }
+.el-editor-actions > button {
+  flex: 1 1 auto;
+  min-height: max(calc(46 * var(--u)), 46px);
+  padding-inline: calc(18 * var(--u));
+  font-size: calc(14 * var(--u));
+}
 .el-editor-actions > .el-secondary.is-danger { color: var(--el-error); border-color: currentColor; }
 
 /* —— 「她的过去」顶部那条：条数 + 记一条 —— */
@@ -130,3 +153,10 @@
   border-radius: calc(999 * var(--u));
 }
 .el-memory-tool.is-danger { color: #8a2436; border-color: rgba(138, 36, 54, 0.28); }
+/* 待确认态：整块变红，跟「改」拉开距离，手指知道自己在按哪个 */
+.el-memory-tool.is-armed {
+  color: #fff;
+  background: #8a2436;
+  border-color: #8a2436;
+}
+.el-memory-tool:disabled { opacity: 0.55; }

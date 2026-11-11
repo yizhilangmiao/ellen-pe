@@ -225,6 +225,7 @@
 }
 
 .ellen-app[data-skin='zzz'] .el-composer-field {
+  min-height: max(calc(46 * var(--u)), 46px);
   padding: calc(8 * var(--u)) calc(2 * var(--u));
   background: transparent;
   border: 0;
@@ -243,8 +244,8 @@
 /* 左 32u ＋ 方钮（9u 圆角） */
 .ellen-app[data-skin='zzz'] .el-composer-mic {
   flex: none;
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
+  width: max(calc(44 * var(--u)), 46px);
+  height: max(calc(44 * var(--u)), 46px);
   border: 1px solid var(--z-line-strong);
   border-radius: calc(9 * var(--u));
   background: transparent;
@@ -253,16 +254,16 @@
 }
 
 .ellen-app[data-skin='zzz'] .el-composer-mic .el-icon svg {
-  width: calc(15 * var(--u));
-  height: calc(15 * var(--u));
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
 }
 
 /* 右发送钮：荧光底 + 右下缺角（骨架件，允许切角） */
 .ellen-app[data-skin='zzz'] .el-composer-send,
 .ellen-app[data-skin='zzz'] .el-composer-stop {
   flex: none;
-  width: calc(34 * var(--u));
-  height: calc(34 * var(--u));
+  width: max(calc(44 * var(--u)), 46px);
+  height: max(calc(44 * var(--u)), 46px);
   border: 0;
   border-radius: 0;
   background: var(--z-signal);

@@ -190,14 +190,39 @@ function memoryCard(item, onChanged) {
     });
     if (res !== 'cancelled' && typeof onChanged === 'function') onChanged();
   });
+  // 删：就地二次确认，**绝不打开编辑面板**（老版本这里错调了 openMemoryEditor，
+  // 于是点「删」弹出来的是「改」的界面）。首点只进入「待确认」，3 秒不点自动还原。
+  let delArmed = false;
+  let delTimer = 0;
+  const disarmDelete = () => {
+    delArmed = false;
+    window.clearTimeout(delTimer);
+    delTimer = 0;
+    delBtn.disabled = false;
+    delBtn.classList.remove('is-armed');
+    delBtn.textContent = s('memory.deleteMemory');
+  };
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const res = await openMemoryEditor({
-      item,
-      onSave: (patch) => updateMemory(item.headId, patch),
-      onDelete: () => removeMemory(item.headId),
-    });
-    if (res !== 'cancelled' && typeof onChanged === 'function') onChanged();
+    if (!delArmed) {
+      delArmed = true;
+      delBtn.classList.add('is-armed');
+      delBtn.textContent = s('memory.confirmDelete');
+      window.clearTimeout(delTimer);
+      delTimer = window.setTimeout(disarmDelete, 3000);
+      return;
+    }
+    window.clearTimeout(delTimer);
+    delArmed = false;
+    delBtn.disabled = true;
+    delBtn.textContent = s('memory.deleting');
+    try {
+      await removeMemory(item.headId);
+      if (typeof onChanged === 'function') onChanged();
+    } catch (err) {
+      console.error('[memory] 删除失败', err);
+      disarmDelete();
+    }
   });
   tools.append(editBtn, delBtn);
 
