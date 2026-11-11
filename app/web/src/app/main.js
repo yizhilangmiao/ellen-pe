@@ -48,6 +48,7 @@ import {
 import { dropDb } from './core/store/db.js';
 import { pushMaterial, takePending, readState as readProactiveState } from './core/proactive.js';
 import { maybeCompose as maybeWriteJournal, dueFor as journalDue, todayJournal, dayKey } from './core/journal.js';
+import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs } from './core/memory.js';
 import { setThread as setBackgroundThread, takeChatReply } from './core/background.js';
 import * as recorder from './core/recorder.js';
 import { loadConfig as loadAsrConfig, isUsable as asrUsable, transcribe as transcribeAudio } from './core/asr.js';
@@ -245,6 +246,10 @@ function sendMessage(text) {
     // 每轮聊完顺手看看该不该写手记；不 await 到界面路径上，失败也不影响聊天
     maybeWriteJournal({ config: appState.getConfig(), messages: appState.getMessages() }).catch((err) =>
       console.warn('[main] 手记没写成', err)
+    );
+    // 顺手看看有没有「值得记住的事」（门槛见 core/memory.js：4 条新消息 + 20 分钟间隔）
+    maybeRemember({ config: appState.getConfig(), messages: appState.getMessages() }).catch((err) =>
+      console.warn('[main] 记忆没写成', err)
     );
     // 开了「她说完就念」就把这一句读出来（读不出来不影响聊天）
     maybeReadAloud();
@@ -583,6 +588,7 @@ function sendMessage(text) {
     drainProactive();
     drainChatReply();
     maybeWriteJournal({ config: appState.getConfig(), messages: appState.getMessages() }).catch(() => {});
+    maybeRemember({ config: appState.getConfig(), messages: appState.getMessages() }).catch(() => {});
     autoBackup().catch(() => {});
   });
   // 从后台切回来（点通知）不一定触发 visibilitychange，补一道
@@ -643,6 +649,12 @@ function sendMessage(text) {
         if (id) lastRhythmId = id;
         return lastRhythmId;
       },
+    },
+    memory: {
+      due: () => memoryDue({ messages: appState.getMessages() }),
+      prefs: () => readMemoryPrefs(),
+      // 验收用：不看门槛直接抽一次并落库
+      force: () => rememberNow({ config: appState.getConfig(), messages: appState.getMessages() }),
     },
     journal: {
       day: () => dayKey(),
