@@ -365,7 +365,9 @@ export function createMemoryView() {
       // 为什么：500 篇的库里一次性渲染 401 张卡片，DOM 两千多个节点、页面高 61000 px，
       // 低端机上滚动会掉帧；而且原来写死 limit:400，超过 400 篇的老手记在列表里根本到不了。
       const JOURNAL_PAGE = 60;
-      const state = { tab: 'daily', loading: false, month: null, journalRows: null, journalShown: 0 };
+      // pending：切换页签时若上一次 load 还在跑，先记下来，等它落地后再补跑一次。
+      // 否则 load() 开头的 loading 守卫会把这次点击整个吞掉（状态改了、界面不变）。
+      const state = { tab: 'daily', loading: false, pending: false, month: null, journalRows: null, journalShown: 0 };
 
       function paintButtons() {
         for (const b of pageBtns) b.classList.toggle('is-active', b.dataset.memoryTab === state.tab);
@@ -519,7 +521,10 @@ export function createMemoryView() {
       }
 
       async function load() {
-        if (state.loading) return;
+        if (state.loading) {
+          state.pending = true;
+          return;
+        }
         state.loading = true;
         list.replaceChildren();
         const loading = document.createElement('div');
@@ -598,16 +603,23 @@ export function createMemoryView() {
           list.replaceChildren(emptyBox('读不出来了', String((err && err.message) || err)));
         } finally {
           state.loading = false;
+          if (state.pending) {
+            state.pending = false;
+            load();
+          }
         }
       }
 
-      for (const b of pageBtns) {
-        b.addEventListener('click', () => {
-          if (state.tab === b.dataset.memoryTab) return;
-          state.tab = b.dataset.memoryTab;
-          load();
-        });
-      }
+      // 事件委托挂在容器上，只挂一次：将来谁重建 pages 也不会把 handler 丢掉。
+      pages.addEventListener('click', (ev) => {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('[data-memory-tab]') : null;
+        if (!btn || !pages.contains(btn)) return;
+        const tab = btn.dataset.memoryTab;
+        if (!tab || state.tab === tab) return;
+        state.tab = tab;
+        paintButtons(); // 同步给反馈，不等 load() 里的异步刷新
+        load();
+      });
 
       paintButtons();
       load();

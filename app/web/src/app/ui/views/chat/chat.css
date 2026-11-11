@@ -399,3 +399,21 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.82); }
 }
+
+/* 语音条失败时的一行人话：下一次点击由 JS 摘掉（hidden） */
+.el-msg-clip-note {
+  /* 默认皮肤 .el-msg 是 column flex（align-self 撑满宽度）；
+     zzz 皮肤 assistant 是 grid（32u 头像 + 1fr 正文），必须落到第二列 */
+  grid-column: 2;
+  justify-self: stretch;
+  align-self: stretch;
+  display: block;
+  margin-top: calc(4 * var(--u));
+  padding-left: calc(4 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-error);
+  opacity: 0.85;
+  word-break: break-word;
+}
+.el-msg-clip-note[hidden] { display: none; }

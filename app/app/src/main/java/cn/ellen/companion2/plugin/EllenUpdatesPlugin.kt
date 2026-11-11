@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -32,6 +33,18 @@ class EllenUpdatesPlugin : Plugin() {
     private val worker = Executors.newSingleThreadExecutor()
     private val busy = AtomicBoolean(false)
     private val cancelled = AtomicBoolean(false)
+
+    /**
+     * 正在下的连接与输出流。
+     *
+     * `worker.shutdownNow()` 只发中断，**打断不了阻塞在 socket read 上的线程** ——
+     * 必须把连接/流关掉，read 才会抛出来。cancel 与 handleOnDestroy 都走 closeActive()。
+     */
+    @Volatile
+    private var activeConn: java.net.HttpURLConnection? = null
+
+    @Volatile
+    private var activeOut: java.io.OutputStream? = null
 
     private fun prefs() = context.getSharedPreferences("ellen-updates-v1", android.content.Context.MODE_PRIVATE)
 
@@ -97,13 +110,47 @@ class EllenUpdatesPlugin : Plugin() {
             .apply()
     }
 
+    /**
+     * 本包的清单里有没有声明 REQUEST_INSTALL_PACKAGES。
+     * 必须读 requestedPermissions，不能读 checkSelfPermission：Android 15 上该权限不自动授予，
+     * checkSelfPermission 恒 DENIED，会把「能正常跳设置页」的包误判成「只能手动装」。
+     * 读不到（异常）按「有」处理，别把正常路径挡死。
+     * 失效后果：如果反过来按 false，任何一次 PackageManager 读失败都会把正常升级路径
+     * 挡成「去设置里开权限」，用户会以为包坏了。
+     */
+    private fun declaresInstallPermission(): Boolean = try {
+        val pm = context.packageManager
+        val names = if (Build.VERSION.SDK_INT >= 33) {
+            pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(android.content.pm.PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions
+        }
+        names?.contains(android.Manifest.permission.REQUEST_INSTALL_PACKAGES) == true
+    } catch (e: Exception) {
+        Log.w("EllenUpdates", "读 requestedPermissions 失败，按「已声明」处理", e)
+        true
+    }
+
+    /**
+     * canRequestPackageInstalls() 在「包本身没申请 REQUEST_INSTALL_PACKAGES」时会抛 SecurityException
+     * （Android 15 实测栈顶 ComputerEngine.canRequestPackageInstalls:4009），不包住会把整进程带走：
+     * state() 与 install() 都在调用路径上。异常路径一律当 false，并留一条 W 日志记账（唯一允许的日志）。
+     */
+    private fun canInstallSafely(): Boolean = try {
+        context.packageManager.canRequestPackageInstalls()
+    } catch (e: SecurityException) {
+        Log.w("EllenUpdates", "canRequestPackageInstalls 抛 SecurityException（包未申请 REQUEST_INSTALL_PACKAGES），按 false 处理", e)
+        false
+    }
+
     private fun publish(phase: String, message: String, extra: JSObject? = null): JSObject {
         val (version, code) = currentVersion()
         val raw = JSONObject()
         raw.put("phase", phase)
         raw.put("message", message)
         raw.put("sequence", prefs().getLong("sequence", 0L) + 1)
-        raw.put("canInstall", context.packageManager.canRequestPackageInstalls())
+        raw.put("canInstall", canInstallSafely())
         raw.put("current", JSObject().apply {
             put("version", version)
             put("versionCode", code)
@@ -114,6 +161,12 @@ class EllenUpdatesPlugin : Plugin() {
                 val k = keys.next()
                 raw.put(k, e.opt(k))
             }
+        }
+        // latest 是粘的：cancelled / error 这类相位也要留住它，否则 cancel 完再 download
+        // 会因为「还没有检查到新版本」被挡回去（实测踩过）
+        if (!raw.has("latest")) {
+            val previous = readState().optJSONObject("latest")
+            if (previous != null) raw.put("latest", previous)
         }
         val state = sanitize(raw)
         persist(state)
@@ -137,6 +190,9 @@ class EllenUpdatesPlugin : Plugin() {
         val out = sanitize(saved)
         val (version, code) = currentVersion()
         out.put("current", JSObject().apply { put("version", version); put("versionCode", code) })
+        // canInstall 是瞬时值（取决于系统「未知来源」开关），由 canInstallSafely() 现算；
+        // 持久快照只留 phase / 进度，别把上一轮的开关状态当历史记录返回。
+        out.put("canInstall", canInstallSafely())
         out.put("supported", true)
         // 顺手把脏字段落盘清掉，否则下次读出来还是那条假进度
         persist(out)
@@ -202,10 +258,18 @@ class EllenUpdatesPlugin : Plugin() {
                     })
                 }
 
-                if (versionCode <= currentCode) {
-                    publish("current", "已经是最新的（$currentName）。", JSObject().apply { put("latest", latest) })
-                } else {
+                // 同版本重发（versionCode 一样但包换了）也算有更新：
+                // 只比 versionCode 的话，改了个字重发一版就永远推不下去。
+                val installedSha = installedApkSha()
+                val republished = versionCode == currentCode &&
+                    installedSha.isNotEmpty() &&
+                    !installedSha.equals(sha, ignoreCase = true)
+                if (versionCode > currentCode) {
                     publish("available", "有新版本：$version", JSObject().apply { put("latest", latest) })
+                } else if (republished) {
+                    publish("available", "有同版本的新包：$version", JSObject().apply { put("latest", latest) })
+                } else {
+                    publish("current", "已经是最新的（$currentName）。", JSObject().apply { put("latest", latest) })
                 }
             } catch (e: Exception) {
                 publish("error", describe(e))
@@ -216,6 +280,28 @@ class EllenUpdatesPlugin : Plugin() {
         val out = JSObject()
         out.put("started", true)
         call.resolve(out)
+    }
+
+    /** 已装包自己的 sha256（同版本重发靠它判断）。按 versionCode 缓存，别每次 check 都读 100 MB。 */
+    private fun installedApkSha(): String {
+        val (_, code) = currentVersion()
+        val cached = prefs().getString("installedSha", "") ?: ""
+        if (cached.isNotEmpty() && prefs().getLong("installedShaCode", -1L) == code) return cached
+        val src = try {
+            context.packageManager.getApplicationInfo(context.packageName, 0).sourceDir
+        } catch (e: Exception) {
+            ""
+        }
+        if (src.isNullOrEmpty()) return ""
+        val sha = try {
+            sha256(File(src))
+        } catch (e: Exception) {
+            ""
+        }
+        if (sha.isNotEmpty()) {
+            prefs().edit().putString("installedSha", sha).putLong("installedShaCode", code).apply()
+        }
+        return sha
     }
 
     private fun describe(e: Exception): String {
@@ -248,9 +334,11 @@ class EllenUpdatesPlugin : Plugin() {
 
         // 换版本先清掉旧包，否则会拿半截旧文件续传，永远校验不过
         val target = apkFile()
-        if (target.exists() && readState().optString("downloadingSha") != sha) {
-            target.delete()
-        }
+        val savedSha = prefs().getString("downloadingSha", "") ?: ""
+        if (target.exists() && savedSha != sha) target.delete()
+        // part 也必须跟着版本走：不同 sha 的残片续上去，校验必错
+        if (partFile().exists() && savedSha.isNotEmpty() && savedSha != sha) partFile().delete()
+        prefs().edit().putString("downloadingSha", sha).apply()
         cancelled.set(false)
         publish("downloading", "", JSObject().apply {
             put("received", 0L)
@@ -282,43 +370,73 @@ class EllenUpdatesPlugin : Plugin() {
             part.delete()
             offset = 0
         }
+        if (offset > 0 && total > 0 && offset == total) {
+            // 上次其实已经下完、只差校验：直接进校验，别再发一次请求
+            publish("verifying", "")
+            finish(part, sha)
+            return
+        }
 
         val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 60_000
             if (offset > 0) setRequestProperty("Range", "bytes=$offset-")
         }
+        activeConn = conn
         val status = conn.responseCode
         if (offset > 0 && status == 200) {
             // 服务端不认 Range，只能从头来
             part.delete()
             offset = 0
+        } else if (offset > 0 && status == 416) {
+            // 续传点越界：残片作废，从头下
+            part.delete()
+            offset = 0
         } else if (status >= 400) {
             conn.disconnect()
+            activeConn = null
             throw IllegalStateException("HTTP $status")
+        }
+        if (status == 206 && offset == 0L) {
+            // 206 但我们是头一次请求 —— 说明上次 part 没了、offset 被清零，正常往下走
         }
 
         val expected = if (conn.contentLengthLong > 0) conn.contentLengthLong + offset else total
-        conn.inputStream.use { input ->
-            java.io.FileOutputStream(part, offset > 0).use { out ->
-                val buffer = ByteArray(64 * 1024)
-                var written = offset
-                while (true) {
-                    if (cancelled.get()) throw InterruptedException("cancelled")
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    out.write(buffer, 0, n)
-                    written += n
-                    publish("downloading", "", JSObject().apply {
-                        put("received", written)
-                        put("total", expected)
-                    })
+        try {
+            conn.inputStream.use { input ->
+                java.io.FileOutputStream(part, offset > 0).use { out ->
+                    activeOut = out
+                    val buffer = ByteArray(64 * 1024)
+                    var written = offset
+                    while (true) {
+                        if (cancelled.get()) throw InterruptedException("cancelled")
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                        written += n
+                        publish("downloading", "", JSObject().apply {
+                            put("received", written)
+                            put("total", expected)
+                        })
+                    }
                 }
             }
+        } finally {
+            activeOut = null
+            activeConn = null
+            try {
+                conn.disconnect()
+            } catch (_: Exception) {
+                /* ignore */
+            }
         }
-        conn.disconnect()
 
         publish("verifying", "")
+        finish(part, sha)
+    }
+
+    /** 校验 + 改名 + 收尾；校验不过就删残片（续传不能用坏字节）。 */
+    private fun finish(part: File, sha: String) {
         val actual = sha256(part)
         if (!actual.equals(sha, ignoreCase = true)) {
             part.delete()
@@ -339,7 +457,21 @@ class EllenUpdatesPlugin : Plugin() {
             call.reject("还没有下载好的安装包。", "UPDATE_UNAVAILABLE")
             return
         }
-        if (!context.packageManager.canRequestPackageInstalls()) {
+        // 两种「装不了」要分开说：
+        //  a) 包本身没申请 REQUEST_INSTALL_PACKAGES —— 跳设置页没用，只能手动装；
+        //  b) 申请了，但用户没开「允许安装未知来源」—— 跳设置页让他开。
+        // 注意：这里判的是「清单里声明了没有」，不能用 checkSelfPermission ——
+        // Android 15 实测该权限不会自动授予，checkSelfPermission 恒回 DENIED，
+        // 而 canRequestPackageInstalls() 回 true（见 _verify\plugins\EllenUpdates.md 〇 节）。
+        if (Build.VERSION.SDK_INT >= 26 && !declaresInstallPermission()) {
+            publish("permission", "这个安装包没有申请安装应用的权限，更新只能手动装。")
+            val out = JSObject()
+            out.put("started", false)
+            out.put("reason", "no_permission")
+            call.resolve(out)
+            return
+        }
+        if (!canInstallSafely()) {
             publish("permission", "需要在系统设置里允许安装未知来源。")
             try {
                 val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
@@ -375,10 +507,50 @@ class EllenUpdatesPlugin : Plugin() {
 
     @PluginMethod
     fun cancel(call: PluginCall) {
+        val wasBusy = busy.get()
         cancelled.set(true)
+        // 光置标志位不够：read 阻塞在 socket 上时循环体根本跑不到，得把流关掉
+        closeActive()
+        if (wasBusy) awaitIdle()
         val out = JSObject()
         out.put("cancelled", true)
+        out.put("stopped", wasBusy && !busy.get())
+        out.put("keptBytes", if (partFile().exists()) partFile().length() else 0L)
         call.resolve(out)
+    }
+
+    /** 关掉正在下的流：让阻塞中的 read 立刻抛异常，而不是等 60 s 读超时。 */
+    private fun closeActive() {
+        try {
+            activeOut?.flush()
+        } catch (_: Exception) {
+            /* 已经坏了就算了 */
+        }
+        try {
+            activeOut?.close()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        try {
+            activeConn?.disconnect()
+        } catch (_: Exception) {
+            /* ignore */
+        }
+        activeOut = null
+        activeConn = null
+    }
+
+    /** cancel 之后立刻 download 要能接上：等 worker 真正把 busy 放掉（最多 1.5 s）。 */
+    private fun awaitIdle(timeoutMs: Long = 1500L) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (busy.get() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(20)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
+        }
     }
 
     private fun httpGet(url: String): String {
@@ -410,7 +582,14 @@ class EllenUpdatesPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         cancelled.set(true)
+        // 顺序不能反：先关流把阻塞的 read 打醒，再 shutdownNow
+        closeActive()
         worker.shutdownNow()
+        try {
+            worker.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
         super.handleOnDestroy()
     }
 

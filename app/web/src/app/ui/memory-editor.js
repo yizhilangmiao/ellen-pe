@@ -119,8 +119,13 @@ export function openMemoryEditor({ item = null, onSave, onDelete } = {}) {
 
   card.append(head, hint, titleLabel, bodyLabel, tagLabel, scopeRow, note, actions);
   scrim.append(card);
-  document.body.append(scrim);
+  // 挂到 .ellen-app 里面而不是 body：--el-* / --z-* 令牌全定义在 .ellen-app 上，
+  // 挂 body 会让整块面板拿不到任何颜色（实测卡片底色 rgba(0,0,0,0)、遮罩全透明）。
+  const host = document.querySelector('.ellen-app') || document.body;
+  host.append(scrim);
   requestAnimationFrame(() => {
+    // 遮罩和卡片都要上 is-open：遮罩靠它把 background 从 0 过渡到 0.72
+    scrim.classList.add('is-open');
     card.classList.add('is-open');
     titleInput.focus();
   });

@@ -37,7 +37,9 @@
   margin: 0;
   font-size: calc(17 * var(--u));
   line-height: 1.35;
-  color: var(--z-ink-paper, var(--el-text));
+  /* 面板底是深色（#0f1113），标题必须用「深底上的墨」--z-ink；
+     原来用了 --z-ink-paper（#12100f，那是米白纸面上的墨），深底上对比度≈1:1，等于看不见。 */
+  color: var(--z-ink, var(--el-text));
 }
 .el-editor-hint {
   margin: 0;

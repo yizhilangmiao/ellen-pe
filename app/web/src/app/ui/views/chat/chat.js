@@ -172,6 +172,18 @@ export function createChatView() {
         const chars = plain(msg.text).length;
         len.textContent = `${Math.max(2, Math.round(chars / 5))}″`;
 
+        // 失败时贴在气泡里的一行人话：下一次点击自动消失。
+        // 没有它的话，重试虽然真的在跑（synthesize 会被再调一次），但界面上什么都没变，
+        // 用户看到的就是「点了没反应」，只能杀进程重进。
+        const note = document.createElement('span');
+        note.className = 'el-msg-clip-note';
+        note.hidden = true;
+        const clearFail = () => {
+          node.classList.remove('is-clip-failed');
+          note.hidden = true;
+          note.textContent = '';
+        };
+
         let audio = null;
         bar.addEventListener('click', async () => {
           if (audio && !audio.paused) {
@@ -179,13 +191,22 @@ export function createChatView() {
             bar.classList.remove('is-playing');
             return;
           }
+          // 一按下去就把上一次的失败痕迹摘干净，加载态才看得见
+          clearFail();
           let url = clipCache.get(msg.id);
           if (!url) {
             bar.classList.add('is-loading');
-            const res = await synthesizeUrl(msg.text).catch((err) => ({ error: String((err && err.message) || err) }));
+            const res = await synthesizeUrl(msg.text).catch((err) => ({ error: String((err && err.message) || err), code: (err && err.code) || '' }));
             bar.classList.remove('is-loading');
             if (!res || res.error) {
               node.classList.add('is-clip-failed');
+              note.textContent =
+                res && res.code === 'NO_API_KEY'
+                  ? '还没配朗读的 key，去设置 → 声音里填一下'
+                  : '这条念不出来，等下再点一次';
+              // 文案挂在条下面（当条的小字注释），不是条上面——否则读起来像正文的一部分
+              if (!note.isConnected) node.insertBefore(note, bar.nextSibling);
+              note.hidden = false;
               return;
             }
             url = res.url;
@@ -330,7 +351,18 @@ export function createChatView() {
       return {
         setRecording,
         setDictation,
-        destroy() {},
+        // 语音条的 blob URL 只在当前这棵 stream 上还有用；视图销毁就全撤掉。
+        // 不撤的话 1/7 概率攒下来的 blob 会一直常驻（聊 700 句就是 100 个 URL）。
+        destroy() {
+          clipCache.forEach((url) => {
+            try {
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              /* 已经释放过就忽略 */
+            }
+          });
+          clipCache.clear();
+        },
         // 供 app 层推送状态
         setMessages(list) {
           const prev = state.messages;

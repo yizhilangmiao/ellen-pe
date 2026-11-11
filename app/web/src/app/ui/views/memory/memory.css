@@ -299,3 +299,109 @@
 .ellen-app[data-skin='zzz'] .el-recall-group.is-active::before {
   content: none;
 }
+
+/* ============================================================
+ * 「我眼里的你」正文卡（纸面卡里换成一段第二人称的话）
+ * 颜色一律走 --el-ink / --el-paper-muted：这两条在 zzz 皮肤下已经是
+ * 纸面深墨（别名桥 --el-ink → --z-ink-paper），米白纸上一眼能读。
+ * ============================================================ */
+.el-understanding-body {
+  margin: 0;
+  font-size: calc(14.5 * var(--u));
+  line-height: 1.95;
+  color: var(--el-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.el-understanding-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u));
+  margin-top: calc(12 * var(--u));
+}
+
+.el-understanding-tag {
+  padding: calc(3 * var(--u)) calc(8 * var(--u));
+  border-radius: calc(3 * var(--u));
+  border: 1px solid color-mix(in srgb, var(--el-ink) 18%, transparent);
+  font-size: calc(10.5 * var(--u));
+  line-height: 1.4;
+  color: var(--el-paper-muted);
+}
+
+.el-understanding-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  margin-top: calc(14 * var(--u));
+  padding-top: calc(10 * var(--u));
+  border-top: 1px solid color-mix(in srgb, var(--el-ink) 14%, transparent);
+}
+
+.el-understanding-when {
+  font-size: calc(10.5 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--el-paper-muted);
+}
+
+.el-understanding-again {
+  appearance: none;
+  padding: calc(5 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(6 * var(--u));
+  border: 1px solid color-mix(in srgb, var(--el-ink) 22%, transparent);
+  background: transparent;
+  color: var(--el-ink);
+  font-family: inherit;
+  font-size: calc(11.5 * var(--u));
+  cursor: pointer;
+}
+
+.el-understanding-again:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 空态里的「现在就想一想」：空态是深底面板，所以按钮走深底那套 */
+.el-understanding-cta {
+  appearance: none;
+  margin-top: calc(16 * var(--u));
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(6 * var(--u));
+  border: 1px solid var(--el-line);
+  background: transparent;
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  cursor: pointer;
+}
+
+.el-understanding-cta:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* zzz：空态按钮用 1px 强线而不是荧光块（记忆页荧光预算已经给了分段选中 + 底栏） */
+.ellen-app[data-skin='zzz'] .el-understanding-cta {
+  border-color: var(--z-line-strong);
+  border-radius: var(--z-r-2);
+  color: var(--z-ink);
+  font-family: var(--z-font-display);
+}
+
+.ellen-app[data-skin='zzz'] .el-understanding-again {
+  border-color: var(--z-ink-paper-2);
+  color: var(--z-ink-paper);
+  border-radius: var(--z-r-2);
+  font-family: var(--z-font-display);
+}
+
+.ellen-app[data-skin='zzz'] .el-understanding-tag {
+  border-color: color-mix(in srgb, var(--z-ink-paper) 20%, transparent);
+  border-radius: var(--z-r-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-understanding-foot {
+  border-top-color: color-mix(in srgb, var(--z-ink-paper) 16%, transparent);
+}
