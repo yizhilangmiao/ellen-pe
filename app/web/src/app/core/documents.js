@@ -127,3 +127,24 @@ export function revokeAll() {
 export function blobUrlCount() {
   return blobUrls.size;
 }
+
+/** 列附件目录（原生只列一层、按 mtime 新→旧、上限 5000 条、*.part 不计入只算 skipped）。
+ *  排序与「删谁」的策略留在 web 层：200 MB 阈值以后还要调，不该烧进 Kotlin。
+ *  注意：目录读不到时原生回空表、不 reject，所以这里也不抛。 */
+export async function listDocuments({ prefix = '' } = {}) {
+  const args = prefix ? { prefix } : {};
+  const res = await call('EllenDocuments', 'list', args);
+  const files = Array.isArray(res && res.files) ? res.files : [];
+  return {
+    files: files.map((f) => ({
+      name: String(f.name || ''),
+      bytes: Number(f.bytes || 0),
+      mtime: Number(f.mtime || 0),
+      uri: String(f.uri || ''),
+    })),
+    count: Number((res && res.count) || files.length),
+    totalBytes: Number((res && res.totalBytes) || 0),
+    skipped: Number((res && res.skipped) || 0),
+    truncated: Boolean(res && res.truncated),
+  };
+}

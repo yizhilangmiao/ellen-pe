@@ -53,7 +53,7 @@ import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs } from
 import { setThread as setBackgroundThread, takeChatReply } from './core/background.js';
 import { loadConfig as loadAsrConfig, isUsable as asrUsable, transcribe as transcribeAudio } from './core/asr.js';
 import { createVoiceInput } from './core/voice-input.js';
-import { prepareVoice } from './core/voice-message.js';
+import { prepareVoice, pruneVoices, voiceStorage } from './core/voice-message.js';
 import { readPersona, writePersona, buildSystemPrompt } from './core/persona.js';
 import { buildManifest } from './core/store/export.js';
 import { configure as backupConfigure } from './core/backup.js';
@@ -383,6 +383,8 @@ function sendMessage(text, extra = null) {
           model: appState.getModelName(),
           onSend: (text) => sendMessage(text),
           onStop: () => session.stop(),
+          // 语音文件被 200 MB 清理删掉后，让气泡自己变灰（而不是点了没反应）
+          onVoiceMissing: (id, audio) => appState.updateMessage(id, { audio: { ...audio, missing: true } }),
           voice: voiceInput,
           onVoiceMode: (mode) => {
             // 语音态切走 / 切回来都别留半段录音
@@ -584,7 +586,27 @@ function sendMessage(text, extra = null) {
   chatHandle && chatHandle.setModel(appState.getModelName());
 
   // —— 主动消息：把素材推给 native，并把待读的取回来落成一条消息 ——
-  async function syncProactive() {
+  /** 把「磁盘上已经没有的语音文件」在消息里标成 missing。
+ *  清理和换机恢复都会造成这种状态；只在启动与清理后跑一次，不扫全库（只扫已加载的）。 */
+async function reconcileVoiceFiles() {
+  try {
+    const disk = await voiceStorage();
+    const alive = new Set((disk.files || []).map((f) => f.name));
+    let marked = 0;
+    appState.getMessages().forEach((m) => {
+      if (!m.audio || m.audio.missing || !m.audio.name) return;
+      if (alive.has(m.audio.name)) return;
+      appState.updateMessage(m.id, { audio: { ...m.audio, missing: true } });
+      marked += 1;
+    });
+    return { alive: alive.size, marked };
+  } catch (err) {
+    console.warn('[main] 核对语音文件失败', err);
+    return { alive: 0, marked: 0, error: String((err && err.message) || err) };
+  }
+}
+
+async function syncProactive() {
     if (!isNative()) return;
     try {
       const st = await readProactiveState();
@@ -641,6 +663,12 @@ function sendMessage(text, extra = null) {
   await drainProactive();
   await drainChatReply();
   await syncProactive();
+  pruneVoices()
+    .then((res) => {
+      if (res.removed.length) console.log('[main] 语音清理', res.removed.length, res.freedBytes);
+      return reconcileVoiceFiles();
+    })
+    .catch((err) => console.warn('[main] 语音清理没跑成', err));
   // 备份是慢活（读全表 + 写文件），放到启动收尾，失败只记日志不打断界面
   autoBackup().catch((err) => console.warn('[main] 自动备份跳过', err && (err.code || err.message)));
 
@@ -695,6 +723,7 @@ function sendMessage(text, extra = null) {
     exportPreview: () => buildManifest().then((r) => ({ stats: r.stats, manifestBytes: r.stats.manifestBytes, head: r.manifestText.slice(0, 200) })),
     recall: (text, opts) => recall(text, opts),
     asr: { load: () => loadAsrConfig(), transcribe: (input) => transcribeAudio(input), isUsable: (cfg) => asrUsable(cfg) },
+    voiceStore: { list: () => voiceStorage(), prune: (opts) => pruneVoices(opts), reconcile: () => reconcileVoiceFiles() },
     voice: {
       // 验收口：录音状态机是唯一事实源，别再读一个局部布尔
       state: () => voiceInput.state(),

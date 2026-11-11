@@ -481,7 +481,11 @@ export function createChatView() {
                 const hit = voiceCache.get(key);
                 if (hit) return hit;
                 const res = await readDocument(audio.uri || audio.name).catch(() => null);
-                if (!res || !res.base64) return '';
+                if (!res || !res.base64) {
+                  // 文件被 200 MB 清理删掉了：就地标 missing 并落库，下次打开就不用再试
+                  if (typeof props.onVoiceMissing === 'function') props.onVoiceMissing(msg.id, audio);
+                  return '';
+                }
                 const url = toBlobUrl(res.base64, res.mimeType || 'audio/wav', `voice:${key}`);
                 voiceCache.set(key, url);
                 return url;

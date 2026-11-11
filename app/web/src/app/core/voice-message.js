@@ -6,7 +6,7 @@
 //
 // speech 单独存一份：界面永不渲染它，只有喂模型时用 text（见 chat/session.js）。
 // 转写失败也必须发出去——不能让一次没听清把用户说的话吞掉。
-import { saveDocument } from './documents.js';
+import { saveDocument, listDocuments, removeDocument } from './documents.js';
 import { transcribe } from './asr.js';
 
 const FALLBACK_HEADER = 44;
@@ -146,4 +146,43 @@ export async function prepareVoice({ base64, durationMs }) {
       ...(reason ? { code: reason } : {}),
     },
   };
+}
+
+/** 语音上限与「最少留几条」。
+ *  200 MB 是老大定的。keepNewest 取 20：一条语音约 1~2 MB，20 条 ≈ 40 MB，
+ *  既保证最近二十句一定能播，又不会大到把 200 MB 的闸门顶穿（留 200 条就没法触发清理了）。 */
+export const VOICE_MAX_BYTES = 200 * 1024 * 1024;
+export const VOICE_KEEP_NEWEST = 20;
+
+/** 看一眼语音占了多少。 */
+export async function voiceStorage() {
+  return listDocuments({ prefix: 'voice-' });
+}
+
+/**
+ * 超上限就从最老的开始删（原生已按 mtime 新→旧排好，所以从尾部取），
+ * 但至少留 keepNewest 条。删不掉的文件跳过、不中断——少删一个比删一半崩掉好。
+ */
+export async function pruneVoices({ maxBytes = VOICE_MAX_BYTES, keepNewest = VOICE_KEEP_NEWEST } = {}) {
+  const res = await listDocuments({ prefix: 'voice-' });
+  const files = res.files || [];
+  const before = res.totalBytes;
+  if (before <= maxBytes) {
+    return { removed: [], freedBytes: 0, totalBytes: before, kept: files.length, truncated: res.truncated };
+  }
+  const floor = Math.min(keepNewest, files.length);
+  const removed = [];
+  let freed = 0;
+  for (let i = files.length - 1; i >= floor; i -= 1) {
+    if (before - freed <= maxBytes) break;
+    const file = files[i];
+    try {
+      await removeDocument(file.uri);
+      freed += Number(file.bytes || 0);
+      removed.push(file.name);
+    } catch (err) {
+      console.warn('[voice] 删不掉，跳过', file.name, err);
+    }
+  }
+  return { removed, freedBytes: freed, totalBytes: before - freed, kept: files.length - removed.length, truncated: res.truncated };
 }
