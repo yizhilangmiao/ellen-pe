@@ -1,0 +1,171 @@
+/* 聊天模型三步向导。全部走 --u 相对单位，颜色只取 --el-* / --z-* 令牌。 */
+
+.el-wiz .el-settings-card-hint { margin-bottom: calc(10 * var(--u)); }
+
+/* 步骤条：三个格子，当前格亮、走过的格打勾色 */
+.el-wiz-rail {
+  display: flex;
+  gap: calc(6 * var(--u));
+  margin-bottom: calc(12 * var(--u));
+}
+
+.el-wiz-step {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(7 * var(--u)) calc(8 * var(--u));
+  border: 0.8px solid var(--el-settings-line, var(--el-line));
+  border-radius: calc(10 * var(--u));
+  background: transparent;
+  color: var(--el-settings-muted, var(--el-muted));
+  font-family: inherit;
+  font-size: calc(11 * var(--u));
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-wiz-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-size: calc(10 * var(--u));
+  flex: 0 0 auto;
+}
+
+.el-wiz-step.is-active {
+  border-color: var(--el-settings-accent, var(--el-pink));
+  background: color-mix(in srgb, var(--el-settings-accent, var(--el-pink)) 16%, transparent);
+  color: var(--el-settings-ink, var(--el-text));
+}
+
+.el-wiz-step.is-done { color: var(--el-settings-ink, var(--el-text)); }
+.el-wiz-step.is-done .el-wiz-step-num { background: color-mix(in srgb, var(--el-settings-accent, var(--el-pink)) 70%, transparent); color: #2b1f2c; }
+
+/* 服务商大卡 */
+.el-wiz-providers {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+  margin-bottom: calc(10 * var(--u));
+}
+
+.el-wiz-provider {
+  display: flex;
+  flex-direction: column;
+  gap: calc(3 * var(--u));
+  padding: calc(11 * var(--u)) calc(12 * var(--u));
+  border: 0.8px solid var(--el-settings-line, var(--el-line));
+  border-radius: calc(12 * var(--u));
+  background: var(--el-settings-surface, var(--el-surface));
+  color: var(--el-settings-ink, var(--el-text));
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s linear, background-color 0.12s linear;
+}
+
+.el-wiz-provider.is-active {
+  border-color: var(--el-settings-accent, var(--el-pink));
+  background: color-mix(in srgb, var(--el-settings-accent, var(--el-pink)) 12%, transparent);
+}
+
+.el-wiz-provider-top {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+}
+
+.el-wiz-provider-name { font-size: calc(14 * var(--u)); }
+
+.el-wiz-badge {
+  padding: calc(2 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(6 * var(--u));
+  background: var(--el-settings-accent, var(--el-pink));
+  color: #2b1f2c;
+  font-size: calc(10 * var(--u));
+}
+
+.el-wiz-provider-tag {
+  font-size: calc(11 * var(--u));
+  line-height: 1.45;
+  color: var(--el-settings-muted, var(--el-muted));
+}
+
+/* 领钥匙指路 */
+.el-wiz-signup {
+  padding: calc(10 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: color-mix(in srgb, var(--el-settings-accent, var(--el-pink)) 8%, transparent);
+}
+
+.el-wiz-signup-title {
+  font-size: calc(12 * var(--u));
+  color: var(--el-settings-ink, var(--el-text));
+  margin-bottom: calc(6 * var(--u));
+}
+
+.el-wiz-url-row {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  margin-bottom: calc(7 * var(--u));
+}
+
+.el-wiz-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: calc(11 * var(--u));
+  color: var(--el-settings-accent, var(--el-pink));
+}
+
+.el-wiz-copy { flex: 0 0 auto; padding: calc(5 * var(--u)) calc(9 * var(--u)); font-size: calc(11 * var(--u)); }
+
+.el-wiz-signup-steps {
+  margin: 0;
+  padding-left: calc(16 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: 1.6;
+  color: var(--el-settings-muted, var(--el-muted));
+}
+
+/* 钥匙输入：右侧一个「显示/隐藏」 */
+.el-wiz-key-wrap { position: relative; display: flex; align-items: center; }
+.el-wiz-key-wrap .el-settings-input { padding-right: calc(52 * var(--u)); }
+
+.el-wiz-eye {
+  position: absolute;
+  right: calc(6 * var(--u));
+  padding: calc(4 * var(--u)) calc(7 * var(--u));
+  border: 0;
+  border-radius: calc(8 * var(--u));
+  background: transparent;
+  color: var(--el-settings-accent, var(--el-pink));
+  font-family: inherit;
+  font-size: calc(11 * var(--u));
+  cursor: pointer;
+}
+
+/* 底部按钮 */
+.el-wiz-next, .el-wiz-save { flex: 1 1 auto; }
+.el-wiz-pane[hidden] { display: none; }
+.el-wiz [hidden] { display: none; }
+
+/* 结果条：跑 / 好 / 坏 */
+.el-wiz-result {
+  margin: calc(10 * var(--u)) 0 0;
+  padding: calc(9 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(10 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: 1.55;
+}
+
+.el-wiz-result.is-run { background: color-mix(in srgb, var(--el-settings-accent, var(--el-pink)) 10%, transparent); color: var(--el-settings-ink, var(--el-text)); }
+.el-wiz-result.is-ok { background: color-mix(in srgb, var(--el-settings-success, #b4ddc6) 22%, transparent); color: var(--el-settings-ink, var(--el-text)); }
+.el-wiz-result.is-bad { background: color-mix(in srgb, var(--el-settings-error, #ffc1cc) 20%, transparent); color: var(--el-settings-ink, var(--el-text)); }
