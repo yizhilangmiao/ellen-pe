@@ -1,0 +1,263 @@
+/* 星图（starmap）· 竖版时间河。
+   尺寸一律 calc(N * var(--u))；颜色只取 tokens 变量（中心星樱粉 / 记忆点暖白 /
+   「她在意的事」青绿，就这三色，不再六色混杂）。 */
+
+.el-starmap-head {
+  margin: 0 0 calc(12 * var(--u));
+}
+
+/* ── 组标签：点一下「只看这组」 ─────────────────────────────── */
+.el-river-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u));
+  margin: 0 0 calc(10 * var(--u));
+}
+
+.el-river-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(6 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-muted);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-river-chip.is-on {
+  color: var(--el-text);
+  border-color: var(--el-line);
+  background: var(--el-surface-2, var(--el-surface));
+}
+
+.el-river-chip-dot {
+  display: block;
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 50%;
+  background: var(--el-text);
+  opacity: 0.8;
+}
+
+.el-river-chip-dot[data-kind='memory'] {
+  background: var(--el-success);
+}
+
+/* ── 河：滚动容器在底层吃手势，画布钉在上层当装饰 ─────────── */
+.el-river-stage {
+  position: relative;
+  /* 满幅：银河关在一个圆角卡片里永远显小。
+     用负边距抵掉页面左右留白（padding = max(28u, (100% - 560u)/2)），
+     不能写 100vw —— 横屏会被放大四倍。 */
+  margin-inline: min(calc(-28 * var(--u)), calc((560 * var(--u) - 100%) / 2));
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  height: min(calc(700 * var(--u)), 76vh);
+  background: var(--el-surface);
+  overflow: hidden;
+}
+
+.el-river-viewport {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* 只用来撑出滚动高度，本身不显示任何东西 */
+.el-river-spacer {
+  width: 100%;
+  pointer-events: none;
+}
+
+/* 画布：钉在舞台里，滚动时按 scrollTop 重画（不跟着内容跑） */
+.el-river-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-river-empty {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(120 * var(--u));
+  margin: 0;
+  text-align: center;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+  pointer-events: none;
+}
+
+.el-river-empty[hidden] {
+  display: none;
+}
+
+/* 提示：只写这一句，不提双指缩放 */
+.el-river-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: calc(8 * var(--u)) 0 calc(10 * var(--u));
+  text-align: center;
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--el-muted);
+  background: linear-gradient(to bottom, transparent, var(--el-surface) 60%);
+  pointer-events: none;
+}
+
+.el-river-hint[hidden] {
+  display: none;
+}
+
+/* ── 底部卡片：点一颗星滑出来 ─────────────────────────────── */
+.el-river-sheet {
+  position: fixed;
+  left: calc(12 * var(--u));
+  right: calc(12 * var(--u));
+  bottom: calc(96 * var(--u));
+  z-index: 40;
+  padding: calc(14 * var(--u)) calc(16 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(16 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface-2, var(--el-surface));
+  box-shadow: 0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(0, 0, 0, 0.45);
+  transform: translateY(calc(14 * var(--u)));
+  opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.el-river-sheet.is-open {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.el-river-sheet[hidden] {
+  display: none;
+}
+
+.el-river-sheet-kind {
+  margin: 0 0 calc(6 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-river-sheet-title {
+  margin: 0;
+  font-size: calc(14.5 * var(--u));
+  line-height: calc(22 * var(--u));
+  color: var(--el-text);
+}
+
+.el-river-sheet-body {
+  margin: calc(6 * var(--u)) 0 0;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-muted);
+  max-height: calc(76 * var(--u));
+  overflow: hidden;
+}
+
+/* 「和这几件连在一起」：横向那几笔的落点，点了能跳过去 */
+.el-river-sheet-rel-title {
+  margin: calc(12 * var(--u)) 0 calc(4 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-river-sheet-rel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+}
+
+.el-river-rel {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  width: 100%;
+  padding: calc(7 * var(--u)) 0;
+  border: 0;
+  border-radius: calc(8 * var(--u));
+  background: transparent;
+  color: var(--el-text);
+  font-family: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-river-rel:active {
+  background: var(--el-surface);
+}
+
+.el-river-rel-dot {
+  flex: 0 0 auto;
+  width: calc(5 * var(--u));
+  height: calc(5 * var(--u));
+  border-radius: 50%;
+  background: var(--el-text);
+}
+
+.el-river-rel-dot[data-kind='memory'] {
+  background: var(--el-success);
+}
+
+.el-river-rel-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(18 * var(--u));
+}
+
+.el-river-rel-when {
+  flex: 0 0 auto;
+  font-size: calc(10.5 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-river-sheet-close {
+  margin: calc(10 * var(--u)) 0 0;
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: transparent;
+  color: var(--el-muted);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-river-sheet-theme {
+  margin: calc(4 * var(--u)) 0 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  letter-spacing: calc(0.3 * var(--u));
+  color: var(--el-pink);
+}

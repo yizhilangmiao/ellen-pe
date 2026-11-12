@@ -1,15 +1,15 @@
 {
  "source": "E:\\ailian\\艾莲手机版\\创作版\\dexwork\\smali-b17",
  "fileCount": 29,
- "pluginCount": 28,
- "totalMethods": 826,
- "totalPluginMethods": 195,
+ "pluginCount": 30,
+ "totalMethods": 834,
+ "totalPluginMethods": 199,
  "coverage": {
-  "pluginMethods": 195,
-  "withOptions": 82,
+  "pluginMethods": 199,
+  "withOptions": 85,
   "withEvents": 1,
-  "withMessages": 112,
-  "optionKeys": 151,
+  "withMessages": 118,
+  "optionKeys": 153,
   "eventNames": 1
  },
  "plugins": [
@@ -21271,6 +21271,274 @@
       "Unsupported screen appearance"
      ],
      "line": 475
+    }
+   ]
+  },
+  {
+   "plugin": "EllenMedia",
+   "class": "cn.ellen.companion2.plugin.EllenMediaPlugin",
+   "file": "E:\\ailian\\\u827e\u83b2\u624b\u673a\u7248\\\u521b\u4f5c\u7248\\app\\app\\src\\main\\java\\cn\\ellen\\companion2\\plugin\\EllenMediaPlugin.kt",
+   "smaliBytes": 0,
+   "methodCount": 5,
+   "pluginMethodCount": 2,
+   "events": [],
+   "staticStrings": {},
+   "methods": [
+    {
+     "name": "<init>",
+     "params": "()V",
+     "isStatic": false,
+     "annotated": false,
+     "returnType": null,
+     "options": [],
+     "messages": [],
+     "events": [],
+     "putKeys": [],
+     "calls": [],
+     "constStrings": [],
+     "line": 0
+    },
+    {
+     "name": "pickImage",
+     "params": "(Lcom/getcapacitor/PluginCall;)V",
+     "isStatic": false,
+     "annotated": true,
+     "returnType": null,
+     "options": [
+      {
+       "api": "getDouble",
+       "key": "maxSide"
+      },
+      {
+       "api": "getDouble",
+       "key": "maxBytes"
+      }
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MEDIA_BUSY"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_UNAVAILABLE"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_DECODE_FAILED"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "picked",
+      "name",
+      "uri",
+      "mimeType",
+      "bytes",
+      "width",
+      "height"
+     ],
+     "calls": [
+      "startActivityForResult"
+     ],
+     "constStrings": [
+      "image/*",
+      "photos",
+      "IMG_",
+      "image/jpeg"
+     ],
+     "line": 70
+    },
+    {
+     "name": "pickedImage",
+     "params": "(Lcom/getcapacitor/PluginCall;Landroidx/activity/result/ActivityResult;)V",
+     "isStatic": false,
+     "annotated": false,
+     "returnType": null,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MEDIA_DECODE_FAILED"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "picked"
+     ],
+     "calls": [
+      "compressToPhoto"
+     ],
+     "constStrings": [],
+     "line": 89
+    },
+    {
+     "name": "saveToAlbum",
+     "params": "(Lcom/getcapacitor/PluginCall;)V",
+     "isStatic": false,
+     "annotated": true,
+     "returnType": null,
+     "options": [
+      {
+       "api": "getString",
+       "key": "name"
+      },
+      {
+       "api": "getString",
+       "key": "mimeType"
+      },
+      {
+       "api": "getString",
+       "key": "path"
+      }
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MEDIA_NOT_FOUND"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_PERMISSION"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_WRITE_FAILED"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "saved"
+     ],
+     "calls": [
+      "insertWithMediaStore",
+      "insertLegacy",
+      "requestPermissionForAlias"
+     ],
+     "constStrings": [
+      "Pictures/\u827e\u83b2",
+      "image/jpeg",
+      "image/"
+     ],
+     "line": 258
+    },
+    {
+     "name": "storageResult",
+     "params": "(Lcom/getcapacitor/PluginCall;)V",
+     "isStatic": false,
+     "annotated": false,
+     "returnType": null,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "MEDIA_PERMISSION"
+      },
+      {
+       "api": "reject",
+       "key": "MEDIA_NOT_FOUND"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "saved"
+     ],
+     "calls": [
+      "insertLegacy"
+     ],
+     "constStrings": [],
+     "line": 286
+    }
+   ]
+  },
+  {
+   "plugin": "EllenVolume",
+   "class": "cn.ellen.companion2.plugin.EllenVolumePlugin",
+   "file": "E:\\ailian\\\u827e\u83b2\u624b\u673a\u7248\\\u521b\u4f5c\u7248\\app\\app\\src\\main\\java\\cn\\ellen\\companion2\\plugin\\EllenVolumePlugin.kt",
+   "smaliBytes": 0,
+   "methodCount": 3,
+   "pluginMethodCount": 2,
+   "events": [],
+   "staticStrings": {},
+   "methods": [
+    {
+     "name": "<init>",
+     "params": "()V",
+     "isStatic": false,
+     "annotated": false,
+     "returnType": null,
+     "options": [],
+     "messages": [],
+     "events": [],
+     "putKeys": [],
+     "calls": [],
+     "constStrings": [],
+     "line": 0
+    },
+    {
+     "name": "get",
+     "params": "(Lcom/getcapacitor/PluginCall;)V",
+     "isStatic": false,
+     "annotated": true,
+     "returnType": null,
+     "options": [],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "VOLUME_UNAVAILABLE"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "volume",
+      "max"
+     ],
+     "calls": [
+      "getStreamVolume",
+      "getStreamMaxVolume"
+     ],
+     "constStrings": [],
+     "line": 40
+    },
+    {
+     "name": "set",
+     "params": "(Lcom/getcapacitor/PluginCall;)V",
+     "isStatic": false,
+     "annotated": true,
+     "returnType": null,
+     "options": [
+      {
+       "api": "getDouble",
+       "key": "volume"
+      },
+      {
+       "api": "getInt",
+       "key": "volume"
+      }
+     ],
+     "messages": [
+      {
+       "api": "reject",
+       "key": "VOLUME_UNAVAILABLE"
+      },
+      {
+       "api": "reject",
+       "key": "VOLUME_PERMISSION"
+      },
+      {
+       "api": "reject",
+       "key": "VOLUME_SET_FAILED"
+      }
+     ],
+     "events": [],
+     "putKeys": [
+      "volume"
+     ],
+     "calls": [
+      "setStreamVolume"
+     ],
+     "constStrings": [],
+     "line": 70
     }
    ]
   }

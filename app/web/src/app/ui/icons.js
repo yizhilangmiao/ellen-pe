@@ -37,6 +37,7 @@ export const PATHS = {
   check: '<path d="m4 12 5 5L20 6"></path>',
   mic: '<rect x="9" y="2" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"></path>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path>',
+  smile: '<circle cx="12" cy="12" r="9"></circle><path d="M8.4 14.3a4.4 4.4 0 0 0 7.2 0"></path><circle cx="9.2" cy="10" r="1"></circle><circle cx="14.8" cy="10" r="1"></circle>',
   volume: '<path d="M11 5 6 9H3v6h3l5 4Z"></path><path d="M16 9a4 4 0 0 1 0 6"></path><path d="M19 6a8 8 0 0 1 0 12"></path>',
   muted: '<path d="M11 5 6 9H3v6h3l5 4Z"></path><path d="m16 9 6 6M22 9l-6 6"></path>',
 };

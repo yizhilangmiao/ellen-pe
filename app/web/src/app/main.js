@@ -42,6 +42,10 @@ import { createModelPage } from './ui/views/settings/page-model.js';
 import { createVoicePage } from './ui/views/settings/page-voice.js';
 import { createBackupPage } from './ui/views/settings/page-backup.js';
 import { createCompanionPage } from './ui/views/settings/page-companion.js';
+// 新一轮补齐的三个全屏页（E 组）：信 / 星图 / 徽章
+import { createLetterView } from './ui/views/letter/letter.js';
+import { createStarmapView } from './ui/views/starmap/starmap.js';
+import { createAchievementsView } from './ui/views/achievements/achievements.js';
 import { createAboutPage } from './ui/views/settings/page-about.js';
 import {
   importSnapshot,
@@ -65,6 +69,23 @@ import { configure as backupConfigure } from './core/backup.js';
 import { autoRun as autoBackup, state as backupState, due as backupDue, run as runBackupOnce } from './core/backup.js';
 import { readChatPrefs, writeChatPrefs } from './core/chatprefs.js';
 import { relationship } from './core/companion.js';
+// —— 本轮补齐（2026-11-12）——
+import { migrateAll } from './core/store/migrate.js';
+import { snapshot as bondSnapshot, touchMessage as bondTouch, onChange as onBondChange, STAGES as BOND_STAGES, markLetterWritten } from './core/bond.js';
+import { unreadCount as letterUnread, listLetters, writeLetter, canWrite as letterCanWrite, markRead as markLetterRead } from './core/letter.js';
+import { doCheckin, readCheckin } from './core/checkin.js';
+import {
+  checkAll as checkAchievements,
+  list as listAchievements,
+  progress as achievementsProgress,
+  onUnlock as onAchievementUnlock,
+  DEFS as ACH_DEFS,
+} from './core/achievements.js';
+import { due as ritualDue, markAsk, markGoodnight, morningQuestion, nightRitual } from './core/ritual.js';
+import { buildStarmap, dayEvents } from './core/starmap.js';
+import { extractTone, toneEnabled, toneToRate } from './core/tone.js';
+import { pickStickerReply, replyDelay, slotOf } from './core/sticker-reply.js';
+import { pickImage as pickMediaImage, saveToAlbum as saveMediaToAlbum } from './core/media.js';
 
 const THEME_KEY = 'ellen-ui-theme';
 
@@ -245,11 +266,106 @@ async function main() {
 
   const session = createChatSession({ state: appState, getSystemPrompt: currentSystemPrompt });
 
+// 引用状态：聊天页记着「正在回哪一条」，键盘回车路径不会带 extra，靠它补进下一条消息
+let quotedOf = null;
+// 她回表情的定时器：连着发表情时不叠一串，后一张覆盖前一张
+let replyTimer = null;
+
+/** 阶段 id → 中文名（界面提示用，不参与判定）。 */
+function stageLabel(id) {
+  const found = (Array.isArray(BOND_STAGES) ? BOND_STAGES : []).find((x) => x && (x.id === id || x.key === id));
+  return (found && (found.label || found.name)) || { acquainted: '相识', familiar: '熟悉', trusted: '信赖', close: '亲近', lover: '恋人' }[id] || '相识';
+}
+
+// 写信状态：生成期间相处页/信页要能显示「她正在写信…」和字数递增
+let letterWriting = null; // { chars, target, at } | null
+let letterBusy = false;
+
+// 解锁一枚徽章就轻提示一句（弹窗太重，这里用现有的 flash 条）
+onAchievementUnlock((ev) => {
+  const def = (Array.isArray(ACH_DEFS) ? ACH_DEFS : []).find((d) => d && d.id === (ev && ev.id));
+  const name = (def && (def.title || def.name)) || '';
+  flash(name ? `${s('ach.popupTitle')} · ${name}` : s('ach.popupTitle'));
+});
+
+/**
+ * 写一封信。亲密度升阶时自动调，相处页的「让她写一封」也走这里。
+ * 硬要求：正文不低于 1500 字（恋人 3000），不够字数 letter.js 会自己重写一次。
+ * @param {string} [stage] 升阶到哪一档（触发时传，重写按钮不传）
+ * @param {{force?: boolean}} [opts]
+ */
+async function maybeWriteLetter(stage = null, opts = {}) {
+  if (letterBusy) return null;
+  let snap = null;
+  try {
+    snap = await bondSnapshot();
+  } catch (err) {
+    console.warn('[main] 读亲密度失败，这次不写信', err);
+    return null;
+  }
+  if (!opts.force && stage && snap && snap.lastLetterStage === stage) return null;
+  letterBusy = true;
+  letterWriting = { chars: 0, target: snap && snap.stage === 'lover' ? 3000 : 1500, at: Date.now() };
+  try {
+    // 不占聊天流：只给她一句轻提示，信落在「信」页里
+    flash(s('letter.writing'));
+    const res = await writeLetter({
+      config: appState.getConfig(),
+      persona: await readPersona(),
+      bond: snap,
+      onDelta: (delta) => {
+        if (!delta) return;
+        if (delta.reset) letterWriting = { ...(letterWriting || {}), chars: 0 };
+        else letterWriting = { ...(letterWriting || {}), chars: delta.chars || 0 };
+        // 信页正开着就把字数推过去（没开着就等下次刷新拿最后状态）
+        if (letterHandle && typeof letterHandle.setWriting === 'function') {
+          try {
+            letterHandle.setWriting(letterWriting);
+          } catch (err) {
+            console.warn('[main] 写信进度没推进视图', err);
+          }
+        }
+      },
+      force: !!opts.force,
+    });
+    flash(res && res.short ? s('letter.short') : s('letter.noticeInChat'));
+    if (res && res.stage) {
+      try {
+        await markLetterWritten(res.stage, Date.now());
+      } catch (err) {
+        console.warn('[main] 写信标记没落库', err);
+      }
+    }
+    return res;
+  } catch (err) {
+    if (err && err.code === 'ALREADY_WRITTEN' && !opts.force) return null;
+    flash(s('letter.writeFail'));
+    console.warn('[main] 信没写成', err);
+    return null;
+  } finally {
+    letterBusy = false;
+    letterWriting = null;
+  }
+}
+
 // 发一句话（键盘回车和语音转写共用这一条路，别再复制一遍）
 function sendMessage(text, extra = null) {
   const clean = (text || '').trim();
   if (!clean) return Promise.resolve();
-  return session.send(clean, extra).then(() => {
+  // 引用：聊天页记着「正在回哪一条」，键盘回车路径不会带 extra，这里补上
+  const payload = extra || (quotedOf ? { quoteOf: quotedOf } : null);
+  quotedOf = null;
+  return session.send(clean, payload).then(() => {
+    // 亲密度计点：每条 +1、每天首条 +3，凑够阈值她会升一档并发一封信
+    bondTouch({ at: Date.now() })
+      .then((res) => {
+        if (res && res.upgraded) {
+          flash(`你们到「${stageLabel(res.stage)}」了。`);
+          maybeWriteLetter(res.stage).catch((err) => console.warn('[main] 升阶信没写成', err));
+        }
+        return checkAchievements();
+      })
+      .catch((err) => console.warn('[main] 亲密度没记上', err));
     // 每轮聊完顺手看看该不该写手记；不 await 到界面路径上，失败也不影响聊天
     maybeWriteJournal({ config: appState.getConfig(), messages: appState.getMessages() }).catch((err) =>
       console.warn('[main] 手记没写成', err)
@@ -371,8 +487,132 @@ function sendMessage(text, extra = null) {
       const m = list[i];
       if (!m || m.role !== 'assistant' || m.pending || m.failed) continue;
       const body = plainVoice(m.text);
-      if (body) speakOut(body).catch((err) => console.warn('[main] 朗读失败', err));
+      if (body) {
+        // 语气标注：她在气泡里写了「（轻声）」，念的时候也要轻声，不然白标了
+        const opts = {};
+        if (toneEnabled() && m.tone) {
+          try {
+            const tone = toneToRate(m.tone) || {};
+            const base = Number(readVoicePrefs().rate) || 1;
+            if (typeof tone.rate === 'number') opts.rate = Math.max(0.5, Math.min(2, base * tone.rate));
+            if (typeof tone.pitch === 'number') opts.pitch = tone.pitch;
+          } catch (err) {
+            console.warn('[main] 语气换算失败，按默认念', err);
+          }
+        }
+        speakOut(body, opts).catch((err) => console.warn('[main] 朗读失败', err));
+      }
       return;
+    }
+  }
+
+  // —— 聊天页长按菜单的四个后端动作 ——
+  /** 把一条消息压成引用块（只留 80 字，正文太长会把引用条撑爆）。 */
+  function quoteData(msg) {
+    if (!msg) return null;
+    return {
+      headId: msg.headId || msg.id || null,
+      role: msg.role === 'user' ? 'user' : 'assistant',
+      text: String(msg.text || '').trim().slice(0, 80),
+      createdAt: msg.createdAt || Date.now(),
+    };
+  }
+
+  /** 点引用条：跳回原消息；原消息已经不在了就给一句轻提示。 */
+  function showQuote(quote) {
+    const key = quote && (quote.headId || quote.id);
+    if (!key) return;
+    const hit = appState.getMessages().find((m) => m.headId === key || m.id === key);
+    if (hit && chatHandle && typeof chatHandle.scrollToMessage === 'function') chatHandle.scrollToMessage(hit.id);
+    else flash(s('msg.quoteMissing'));
+  }
+
+  /** 重新生成：把这条她的回复标成撤回，用它前面那句话再问一次（不再落一条「我说的」）。 */
+  async function regenerateReply(id) {
+    const list = appState.getMessages();
+    const idx = list.findIndex((m) => m.id === id || m.headId === id);
+    if (idx < 0) return;
+    let ask = '';
+    for (let i = idx - 1; i >= 0; i -= 1) {
+      const m = list[i];
+      if (m.role === 'user' && !m.pending && String(m.text || '').trim()) {
+        ask = m.text;
+        break;
+      }
+    }
+    if (!ask) {
+      flash(s('msg.quoteMissing'));
+      return;
+    }
+    // 同一个问题不挂两份答案：旧的先撤回（原文留在库里，不删）
+    await appState.recallMessage(list[idx].id);
+    await session.send(ask, null, { appendUser: false });
+  }
+
+  /** 选图 → 落一条图片消息（图片不进模型上下文，气泡只给人看）。 */
+  async function addPickedImage(picked) {
+    let res = picked;
+    if (!res) {
+      try {
+        res = await pickMediaImage({ maxSide: 1600 });
+      } catch (err) {
+        console.warn('[main] 选图失败', err);
+        flash(s('msg.imageLoadFail'));
+        return;
+      }
+    }
+    if (!res || res.picked === false) return;
+    appState.addMessage({
+      role: 'user',
+      type: 'image',
+      text: '',
+      image: {
+        path: res.uri || res.name || '',
+        name: res.name || '',
+        uri: res.uri || '',
+        src: res.src || '',
+        width: res.width || 0,
+        height: res.height || 0,
+        size: res.bytes || res.size || 0,
+        mime: res.mimeType || res.mime || '',
+      },
+    });
+  }
+
+  /**
+   * 发表情：表情包是包内素材，不落文件、不走网络，只把 stickerId 记进消息。
+   * 发表情不触发模型调用 —— 甩个表情过去，她不用再回一段话。
+   */
+  function sendSticker(sticker) {
+    if (!sticker || !sticker.id) return;
+    appState.addMessage({ role: 'user', type: 'expression', text: '', stickerId: sticker.id });
+    // 你甩一张过来，她有一半多一点的概率也回一张 —— 不是每次都回，那样太吵。
+    // 走本地规则挑图（收藏的 12 张里选），不为挑一张图多发一次请求。
+    const back = pickStickerReply({ incomingSlot: slotOf(sticker.id) });
+    if (replyTimer) {
+      clearTimeout(replyTimer);
+      replyTimer = null;
+    }
+    if (!back) return;
+    replyTimer = setTimeout(() => {
+      replyTimer = null;
+      appState.addMessage({ role: 'assistant', type: 'expression', text: '', stickerId: back.id });
+    }, replyDelay());
+  }
+
+  /** 图片气泡长按「保存到相册」。 */
+  async function saveImageToAlbum(image) {
+    if (!image) return;
+    flash(s('msg.imageSaving'));
+    try {
+      const res = await saveMediaToAlbum({
+        name: image.name || image.path,
+        mimeType: image.mime || image.mimeType || '',
+      });
+      if (res && res.saved) flash(s('msg.imageSaved'));
+      else flash(`${s('msg.imageSaveFail')}${(res && res.code) || ''}`);
+    } catch (err) {
+      flash(`${s('msg.imageSaveFail')}${(err && err.message) || ''}`);
     }
   }
 
@@ -386,8 +626,27 @@ function sendMessage(text, extra = null) {
         const handle = view.mount(el, {
           messages: appState.getMessages(),
           model: appState.getModelName(),
-          onSend: (text) => sendMessage(text),
+          onSend: (text, extra) => sendMessage(text, extra),
           onStop: () => session.stop(),
+          // —— 长按菜单的五个出口（缺哪个，聊天页就不显示哪一项）——
+          // 撤回：窗口（120 秒）由聊天页判，这里只管写库；返回 value|null
+          onRecall: (id) => {
+            appState.recallMessage(id).catch((err) => console.warn('[main] 撤回失败', err));
+          },
+          onRegenerate: (id) => {
+            regenerateReply(id).catch((err) => {
+              console.warn('[main] 重新生成失败', err);
+              flash(s('msg.recallTooLate'));
+            });
+          },
+          onQuote: (msg) => {
+            quotedOf = quoteData(msg);
+            return quotedOf;
+          },
+          onShowQuote: (quote) => showQuote(quote),
+          onPickImage: (picked) => addPickedImage(picked),
+          onSaveImage: (image) => saveImageToAlbum(image),
+          onSticker: (sticker) => sendSticker(sticker),
           // 语音文件被 200 MB 清理删掉后，让气泡自己变灰（而不是点了没反应）
           onVoiceMissing: (id, audio) => appState.updateMessage(id, { audio: { ...audio, missing: true } }),
           voice: voiceInput,
@@ -404,9 +663,96 @@ function sendMessage(text, extra = null) {
     };
   });
 
-  defineView('memory', () => createMemoryView());
+  // 「回忆」页里那个星图页签不再是占位格，改成整页推进自家的星图页。
+  // 路由 push 不带参数，所以回调只能在这里注进去。
+  defineView('memory', () => {
+    const view = createMemoryView();
+    return {
+      mount(el, props = {}) {
+        return view.mount(el, { onOpenStars: () => push('starmap'), ...props });
+      },
+      resume(...args) {
+        if (view.resume) return view.resume(...args);
+        return undefined;
+      },
+      destroy(...args) {
+        if (view.destroy) return view.destroy(...args);
+        return undefined;
+      },
+    };
+  });
+  // 相处页：数据自己读 core（这里只补「答一句 / 说晚安」两条真发消息的回调）
+  function companionParams() {
+    return {
+      onAsk: (text) => sendRitual(text, 'ask'),
+      onSay: (text) => sendRitual(text, 'say'),
+      // 签到顺手可能解锁徽章 / 触发升阶，两个都在这儿兜一次
+      onCheckin: async () => {
+        try {
+          await checkAchievements();
+        } catch (err) {
+          console.warn('[main] 签到后算徽章失败', err);
+        }
+      },
+    };
+  }
+
+  /** 仪式里回答一句 / 说晚安：先落标记再发出去，发完把人带回聊天页。 */
+  async function sendRitual(text, kind) {
+    const t = String(text || '').trim();
+    if (!t) return;
+    const now = Date.now();
+    try {
+      if (kind === 'ask') await markAsk(now, t);
+      else await markGoodnight(now);
+    } catch (err) {
+      console.warn('[main] 仪式标记没落库', err);
+    }
+    await sendMessage(t);
+    goChat();
+  }
+
+  function goChat() {
+    if (drawer.isOpen()) drawer.close({ silent: true });
+    show('chat');
+    syncTabs('chat');
+  }
 
   defineView('companion', () => createCompanionView({ state: appState }));
+
+  // 信：列表自己读库；「让她重写一封」必须由这边起稿（要配置和人设）
+  let letterHandle = null;
+  function refreshLetterView() {
+    const h = letterHandle;
+    if (!h) return;
+    if (typeof h.setWriting === 'function') h.setWriting(letterWriting);
+    if (typeof h.setLetters === 'function') {
+      listLetters({ limit: 100 })
+        .then((list) => h.setLetters(Array.isArray(list) ? list : []))
+        .catch((err) => console.warn('[main] 信列表刷新失败', err));
+    }
+  }
+
+  defineView('letter', () => {
+    const view = createLetterView({ state: appState });
+    return {
+      mount(el, props) {
+        const handle = view.mount(el, {
+          ...(props || {}),
+          writing: letterWriting,
+          // 太短/想再要一封：强制重写，进度直接推回视图
+          onRewrite: (id) => maybeWriteLetter(null, { force: true }).then(() => refreshLetterView()),
+          onRead: (id) => markLetterRead(id).catch((err) => console.warn('[main] 信已读没落库', err)),
+        });
+        letterHandle = handle;
+        return handle;
+      },
+    };
+  });
+
+  defineView('starmap', () => createStarmapView({ state: appState }));
+
+  defineView('achievements', () => createAchievementsView({ state: appState }));
 
   defineView('settings', () => createSettingsView({ state: appState, onChange: () => session.refresh() }));
   // 设置二级页（老大反馈「一整个平铺太长」）：首页只留入口行，重内容各自成页。
@@ -512,6 +858,10 @@ function sendMessage(text, extra = null) {
     background: 'settings',
     feedback: 'settings',
     journal: 'memory',
+    // 新一轮补齐的三个全屏页：信 / 星图 / 徽章都从「相处」进，底栏高亮跟着相处走
+    letter: 'companion',
+    starmap: 'companion',
+    achievements: 'companion',
   };
 
   function syncTabs(rawName) {
@@ -538,7 +888,10 @@ function sendMessage(text, extra = null) {
   for (const [tab, btn] of shell.tabButtons) {
     btn.addEventListener('click', () => {
       if (DRAWER_TABS.has(tab)) {
-        drawer.toggle(tab, { from: btn });
+        const opts = { from: btn };
+        // 相处页要接两条真发消息的回调，抽屉默认不带 props，这里补
+        if (tab === 'companion') opts.params = companionParams();
+        drawer.toggle(tab, opts);
         syncTabs(drawer.isOpen() ? tab : currentName());
       } else {
         drawer.close({ silent: true });
@@ -635,8 +988,19 @@ function sendMessage(text, extra = null) {
   syncTabs('chat');
 
   // 读加密配置（异步），读到后刷新聊天页标题上的模型名
+  // 先把老消息补成新形状（type/recalled/quoteOf…）：界面按新字段分支渲染，
+  // 缺字段会走进奇怪的分支，所以迁移必须在第一次读消息之前。
+  try {
+    const migrated = await migrateAll();
+    if (migrated && migrated.changed) console.info('[main] 消息结构已升级', migrated);
+  } catch (err) {
+    console.warn('[main] 消息结构升级失败，按老形状继续跑', err);
+  }
   await appState.init();
   chatHandle && chatHandle.setModel(appState.getModelName());
+
+  // 老数据里已经发生过的事该发的徽章补发一次（首次上这个版本时口径对齐）
+  checkAchievements().catch((err) => console.warn('[main] 启动补算徽章失败', err));
 
   // —— 主动消息：把素材推给 native，并把待读的取回来落成一条消息 ——
   /** 把「磁盘上已经没有的语音文件」在消息里标成 missing。
@@ -858,6 +1222,19 @@ async function syncProactive() {
       read: async () => {
         const m = await import('./core/companion.js');
         return m.snapshot();
+      },
+    },
+    letter: {
+      // 验收用：不等升阶，直接催她写一封（force 才能跨过「同一档只写一次」）
+      write: (opts = {}) => maybeWriteLetter(null, { force: true, ...opts }),
+      writing: () => letterWriting,
+      list: () => listLetters({ limit: 20 }),
+      unread: () => letterUnread(),
+      bond: () => bondSnapshot(),
+      // 验收用：直接加点，看升阶 + 「该写信了」这条路，不去真聊三十条
+      addPoints: async (n = 25) => {
+        const m = await import('./core/bond.js');
+        return m.addPoints(n, { at: Date.now(), reason: 'debug' });
       },
     },
   };

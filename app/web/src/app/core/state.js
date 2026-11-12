@@ -5,7 +5,7 @@
 //   - 每条消息带 headId，后续修改（流式收尾、失败标记）走 revision 追加
 //   - 落库是异步的，界面不等它 —— 写失败只在控制台报，不挡聊天
 import { loadModelConfig, isUsable } from './config.js';
-import { appendMessage, loadMessages, replaceMessage, currentThreadId } from './store/messages.js';
+import { appendMessage, loadMessages, replaceMessage, currentThreadId, recallMessage as recallInStore } from './store/messages.js';
 
 const MESSAGE_WINDOW = 200;
 
@@ -76,6 +76,19 @@ export function createAppState() {
       else delete value.audio;
       if (local.speech) value.speech = local.speech;
       else delete value.speech;
+      // 图片 / 表情 / 引用 / 拆条 / 语气：这几样也得跟着落库，否则重启回来只剩纯文字
+      for (const key of ['type', 'quoteOf', 'image', 'tone', 'stickerId']) {
+        if (local[key]) value[key] = local[key];
+        else if (key !== 'type') delete value[key];
+      }
+      if (typeof local.segIndex === 'number') value.segIndex = local.segIndex;
+      else delete value.segIndex;
+      if (typeof local.segCount === 'number') value.segCount = local.segCount;
+      else delete value.segCount;
+      if (local.recalled) {
+        value.recalled = true;
+        value.recalledAt = local.recalledAt || Date.now();
+      }
       local.value = value;
       await replaceMessage(local.headId, value);
     });
@@ -156,6 +169,14 @@ export function createAppState() {
       if (msg.audio) local.audio = msg.audio;
       if (msg.speech) local.speech = msg.speech;
       if (msg.voice) local.voice = true;
+      // 图片 / 表情 / 引用 / 拆条 / 语气：进库前必须先挂到 local 上，persistPatch 才带得出去
+      if (msg.type) local.type = msg.type;
+      if (msg.quoteOf) local.quoteOf = msg.quoteOf;
+      if (msg.image) local.image = msg.image;
+      if (msg.stickerId) local.stickerId = msg.stickerId;
+      if (msg.tone) local.tone = msg.tone;
+      if (typeof msg.segIndex === 'number') local.segIndex = msg.segIndex;
+      if (typeof msg.segCount === 'number') local.segCount = msg.segCount;
       messages.push(local);
       emit();
       persist(local);
@@ -174,6 +195,26 @@ export function createAppState() {
       Object.assign(target, patch);
       emit();
       if (opts.persist !== false) persistPatch(target);
+    },
+
+    /**
+     * 撤回一条已落库的消息（2 分钟窗口由调用方判断，这里只负责写）。
+     * 只加 recalled 标记，原文留在库里——误删没法找回，删字更狠。
+     * @param {string} idOrHead 内存 id 或库里的 headId 都认
+     * @returns {Promise<object|null>} 新的 value，找不到返回 null
+     */
+    recallMessage(idOrHead) {
+      const target = messages.find((m) => m.id === idOrHead || m.headId === idOrHead);
+      if (!target || !target.headId) return Promise.resolve(null);
+      return enqueue(target, async () => {
+        const value = await recallInStore(target.headId);
+        if (!value) return null;
+        target.value = value;
+        target.recalled = true;
+        target.recalledAt = value.recalledAt || Date.now();
+        emit();
+        return value;
+      });
     },
 
     clearMessages() {
@@ -218,6 +259,15 @@ export function createAppState() {
           // 语音消息：验收要看「气泡里没文字、重启后还在」，没有这两个字段就只能点屏幕
           audio: m.audio || null,
           speech: m.speech || null,
+          // 探针要能看到新字段：图片/表情/引用/拆条/撤回全靠它们判定渲染分支
+          type: m.type || 'text',
+          recalled: !!m.recalled,
+          quoteOf: m.quoteOf || null,
+          image: m.image || null,
+          stickerId: m.stickerId || null,
+          tone: m.tone || null,
+          segIndex: typeof m.segIndex === 'number' ? m.segIndex : null,
+          segCount: typeof m.segCount === 'number' ? m.segCount : null,
         })),
         configUsable: isUsable(config),
         recall: recall.map((r) => ({ kind: r.kind, title: r.title, score: r.score })),

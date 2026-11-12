@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- 存相册：Android 10+ 走 MediaStore 自己的条目，不需要任何存储权限；
+         只有 API 24~28 的老 insertImage 才需要它，所以用 maxSdkVersion 限死在 28，
+         29+ 的机器上这条权限根本不存在，也就不会被系统当成「要读存储」。 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <!-- 前台保活：流式回复在切走后要能写完 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

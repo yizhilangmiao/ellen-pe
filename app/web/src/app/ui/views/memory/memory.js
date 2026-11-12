@@ -363,7 +363,7 @@ function understandingCard(rec, onAgain) {
 
 export function createMemoryView() {
   return {
-    mount(el) {
+    mount(el, mountProps = {}) {
       el.classList.add('el-scroll-page', 'el-memory-page');
 
       const eyebrow = document.createElement('div');
@@ -663,6 +663,12 @@ export function createMemoryView() {
         if (!btn || !pages.contains(btn)) return;
         const tab = btn.dataset.memoryTab;
         if (!tab || state.tab === tab) return;
+        // 星图已经不是这里的一格内容，而是一整页（相处页也有入口）。
+        // 点它就整页推进去，不切页签、不白读一次库；没有回调时才落回老占位。
+        if (tab === 'stars' && typeof mountProps.onOpenStars === 'function') {
+          mountProps.onOpenStars();
+          return;
+        }
         state.tab = tab;
         paintButtons(); // 同步给反馈，不等 load() 里的异步刷新
         load();

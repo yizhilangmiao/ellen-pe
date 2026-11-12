@@ -611,3 +611,483 @@
   content: '…';
   margin-left: calc(2 * var(--u));
 }
+
+/* ============================================================
+ * 批 2：引用条 / 长按菜单 / 图片·表情气泡 / 音量台
+ * 单位规矩：全部 calc(N * var(--u))，--u 已经是 vmin 基准；
+ * 只有 1px 细线和 0 留 px。font: 简写一律拆四条（简写里塞 clamp 会整条失效）。
+ * ============================================================ */
+
+/* —— 引用条：贴在输入条上方 —— */
+.el-chat-quote {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  margin: 0 calc(12 * var(--u));
+  padding: calc(6 * var(--u)) calc(10 * var(--u));
+  border: 1px solid var(--el-line);
+  border-bottom: 0;
+  border-radius: calc(10 * var(--u)) calc(10 * var(--u)) 0 0;
+  background: var(--el-surface);
+  font-size: calc(12 * var(--u));
+  line-height: calc(17 * var(--u));
+  color: var(--el-muted);
+  min-width: 0;
+}
+.el-chat-quote[hidden] { display: none; }
+.el-chat-quote-who {
+  flex: none;
+  color: var(--el-pink);
+  font-weight: 600;
+}
+.el-chat-quote-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.el-chat-quote-x {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+  border-radius: 50%;
+  color: var(--el-muted);
+}
+.el-chat-quote-x .el-icon svg {
+  width: calc(13 * var(--u));
+  height: calc(13 * var(--u));
+}
+
+/* —— 撤回：一行灰斜体 —— */
+.el-msg-recalled { max-width: 100%; }
+.el-msg-recall {
+  padding: calc(4 * var(--u)) 0;
+  font-style: italic;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+/* —— tone 标注：气泡内小字（12 号那一档）—— */
+.el-msg-tone {
+  display: block;
+  margin-top: calc(4 * var(--u));
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  font-style: italic;
+  color: var(--el-muted);
+  opacity: 0.85;
+}
+
+/* —— 引用块：这条消息引的是哪一句 —— */
+.el-msg-quoted {
+  display: flex;
+  align-items: baseline;
+  gap: calc(5 * var(--u));
+  max-width: 100%;
+  margin-top: calc(4 * var(--u));
+  padding: calc(5 * var(--u)) calc(9 * var(--u));
+  border-left: 2px solid var(--el-pink);
+  border-radius: calc(6 * var(--u));
+  background: color-mix(in srgb, var(--el-surface) 70%, transparent);
+  font-size: calc(12 * var(--u));
+  line-height: calc(17 * var(--u));
+  color: var(--el-muted);
+  text-align: left;
+}
+.el-msg-quoted-who { flex: none; color: var(--el-pink); }
+.el-msg-quoted-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.el-msg-quoted.is-missing {
+  border-left-color: var(--el-line);
+  opacity: 0.75;
+}
+
+/* —— 图片气泡：等比缩略，最大宽约 60% 屏（432 基准下 240u）—— */
+.el-msg-image {
+  display: block;
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: calc(12 * var(--u));
+  overflow: hidden;
+  background: var(--el-surface);
+  max-width: calc(240 * var(--u));
+  line-height: 0;
+}
+.el-msg-image-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(300 * var(--u));
+  object-fit: contain;
+  border-radius: inherit;
+}
+.el-msg-image.is-failed {
+  min-width: calc(120 * var(--u));
+  min-height: calc(80 * var(--u));
+  border: 1px dashed var(--el-line);
+  line-height: normal;
+}
+/* 气泡里的一行临时状态（保存中/已保存/附件没了）：1.8 秒后自己消失 */
+.el-msg-note {
+  display: block;
+  margin-top: calc(4 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+}
+.el-msg-image .el-msg-note {
+  position: absolute;
+  left: calc(6 * var(--u));
+  bottom: calc(6 * var(--u));
+  margin: 0;
+  padding: calc(2 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+}
+
+/* —— 表情气泡：96u 方块 —— */
+.el-msg-expr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(96 * var(--u));
+  height: calc(96 * var(--u));
+  border-radius: calc(12 * var(--u));
+  overflow: hidden;
+  background: var(--el-surface);
+}
+.el-msg-expr.is-tappable { cursor: pointer; }
+.el-msg-expr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.el-msg-expr.is-placeholder {
+  border: 1px dashed var(--el-line);
+  background: transparent;
+}
+.el-msg-expr-ph {
+  padding: 0 calc(6 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(15 * var(--u));
+  color: var(--el-muted);
+  text-align: center;
+}
+
+/* —— 全屏看图：自带遮罩，点任意处关 —— */
+.el-chat-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(16 * var(--u));
+  background: color-mix(in srgb, #000 88%, transparent);
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.el-chat-viewer[hidden] { display: none; }
+.el-chat-viewer.is-open { opacity: 1; }
+.el-chat-viewer-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: calc(8 * var(--u));
+}
+
+/* —— 底部 sheet：长按菜单 / 音量台共用 —— */
+.el-chat-sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: color-mix(in srgb, #000 45%, transparent);
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+.el-chat-sheet-mask[hidden] { display: none; }
+.el-chat-sheet-mask.is-open { opacity: 1; }
+
+.el-chat-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  padding-bottom: calc(8 * var(--u) + var(--el-safe-bottom));
+  border-radius: calc(16 * var(--u)) calc(16 * var(--u)) 0 0;
+  background: var(--el-raised);
+  border-top: 1px solid var(--el-line);
+  transform: translateY(100%);
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.el-chat-sheet[hidden] { display: none; }
+.el-chat-sheet.is-open { transform: translateY(0); }
+
+.el-chat-sheet-title {
+  padding: calc(6 * var(--u)) calc(8 * var(--u)) calc(4 * var(--u));
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(17 * var(--u));
+  font-weight: 600;
+  color: var(--el-muted);
+}
+.el-chat-sheet-title[hidden] { display: none; }
+
+.el-chat-sheet-list {
+  display: flex;
+  flex-direction: column;
+}
+.el-chat-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  width: 100%;
+  padding: calc(12 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: transparent;
+  color: var(--el-text);
+  font-size: calc(15 * var(--u));
+  line-height: calc(21 * var(--u));
+  text-align: left;
+}
+.el-chat-sheet-item:active { background: var(--el-surface); }
+.el-chat-sheet-item .el-icon svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.el-chat-sheet-item.is-disabled {
+  color: var(--el-muted);
+  opacity: 0.55;
+}
+.el-chat-sheet-cancel {
+  margin-top: calc(6 * var(--u));
+  padding: calc(12 * var(--u)) 0;
+  border-radius: calc(10 * var(--u));
+  border-top: 1px solid var(--el-line);
+  color: var(--el-muted);
+  font-size: calc(14 * var(--u));
+  line-height: calc(20 * var(--u));
+  text-align: center;
+}
+
+/* —— 输入条左侧两个键（音量 / 发图）—— */
+.el-composer-volume,
+.el-composer-image {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max(calc(38 * var(--u)), 40px);
+  height: max(calc(38 * var(--u)), 40px);
+  border-radius: 50%;
+  color: var(--el-chat-action);
+}
+.el-composer-volume .el-icon svg,
+.el-composer-image .el-icon svg {
+  width: calc(19 * var(--u));
+  height: calc(19 * var(--u));
+}
+.el-composer-volume.is-muted { color: var(--el-error); }
+
+/* —— 音量面板 —— */
+.el-volume-row {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u)) calc(4 * var(--u));
+}
+.el-volume-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: calc(28 * var(--u));
+  accent-color: var(--el-pink);
+}
+.el-volume-slider[disabled] { opacity: 0.4; }
+.el-volume-pct {
+  flex: none;
+  min-width: calc(42 * var(--u));
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-text);
+  text-align: right;
+}
+.el-volume-mute {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max(calc(36 * var(--u)), 38px);
+  height: max(calc(36 * var(--u)), 38px);
+  border-radius: 50%;
+  border: 1px solid var(--el-line);
+  color: var(--el-chat-action);
+}
+.el-volume-mute.is-on {
+  color: var(--el-error);
+  border-color: color-mix(in srgb, var(--el-error) 45%, transparent);
+}
+.el-volume-mute .el-icon svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.el-volume-hint {
+  margin: 0;
+  padding: 0 calc(10 * var(--u)) calc(6 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+}
+
+/* 引用回跳时闪一下目标气泡（1.4s 后由 JS 摘掉类） */
+.el-msg.is-target .el-msg-body {
+  outline: 1px solid var(--el-pink);
+  outline-offset: 1px;
+}
+.el-msg.is-target .el-msg-image,
+.el-msg.is-target .el-msg-expr {
+  outline: 1px solid var(--el-pink);
+  outline-offset: 2px;
+}
+
+/* —— 绝区零皮肤：新节点按 grid 摆位（她的气泡是 grid，不摆会挤到头像前面）—— */
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant']::before {
+  grid-row: 1 / span 4;
+}
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-quoted {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: start;
+}
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-speak {
+  grid-row: 3;
+}
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-detail {
+  grid-row: 4;
+}
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-image,
+.ellen-app[data-skin='zzz'] .el-msg[data-role='assistant'] > .el-msg-expr {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+}
+.ellen-app[data-skin='zzz'] .el-msg-quoted {
+  background: transparent;
+}
+.ellen-app[data-skin='zzz'] .el-chat-sheet {
+  background: var(--z-card);
+}
+
+/* —— 表情面板（A1）：素材在包内，一页 8 个，四列两行 —— */
+.el-composer-sticker {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max(calc(38 * var(--u)), 40px);
+  height: max(calc(38 * var(--u)), 40px);
+  border-radius: 50%;
+  color: var(--el-chat-action);
+}
+
+.el-composer-sticker .el-icon svg {
+  width: calc(19 * var(--u));
+  height: calc(19 * var(--u));
+}
+
+.el-stk {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+  padding: calc(4 * var(--u)) calc(6 * var(--u)) calc(2 * var(--u));
+}
+
+.el-stk-tabs {
+  display: flex;
+  gap: calc(8 * var(--u));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.el-stk-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.el-stk-tab {
+  flex: none;
+  padding: calc(5 * var(--u)) calc(12 * var(--u));
+  border-radius: 999px;
+  background: var(--el-fill-2, rgba(255, 255, 255, 0.06));
+  color: var(--el-text-dim, rgba(240, 237, 241, 0.62));
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+}
+
+.el-stk-tab.is-on {
+  background: var(--el-pink, #ff9fc6);
+  color: #1a1116;
+}
+
+.el-stk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: calc(8 * var(--u));
+}
+
+.el-stk-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(6 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--el-fill-1, rgba(255, 255, 255, 0.04));
+}
+
+.el-stk-cell img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+}
+
+.el-stk-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(14 * var(--u));
+  padding-top: calc(2 * var(--u));
+}
+
+.el-stk-arrow {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  border-radius: 50%;
+  color: var(--el-text);
+  font-size: calc(18 * var(--u));
+  line-height: 1;
+}
+
+.el-stk-arrow:disabled {
+  opacity: 0.3;
+}
+
+.el-stk-page {
+  color: var(--el-text-dim, rgba(240, 237, 241, 0.62));
+  font-size: calc(12 * var(--u));
+}

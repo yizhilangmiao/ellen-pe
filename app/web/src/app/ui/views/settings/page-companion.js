@@ -19,6 +19,7 @@ import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '..
 import { buildManifest } from '../../../core/store/export.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
+import { readAutonomyPrefs, writeAutonomyPrefs, INTERVAL_OPTIONS, DAILY_OPTIONS } from '../../../core/autonomy-prefs.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';
 import { RELATIONSHIPS, relationship, setRelationship } from '../../../core/companion.js';
 import { readChatPrefs, writeChatPrefs, resetChatPrefs, HISTORY_OPTIONS } from '../../../core/chatprefs.js';
@@ -210,6 +211,258 @@ export function createCompanionPage({ state, onChange } = {}) {
       });
 
       refreshProactive();
+
+
+      // ===== 她什么时候可以找你：时段与上限 =====
+      // 跟上面那张卡不是一件事：上面管「开不开」，这张管「什么时间开、一天开几次」。
+      const aCard = document.createElement('div');
+      aCard.className = 'el-settings-card';
+      const aHead = document.createElement('div');
+      aHead.className = 'el-settings-card-head';
+      const aTitle = document.createElement('div');
+      aTitle.className = 'el-settings-card-title';
+      aTitle.textContent = s('settings.autonomyTitle');
+      const aStatus = document.createElement('div');
+      aStatus.className = 'el-settings-status';
+      aHead.append(aTitle, aStatus);
+      const aHint = document.createElement('div');
+      aHint.className = 'el-settings-card-hint';
+      aHint.textContent = s('settings.autonomyHint');
+
+      let autonomy = readAutonomyPrefs();
+
+      const aRow = document.createElement('div');
+      aRow.className = 'el-settings-row';
+      const aToggle = document.createElement('button');
+      aToggle.type = 'button';
+      aToggle.className = 'el-settings-btn';
+      aRow.append(aToggle);
+
+      const aInterval = segmentField(
+        s('settings.autonomyInterval'),
+        INTERVAL_OPTIONS.map((n) => ({ value: n, label: `${n} ${s('settings.hourUnit')}` })),
+        autonomy.intervalH,
+        (v) => {
+          autonomy = writeAutonomyPrefs({ intervalH: Number(v) });
+          paintAutonomy();
+          syncAutonomy();
+        }
+      );
+
+      const aDaily = segmentField(
+        s('settings.autonomyDaily'),
+        DAILY_OPTIONS.map((n) => ({ value: n, label: `${n} ${s('settings.autonomyDailyUnit')}` })),
+        autonomy.dailyMax,
+        (v) => {
+          autonomy = writeAutonomyPrefs({ dailyMax: Number(v) });
+          paintAutonomy();
+          syncAutonomy();
+        }
+      );
+
+      // 免打扰起止都是 0-23 整点：24 个按钮用 chip 横排（自带换行），
+      // 分段控件不换行，24 个挤一行会窄到点不准
+      function hourField(labelText, key) {
+        const field = document.createElement('div');
+        field.className = 'el-settings-field';
+        const label = document.createElement('span');
+        label.className = 'el-settings-label';
+        label.textContent = labelText;
+        const chips = document.createElement('div');
+        chips.className = 'el-settings-chips';
+        const buttons = [];
+        for (let h = 0; h < 24; h += 1) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'el-settings-chip';
+          b.dataset.value = String(h);
+          b.textContent = String(h).padStart(2, '0');
+          b.addEventListener('click', () => {
+            autonomy = writeAutonomyPrefs({ [key]: h });
+            paintAutonomy();
+            syncAutonomy();
+          });
+          chips.append(b);
+          buttons.push(b);
+        }
+        field.append(label, chips);
+        return { field, buttons };
+      }
+
+      const quietFromField = hourField(s('settings.autonomyQuiet'), 'quietFrom');
+      const quietToField = hourField(s('settings.quietTo'), 'quietTo');
+      const quietHint = document.createElement('div');
+      quietHint.className = 'el-settings-card-hint';
+      quietHint.textContent = s('settings.autonomyQuietHint');
+
+      aCard.append(
+        aHead,
+        aHint,
+        aRow,
+        aInterval,
+        quietFromField.field,
+        quietToField.field,
+        quietHint,
+        aDaily
+      );
+      el.append(aCard);
+
+      function paintAutonomy() {
+        aToggle.textContent = autonomy.enabled ? s('settings.autonomyOff') : s('settings.autonomyOn');
+        aToggle.classList.toggle('is-ghost', !autonomy.enabled);
+        aStatus.textContent = autonomy.enabled ? s('settings.on') : s('settings.off');
+        markSegments(aInterval, autonomy.intervalH);
+        markSegments(aDaily, autonomy.dailyMax);
+        for (const b of quietFromField.buttons) {
+          b.classList.toggle('is-active', b.dataset.value === String(autonomy.quietFrom));
+        }
+        for (const b of quietToField.buttons) {
+          b.classList.toggle('is-active', b.dataset.value === String(autonomy.quietTo));
+        }
+        // 关掉总开关时下面几组只是看着在、点不动 —— 藏起来他会以为设置丢了
+        for (const node of [aInterval, aDaily, quietFromField.field, quietToField.field]) {
+          node.classList.toggle('is-muted', !autonomy.enabled);
+        }
+      }
+
+      // 时段/间隔是 native 排程的依据，改完必须重新推素材再重排一次，否则要等老闹钟响完才生效
+      function syncAutonomy() {
+        pushMaterial({
+          config: state?.getConfig(),
+          messages: state?.getMessages(),
+          rhythmId: currentRhythm,
+        })
+          .then(() => (autonomy.enabled ? setEnabled(true, { profileId: '' }) : null))
+          .catch((err) => console.warn('[settings] 主动消息时段同步失败', err));
+      }
+
+      aToggle.addEventListener('click', async () => {
+        autonomy = writeAutonomyPrefs({ enabled: !autonomy.enabled });
+        paintAutonomy();
+        try {
+          if (autonomy.enabled) {
+            await pushMaterial({
+              config: state?.getConfig(),
+              messages: state?.getMessages(),
+              rhythmId: currentRhythm,
+            });
+            await setEnabled(true, { profileId: '' });
+          } else {
+            await setEnabled(false, { profileId: '' });
+          }
+        } catch (err) {
+          console.warn('[settings] 主动消息开关同步失败', err);
+        }
+        await refreshProactive();
+      });
+
+      paintAutonomy();
+
+
+      // ===== 聊天细节：拆条 / 语气标注 / 亲密度 =====
+      // 这一组不改变她说什么，只改变「说出来的样子」。
+      const dCard = document.createElement('div');
+      dCard.className = 'el-settings-card';
+
+      let detailPrefs = readChatPrefs();
+
+      const splitField = segmentField(
+        s('settings.splitTitle'),
+        [
+          { value: 'on', label: s('settings.on') },
+          { value: 'off', label: s('settings.off') },
+        ],
+        detailPrefs.split ? 'on' : 'off',
+        (v) => {
+          detailPrefs = writeChatPrefs({ split: v === 'on' });
+          paintDetail();
+        }
+      );
+      const splitHint = document.createElement('div');
+      splitHint.className = 'el-settings-card-hint';
+      splitHint.textContent = s('settings.splitHint');
+
+      const toneSwitchField = segmentField(
+        s('settings.toneTitle'),
+        [
+          { value: 'on', label: s('settings.on') },
+          { value: 'off', label: s('settings.off') },
+        ],
+        detailPrefs.tone ? 'on' : 'off',
+        (v) => {
+          detailPrefs = writeChatPrefs({ tone: v === 'on' });
+          paintDetail();
+        }
+      );
+      const toneSwitchHint = document.createElement('div');
+      toneSwitchHint.className = 'el-settings-card-hint';
+      toneSwitchHint.textContent = s('settings.toneHint');
+
+      const bondField = document.createElement('div');
+      bondField.className = 'el-settings-field';
+      const bondLabel = document.createElement('span');
+      bondLabel.className = 'el-settings-label';
+      bondLabel.textContent = s('settings.bondTitle');
+      const bondRow = document.createElement('div');
+      bondRow.className = 'el-settings-row';
+      const bondBtn = document.createElement('button');
+      bondBtn.type = 'button';
+      bondBtn.className = 'el-settings-btn';
+      const bondNote = document.createElement('div');
+      bondNote.className = 'el-settings-note';
+      bondRow.append(bondBtn);
+      bondField.append(bondLabel, bondRow, bondNote);
+
+      dCard.append(splitField, splitHint, toneSwitchField, toneSwitchHint, bondField);
+      el.append(dCard);
+
+      function paintDetail() {
+        markSegments(splitField, detailPrefs.split ? 'on' : 'off');
+        markSegments(toneSwitchField, detailPrefs.tone ? 'on' : 'off');
+      }
+
+      // 亲密度由并行任务产出 core/bond.js：没落地时这一行降级成不可用，
+      // 不能因为一个可选模块把整页设置拖崩
+      let bondApi = null;
+      let bondOn = false;
+
+      function paintBond() {
+        if (!bondApi) {
+          bondBtn.disabled = true;
+          bondBtn.classList.add('is-ghost');
+          bondBtn.textContent = s('settings.off');
+          return;
+        }
+        bondBtn.disabled = false;
+        bondBtn.textContent = bondOn ? s('settings.on') : s('settings.off');
+        bondBtn.classList.toggle('is-ghost', !bondOn);
+      }
+
+      bondBtn.addEventListener('click', async () => {
+        if (!bondApi) return;
+        try {
+          bondApi.setEnabled(!bondOn);
+          bondOn = !!bondApi.isEnabled();
+        } catch (err) {
+          bondNote.textContent = `${s('settings.personaFail')} ${err?.message || err}`;
+        }
+        paintBond();
+      });
+
+      (async () => {
+        try {
+          const mod = await import('../../../core/bond.js');
+          if (!mod || typeof mod.isEnabled !== 'function' || typeof mod.setEnabled !== 'function') return;
+          bondOn = !!mod.isEnabled();
+          bondApi = mod;
+        } catch (err) {
+          console.warn('[settings] 亲密度模块未就绪', err);
+        }
+        paintBond();
+      })();
+
+      paintDetail();
+      paintBond();
 
 
       // ===== 角色卡：她是谁、怎么叫你、一次说多少 =====
@@ -485,6 +738,9 @@ export function createCompanionPage({ state, onChange } = {}) {
         mark(rlimitField, chatPrefs.recallLimit);
         mark(histField, chatPrefs.history);
         mark(thinkField, chatPrefs.thinking);
+        // 拆条/语气也在同一个键里，重置要把上面那张「聊天细节」卡一起刷
+        detailPrefs = chatPrefs;
+        paintDetail();
         paintChatPrefs();
         cNote.textContent = s('settings.chatResetDone');
       });

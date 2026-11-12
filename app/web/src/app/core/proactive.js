@@ -10,6 +10,15 @@
 // 现在 web 只做「配置与取回」，不参与后台执行。
 import { call } from './native/bridge.js';
 import { listLatest } from './store/library.js';
+import {
+  readAutonomyPrefs,
+  canPingNow,
+  readSentToday,
+  markSentToday,
+  intervalMs,
+  msUntilQuietEnd,
+  msUntilNextDay,
+} from './autonomy-prefs.js';
 
 const DEFAULT_PERSONA =
   '你是艾莲，一个会主动惦记他的女孩。说话口语、短、不客套，像是在微信里随手发一条。';
@@ -35,7 +44,11 @@ export function rhythmOf(id) {
 export async function available() {
   try {
     const st = await call('EllenAutonomy', 'state', {});
-    return !!(st && st.available);
+    if (!st || !st.available) return false;
+    // 时段/上限不通过时也当「现在不能发」：调用方据此不排程，
+    // 免得每处调用各写一套判断，迟早有一处漏掉
+    const gate = canPingNow({ sentToday: readSentToday(), lastAt: st.lastAt });
+    return gate.ok;
   } catch {
     return false;
   }
@@ -55,6 +68,12 @@ export async function readState() {
  */
 export async function pushMaterial({ config, messages, rhythmId } = {}) {
   const rhythm = { ...DEFAULT_RHYTHM, ...rhythmOf(rhythmId || 'normal') };
+  // 设置页的「隔多久 / 免打扰」压过节奏按钮的默认值：
+  // 用户亲手调过的那两个数才是他真正想要的，节奏只是没调时的预设。
+  const autonomy = readAutonomyPrefs();
+  const gapMs = intervalMs(autonomy);
+  const minGapMs = Math.max(rhythm.minGapMs, gapMs);
+  const maxGapMs = Math.max(rhythm.maxGapMs, Math.round(gapMs * 1.6));
   let memories = [];
   try {
     const rows = await listLatest('memory', { limit: 12 });
@@ -77,10 +96,10 @@ export async function pushMaterial({ config, messages, rhythmId } = {}) {
     persona: DEFAULT_PERSONA,
     endpoint: config?.endpoint || '',
     model: config?.model || '',
-    minGapMs: rhythm.minGapMs,
-    maxGapMs: rhythm.maxGapMs,
-    quietStart: rhythm.quietStart,
-    quietEnd: rhythm.quietEnd,
+    minGapMs,
+    maxGapMs,
+    quietStart: autonomy.quietFrom,
+    quietEnd: autonomy.quietTo,
     memories,
     recent,
   });
@@ -98,16 +117,47 @@ export async function setEnabled(enabled, { profileId } = {}) {
 export async function takePending() {
   try {
     const res = await call('EllenAutonomy', 'consumeOpen', {});
-    if (res && res.type === 'proactive' && res.text) return res;
+    if (res && res.type === 'proactive' && res.text) {
+      // 后台发送时 web 不在场，只能按「真收到一条」来数当日上限；
+      // 用户一直不开通知时这个数会偏低，属于已知误差，比完全不数强
+      markSentToday();
+      return res;
+    }
     return null;
   } catch {
     return null;
   }
 }
 
-/** 调试用：n 秒后跑一次。 */
+/** 判定不过就顺延到下一个允许的窗口（免打扰结束 / 次日零点）。 */
+function deferMs(reason, prefs, now) {
+  if (reason === 'quiet') return msUntilQuietEnd(now, prefs);
+  if (reason === 'daily') return msUntilNextDay(now);
+  return 0;
+}
+
+/**
+ * 调试用：n 毫秒后跑一次。
+ * 落在免打扰或额度用完的窗口里就顺延，不让「立刻发一条」把时段设置绕过去。
+ */
 export async function scheduleIn(delayMs) {
-  return call('EllenAutonomy', 'scheduleIn', { delayMs });
+  const now = new Date();
+  const prefs = readAutonomyPrefs();
+  let waitMs = Math.max(0, Number(delayMs) || 0);
+  let deferred = false;
+
+  const gate = canPingNow({ sentToday: readSentToday(now), now });
+  if (!gate.ok) {
+    const extra = deferMs(gate.reason, prefs, now);
+    if (extra > waitMs) {
+      waitMs = extra;
+      deferred = true;
+    }
+  }
+
+  const res = await call('EllenAutonomy', 'scheduleIn', { delayMs: waitMs });
+  // 返回值形状保持不变，只多挂两个字段；老调用方读到的还是原来那套
+  return deferred && res && typeof res === 'object' ? { ...res, deferred: true, delayMs: waitMs } : res;
 }
 
 export { DEFAULT_PERSONA, DEFAULT_RHYTHM };

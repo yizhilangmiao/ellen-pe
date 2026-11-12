@@ -11,10 +11,15 @@ import { isUsable, platformOf } from '../config.js';
 import { recall, renderRecall } from './recall.js';
 import { keepAlive } from '../background.js';
 import { readChatPrefs } from '../chatprefs.js';
+import { splitReply, shouldSplit } from '../reply-split.js';
+import { extractTone, toneEnabled } from '../tone.js';
 
 // 单块密文上限：native 每次最多给 0x4000 原始字节（21848 个 base64 字符），
 // 这里只是给个防御性上限，正常永远碰不到。
 const MAX_CHUNKS = 4096;
+
+/** 拆条时段间留白用。 */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * 把 HTTP 失败翻译成人话。
@@ -132,12 +137,13 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
    * @param {string} text 用户说的话（语音消息就是转写文本——模型看这个，界面不看）
    * @param {{audio?: object, speech?: object}} [extra] 语音消息的附加字段，原样透传给这条用户消息
    */
-  async function send(text, extra) {
+  async function send(text, extra, opts = {}) {
     const trimmed = String(text || '').trim();
     if (!trimmed) return;
 
     const cfg = state.getConfig();
-    state.addMessage({ role: 'user', text: trimmed, ...(extra || {}) });
+    // 重新生成时不重复落一条「我说的」：那句话已经在库里了
+    if (opts.appendUser !== false) state.addMessage({ role: 'user', text: trimmed, ...(extra || {}) });
 
     const reply = state.addMessage({ role: 'assistant', text: '', pending: true });
     state.setError(null);
@@ -162,8 +168,17 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
 
       const history = state
         .getMessages()
-        .filter((m) => m.id !== reply.id && !m.pending)
-        .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
+        .filter((m) => m.id !== reply.id && !m.pending && !m.recalled)
+        // 图片/表情没有正文，进历史会变成空消息，模型读不懂；引用只留正文。
+        // 表情单独说一句「发了个表情」，否则模型会把它当成一张图来评论。
+        .filter((m) => String(m.text || '').trim() || (m.image && m.image.path) || m.stickerId)
+        .map((m) => {
+          const own = m.role === 'user';
+          let content = String(m.text || '').trim();
+          if (!content && m.stickerId) content = own ? '（我发了个表情）' : '（她发了个表情）';
+          if (!content) content = '（发了一张图）';
+          return { role: own ? 'user' : 'assistant', content };
+        })
         .slice(-prefs.history);
 
       // 人设每轮现取：设置页改完立刻生效
@@ -248,6 +263,60 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         text: finalText || '（这次没有说出话，可能是服务端没返回内容）',
         pending: false,
       });
+      // ↑ 先按整条收尾（语音条/手记这些副作用拿到的必须是完整一段），
+      //   下面再按拆条重写正文；两条路径都走 updateMessage，库里只有一条消息。
+
+      // 语气标注：「（轻声）那你早点睡」正文只留后半句，tone 决定朗读的语速音高
+      let finalBody = finalText || '（这次没有说出话，可能是服务端没返回内容）';
+      let replyTone = null;
+      if (toneEnabled()) {
+        try {
+          const toned = extractTone(finalBody);
+          if (toned && toned.text) {
+            finalBody = toned.text;
+            replyTone = toned.tone || null;
+          }
+        } catch (err) {
+          console.warn('[chat] 语气标注没摘掉，按原文显示', err);
+        }
+      }
+
+      // 拆条：一次说完的话分两三条气泡，像真的在聊天；关掉就整条显示
+      let segs = [];
+      try {
+        if (shouldSplit()) segs = splitReply(finalBody);
+      } catch (err) {
+        console.warn('[chat] 拆条失败，按整条显示', err);
+      }
+
+      if (segs.length > 1) {
+        state.updateMessage(reply.id, {
+          text: segs[0].text,
+          pending: false,
+          segIndex: 0,
+          segCount: segs.length,
+          ...(replyTone ? { tone: replyTone } : {}),
+        });
+        for (let i = 1; i < segs.length; i += 1) {
+          // 段间留一点空：一口气全冒出来就不像打字了
+          await sleep(320 + Math.random() * 260);
+          state.addMessage({
+            role: 'assistant',
+            text: segs[i].text,
+            segIndex: i,
+            segCount: segs.length,
+            ...(replyTone ? { tone: replyTone } : {}),
+          });
+        }
+      } else {
+        state.updateMessage(reply.id, {
+          text: segs.length ? segs[0].text : finalBody,
+          pending: false,
+          segIndex: 0,
+          segCount: 1,
+          ...(replyTone ? { tone: replyTone } : {}),
+        });
+      }
     } catch (err) {
       const code = err && err.code;
       const aborted = ctl.aborted || code === 'CANCELLED';

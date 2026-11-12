@@ -5,8 +5,12 @@
 //   package     = { content, checksum }                                     恰好 2 键
 //   content     = { format, formatVersion:1, packageId, origin, exportedAt,
 //                   snapshot, media }                                       恰好 7 键
-//   snapshot    = { schemaVersion:1, profiles, records }                    恰好 3 键
+//   snapshot    = { schemaVersion:4, profiles, records }                    恰好 3 键
 //   records[]   = 一次改动（revision），不是 head —— 导入端按 id 分组重放
+//
+// schemaVersion 3 → 4（2026-11-12）：消息 value 里多了 type/recalled/quoteOf/segIndex/
+// segCount/image/tone。新字段**就在 value 里原样带出去**（slimRevision 不裁 value），
+// 所以这里只动版本号；老端读到认不出的字段会忽略，包不会因此读不回来。
 //
 // media.mode 两种：
 //   'metadata-only' —— 只带元数据（旧包轻量版口径）
@@ -17,7 +21,7 @@
 // 附件字节仍然留在设备上，换机只保留清单。要带字节得先把附件落成文件，
 // 那是 M8 之后的事（见 _verify\M7-备份.md）。
 import { STORE_HEADS, STORE_PROFILES, STORE_REVISIONS, count, openDb, reqDone } from './db.js';
-import { ARCHIVE_FORMAT, TRANSFER_FORMAT } from './import.js';
+import { ARCHIVE_FORMAT, SNAPSHOT_SCHEMA_VERSION, TRANSFER_FORMAT } from './import.js';
 import { deviceId, platform } from './records.js';
 import { readDocument } from '../documents.js';
 
@@ -192,7 +196,8 @@ export async function buildManifest({ now = Date.now() } = {}) {
   const kinds = {};
   for (const r of records) kinds[r.kind] = (kinds[r.kind] || 0) + 1;
 
-  const snapshot = { schemaVersion: 1, profiles: profiles.slice(), records };
+  // schemaVersion 与 import.js 的常量同源，改动只改一处（export.js 已经依赖 import.js，不新增环）
+  const snapshot = { schemaVersion: SNAPSHOT_SCHEMA_VERSION, profiles: profiles.slice(), records };
 
   // 语音（及将来的聊天附件）要不要一起打：默认打，超上限就按「新的优先」截断，
   // 截掉的仍在库里、只是不进这个包 —— 用户看到的是 stats.attachmentsSkipped。

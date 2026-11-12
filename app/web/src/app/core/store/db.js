@@ -1,7 +1,7 @@
 // IndexedDB 打开与升级。
 //
 // 库结构与旧包**逐字对齐**（contract/M4-数据模型-真机实测.md）：
-//   DB  `ellen-mobile-data-v1`  version 3
+//   DB  `ellen-mobile-data-v1`  version 4
 //   store `data-meta`      keyPath 'key'
 //   store `data-profiles`  keyPath 'id'
 //   store `data-heads`     keyPath 'id'   index: kind / messageTime / profileId / profileKind / profileKindThread
@@ -10,7 +10,10 @@
 // 对齐的意义：旧包导出的数据不用变形就能灌进来，将来也能双向导。
 
 export const DB_NAME = 'ellen-mobile-data-v1';
-export const DB_VERSION = 3;
+// 3 → 4：只加消息字段（type/recalled/quoteOf…），表结构一个没动。
+// 升版本号是为了让「老库已经打开过」的设备也走一次 onupgradeneeded 把新索引/新表补齐，
+// 数据本身靠 migrateMessages() 补，这里**禁止**删库或清 objectStore。
+export const DB_VERSION = 4;
 
 export const STORE_META = 'data-meta';
 export const STORE_PROFILES = 'data-profiles';

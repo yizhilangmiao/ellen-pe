@@ -1,0 +1,393 @@
+/* 信（letter）。尺寸一律 calc(N * var(--u))，与相处页同一套换算。
+   颜色只取 tokens.css 里现成的变量，不新造色板。 */
+
+.el-letter-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.el-letter-head {
+  flex: 0 0 auto;
+  margin: 0 0 calc(14 * var(--u));
+}
+
+.el-letter-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 列表 ───────────────────────────────────────────────────────── */
+
+.el-letter-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+}
+
+.el-letter-summary {
+  margin: 0 0 calc(2 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-letter-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  padding: calc(13 * var(--u)) calc(15 * var(--u));
+  border-radius: calc(13 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.el-letter-card:active {
+  transform: scale(0.99);
+}
+
+.el-letter-card.is-unread {
+  border-color: var(--el-pink);
+}
+
+.el-letter-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(3 * var(--u));
+}
+
+.el-letter-card-time {
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+  letter-spacing: calc(0.3 * var(--u));
+}
+
+.el-letter-card-line {
+  font-size: calc(14 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.el-letter-card.is-unread .el-letter-card-line {
+  font-weight: 500;
+}
+
+.el-letter-card-meta {
+  flex: 0 0 auto;
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+/* 未读点：左上角贴边的小圆，不参与布局 */
+.el-letter-dot {
+  position: absolute;
+  top: calc(10 * var(--u));
+  right: calc(10 * var(--u));
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 50%;
+  background: var(--el-error);
+}
+
+.el-letter-dot[hidden] {
+  display: none;
+}
+
+/* 空态 / 首屏占位 */
+.el-letter-empty,
+.el-letter-loading {
+  padding: calc(40 * var(--u)) calc(6 * var(--u));
+  text-align: center;
+}
+
+.el-letter-loading {
+  margin: 0;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-letter-empty-text {
+  margin: 0 0 calc(16 * var(--u));
+  font-size: calc(13.5 * var(--u));
+  line-height: calc(24 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-letter-empty-btn {
+  padding: calc(8 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(999 * var(--u));
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── 读信 ───────────────────────────────────────────────────────── */
+
+.el-letter-read {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+}
+
+.el-letter-read-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+}
+
+.el-letter-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-letter-when {
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  letter-spacing: calc(0.3 * var(--u));
+}
+
+.el-letter-stage {
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-pink);
+  opacity: 0.9;
+}
+
+/* 短了：一条浅底提示条 + 重写按钮 */
+.el-letter-short {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(10 * var(--u)) calc(13 * var(--u));
+  border-radius: calc(11 * var(--u));
+  background: var(--el-warning-bg);
+}
+
+.el-letter-short-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-warning);
+}
+
+.el-letter-rewrite {
+  flex: 0 0 auto;
+  padding: calc(6 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-warning);
+  background: transparent;
+  color: var(--el-warning);
+  font-family: inherit;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-letter-rewrite:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 信纸：米白底 + 暖墨字，行距放松，像真的信 */
+.el-letter-paper {
+  padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(22 * var(--u));
+  border-radius: calc(5 * var(--u)) calc(16 * var(--u)) calc(16 * var(--u));
+  background: var(--el-paper);
+  color: var(--el-ink);
+}
+
+.el-letter-para {
+  margin: 0 0 calc(14 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(29 * var(--u));
+  color: var(--el-ink);
+  text-align: justify;
+  word-break: break-word;
+}
+
+.el-letter-para:last-child {
+  margin-bottom: 0;
+}
+
+.el-letter-para.is-empty {
+  color: var(--el-paper-muted);
+  text-align: center;
+}
+
+.el-letter-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(14 * var(--u));
+  padding: calc(4 * var(--u)) 0 calc(2 * var(--u));
+}
+
+.el-letter-nav-btn {
+  padding: calc(7 * var(--u)) calc(15 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: calc(19 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-letter-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.el-letter-nav-page {
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  letter-spacing: calc(0.6 * var(--u));
+}
+
+/* 落款：右对齐，稍微斜一点，像手写收尾 */
+.el-letter-sign {
+  margin: 0;
+  font-size: calc(13 * var(--u));
+  line-height: calc(22 * var(--u));
+  color: var(--el-pink);
+  text-align: right;
+}
+
+.el-letter-foot {
+  margin: 0;
+  text-align: right;
+  font-size: calc(10.5 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.75;
+}
+
+/* ── 生成中 ─────────────────────────────────────────────────────── */
+
+.el-letter-writing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8 * var(--u));
+  padding: calc(56 * var(--u)) calc(10 * var(--u));
+  text-align: center;
+}
+
+.el-letter-writing-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 三点呼吸：只做透明度，不动布局（手机低端机也不掉帧） */
+.el-letter-writing-dots {
+  font-size: calc(18 * var(--u));
+  line-height: calc(24 * var(--u));
+  color: var(--el-pink);
+  letter-spacing: calc(2 * var(--u));
+  animation: el-letter-dots 1.6s ease-in-out infinite;
+}
+
+@keyframes el-letter-dots {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.el-letter-writing-title {
+  margin: 0;
+  font-size: calc(15 * var(--u));
+  line-height: calc(24 * var(--u));
+  color: var(--el-text);
+}
+
+.el-letter-writing-count {
+  margin: 0;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .el-letter-writing-dots {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
+/* 绝区零皮肤：硬边卡片 + 荧光强调 */
+.ellen-app[data-skin='zzz'] .el-letter-card,
+.ellen-app[data-skin='zzz'] .el-letter-paper {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-1);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-paper {
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-para,
+.ellen-app[data-skin='zzz'] .el-letter-card-line {
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-card.is-unread {
+  border-color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-dot {
+  background: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-sign {
+  color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-nav-btn {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-3);
+  color: var(--z-ink-2);
+}

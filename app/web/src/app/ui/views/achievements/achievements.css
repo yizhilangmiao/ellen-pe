@@ -1,0 +1,183 @@
+/* 徽章墙（achievements）。尺寸一律 calc(N * var(--u))；颜色只取 tokens 变量。 */
+
+.el-ach-head {
+  margin: 0 0 calc(14 * var(--u));
+}
+
+.el-ach-count {
+  margin: calc(4 * var(--u)) 0 0 0;
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-pink);
+  letter-spacing: calc(0.4 * var(--u));
+}
+
+/* 三列网格：12 枚刚好四行，手机上一屏能扫完 */
+.el-ach-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(10 * var(--u));
+}
+
+.el-ach-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding: calc(13 * var(--u)) calc(8 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.el-ach-cell:active {
+  transform: scale(0.97);
+}
+
+.el-ach-cell.is-locked {
+  opacity: 0.52;
+}
+
+.el-ach-cell.is-selected {
+  border-color: var(--el-pink);
+}
+
+/* 徽章本体：一个圆章，解锁后带柔光 */
+.el-ach-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  border-radius: 50%;
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-raised);
+  color: var(--el-muted);
+  font-size: calc(13 * var(--u));
+  line-height: 1;
+}
+
+.el-ach-cell.is-unlocked .el-ach-seal {
+  border-color: transparent;
+  background: var(--el-pink);
+  color: var(--el-primary-ink);
+  box-shadow: 0 calc(2 * var(--u)) calc(10 * var(--u)) rgba(231, 139, 166, 0.35);
+}
+
+.el-ach-name {
+  max-width: 100%;
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-text);
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.el-ach-cell.is-locked .el-ach-name {
+  color: var(--el-muted);
+}
+
+.el-ach-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: calc(36 * var(--u)) calc(8 * var(--u));
+  text-align: center;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+/* 点开一枚：标题 + 条件 + 解锁时间 */
+.el-ach-detail {
+  margin: calc(12 * var(--u)) 0 0 0;
+  padding: calc(14 * var(--u)) calc(16 * var(--u)) calc(15 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  animation: el-ach-detail-in 170ms ease-out;
+}
+
+.el-ach-detail[hidden] {
+  display: none;
+}
+
+@keyframes el-ach-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(5 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.el-ach-detail-title {
+  margin: 0;
+  font-size: calc(15 * var(--u));
+  line-height: calc(22 * var(--u));
+  font-weight: 500;
+  color: var(--el-text);
+}
+
+.el-ach-detail-hint {
+  margin: calc(6 * var(--u)) 0 0 0;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-text);
+}
+
+.el-ach-detail-status {
+  margin: calc(8 * var(--u)) 0 0 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(17 * var(--u));
+  color: var(--el-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .el-ach-detail {
+    animation: none;
+  }
+}
+
+/* 绝区零皮肤 */
+.ellen-app[data-skin='zzz'] .el-ach-cell,
+.ellen-app[data-skin='zzz'] .el-ach-detail {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-1);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-ach-seal {
+  border-radius: var(--z-r-3);
+  border: 1px solid var(--z-line-hair);
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-ach-cell.is-unlocked .el-ach-seal {
+  background: var(--z-signal);
+  color: var(--z-signal-ink);
+  box-shadow: var(--z-hard-s);
+}
+
+.ellen-app[data-skin='zzz'] .el-ach-count {
+  color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-ach-detail-title {
+  font-family: var(--z-font-display);
+  color: var(--z-ink);
+}
+/* 页面骨架：与 letter / starmap 保持一致 */
+.el-achievements-page {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+}

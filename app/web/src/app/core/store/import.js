@@ -9,7 +9,9 @@
 //   package     = { content, checksum }
 //   content     = { format:'ellen-companion-transfer', formatVersion:1, packageId,
 //                   origin:{deviceId,platform}, exportedAt, snapshot, media }               恰好 7 键
-//   snapshot    = { schemaVersion:1, profiles:[], records:[] }                              恰好 3 键
+//   snapshot    = { schemaVersion, profiles:[], records:[] }                                恰好 3 键
+//                  schemaVersion 1/2/3/4 都收；4 是当前（消息加了 type/recalled/quoteOf…）。
+//                  读到老版本时按迁移规则把 message 的 value 就地补齐，老备份照样能导进来。
 //   records[]   每项是**一次改动（revision）**，不是 head —— 旧包靠 id 分组重放
 //
 // 我们库里 heads 是独立表，所以导入时要按 id 分组把 head 重建出来。
@@ -22,10 +24,19 @@ import {
   tx,
 } from './db.js';
 import { invalidateProfile, putMeta } from './records.js';
+import { upgradeMessageValue } from './messages.js';
 
 export const ARCHIVE_MAGIC = 'ELLENPK1\n';
 export const ARCHIVE_FORMAT = 'ellen-companion-archive';
 export const TRANSFER_FORMAT = 'ellen-companion-transfer';
+/**
+ * 当前导出的快照版本。3 → 4 只加了消息字段，容器结构没变。
+ * 定义在这里（而不是 export.js）是因为 export.js 已经 import 本文件，
+ * 常量放同一处才不会绕出循环依赖。
+ */
+export const SNAPSHOT_SCHEMA_VERSION = 4;
+/** 读得懂的旧版本：1/2/3 是历史包，4 是当前。 */
+const READABLE_SCHEMA_VERSIONS = [1, 2, 3, 4];
 const MANIFEST_MAX = 48 * 1024 * 1024;
 
 /** 一批写多少条（避开手记保存 30 s 超时的老坑 ①）。 */
@@ -165,16 +176,36 @@ export function parsePackage(pkg) {
   return { content, checksum: decoded.checksum };
 }
 
-/** 校验 snapshot 外形。 */
+/**
+ * 老备份里的一条 revision 补到当前形状。
+ * 只动 message：memory/journal 那些带的字段集是另一套，别拿消息规则瞎补。
+ */
+function upgradeRecord(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  if (raw.kind !== 'message') return raw;
+  if (!raw.value || typeof raw.value !== 'object') return raw;
+  return { ...raw, value: upgradeMessageValue(raw.value) };
+}
+
+/** 校验 snapshot 外形，并把老版本的 message 记录补到当前形状后返回。 */
 export function parseSnapshot(snapshot) {
   if (!keysAre(snapshot, ['schemaVersion', 'profiles', 'records'])) {
     throw fail('INVALID_SCHEMA', '资料快照字段无效（应为 schemaVersion/profiles/records）。');
   }
-  if (snapshot.schemaVersion !== 1) {
+  if (!READABLE_SCHEMA_VERSIONS.includes(snapshot.schemaVersion)) {
     throw fail('UNSUPPORTED_VERSION', '不支持此数据版本。');
   }
   if (!Array.isArray(snapshot.profiles) || !Array.isArray(snapshot.records)) {
     throw fail('INVALID_SCHEMA', '资料列表无效。');
+  }
+  // 1/2/3 的老包：message 的 value 里没有 type/recalled/quoteOf，
+  // 这里按迁移规则补齐再往下走，导入完的东西与本地新数据同形状（视图层不用分版本渲染）。
+  // 幂等：补齐过的再跑一遍值不变，所以 v4 的包重复进入这条分支也没副作用。
+  if (snapshot.schemaVersion < SNAPSHOT_SCHEMA_VERSION) {
+    snapshot.records = snapshot.records.map((r) => upgradeRecord(r));
+    // 补齐后这份快照已经是当前形状了，版本号跟着抬上去：
+    // 后面再拿它做判断（或再走一次 parseSnapshot）就不会重复补一遍。
+    snapshot.schemaVersion = SNAPSHOT_SCHEMA_VERSION;
   }
   return snapshot;
 }

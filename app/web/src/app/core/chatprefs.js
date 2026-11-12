@@ -15,6 +15,10 @@ export const DEFAULT_PREFS = {
   history: 20,
   // 思考模式：default 跟随模型；disabled 关掉（省时间省钱）
   thinking: 'default',
+  // 拆条：一条回复切成两三条气泡（core/reply-split.js 消费）
+  split: true,
+  // 语气标注：句首「（轻声）」显示成小字、朗读带语气（core/tone.js 消费）
+  tone: true,
 };
 
 export function readChatPrefs() {
@@ -27,6 +31,9 @@ export function readChatPrefs() {
     merged.history = clampInt(merged.history, 4, 60, DEFAULT_PREFS.history);
     if (merged.thinking !== 'disabled' && merged.thinking !== 'enabled') merged.thinking = 'default';
     merged.recall = !!merged.recall;
+    // 老包里没有这两个键：缺省按开，别让升级把已有手感悄悄关掉
+    merged.split = merged.split !== false;
+    merged.tone = merged.tone !== false;
     return merged;
   } catch {
     return { ...DEFAULT_PREFS };

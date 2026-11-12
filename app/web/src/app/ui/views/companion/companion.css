@@ -374,3 +374,440 @@
   box-shadow: var(--z-hard-s);
   overflow: hidden;
 }
+
+
+/* ── E 组新增：签到 / 亲密度 / 入口条 / 仪式（批 4）──────────────────────
+   尺寸一律 calc(N * var(--u))，与上面几块保持同一套换算；不新造颜色。 */
+
+/* 签到卡：一行文字 + 一颗按钮，已签就换成静态「今天已经来过了」 */
+.el-companion-checkin {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+  margin: calc(10 * var(--u)) 0 0 0;
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+}
+
+.el-companion-checkin[hidden] {
+  display: none;
+}
+
+.el-companion-checkin-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.el-companion-checkin-streak {
+  margin: 0;
+  font-size: calc(15 * var(--u));
+  line-height: calc(22 * var(--u));
+  font-weight: 500;
+  color: var(--el-text);
+}
+
+.el-companion-checkin-sub {
+  margin: calc(2 * var(--u)) 0 0 0;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-companion-checkin-btn {
+  flex: 0 0 auto;
+  padding: calc(7 * var(--u)) calc(15 * var(--u));
+  border-radius: calc(999 * var(--u));
+  border: 0;
+  background: var(--el-pink);
+  color: var(--el-primary-ink);
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.el-companion-checkin-btn:active {
+  transform: scale(0.97);
+}
+
+/* 已签：降成描边，看得到状态但按不动 */
+.el-companion-checkin-btn.is-done {
+  background: transparent;
+  border: calc(1 * var(--u)) solid var(--el-line);
+  color: var(--el-muted);
+  font-weight: 400;
+  cursor: default;
+}
+
+/* 亲密度卡：阶段名 + 点数 + 进度条 + 「距下一阶还差 N」 */
+.el-companion-bond {
+  margin: calc(10 * var(--u)) 0 0 0;
+  padding: calc(16 * var(--u)) calc(18 * var(--u)) calc(17 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+}
+
+.el-companion-bond[hidden] {
+  display: none;
+}
+
+.el-companion-bond-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+}
+
+.el-companion-bond-stage {
+  font-size: calc(15 * var(--u));
+  line-height: calc(22 * var(--u));
+  font-weight: 500;
+  color: var(--el-text);
+}
+
+.el-companion-bond-points {
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-companion-bond-track {
+  position: relative;
+  height: calc(6 * var(--u));
+  margin: calc(10 * var(--u)) 0 calc(9 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: var(--el-raised);
+  overflow: hidden;
+}
+
+.el-companion-bond-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--el-pink), var(--el-self));
+  transition: width 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.el-companion-bond-next {
+  margin: 0;
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-companion-bond-sub {
+  margin: calc(3 * var(--u)) 0 0 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.85;
+}
+
+/* 入口条：信（带未读点）占一行，星图 / 徽章并排两个小圆 */
+.el-companion-entries {
+  display: flex;
+  align-items: stretch;
+  gap: calc(9 * var(--u));
+  margin: calc(12 * var(--u)) 0 0 0;
+}
+
+.el-companion-entry {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+  padding: calc(10 * var(--u)) calc(13 * var(--u));
+  border-radius: calc(12 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.el-companion-entry:active {
+  transform: scale(0.98);
+}
+
+.el-companion-entry-mail {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.el-companion-entry-mail.has-unread {
+  border-color: var(--el-pink);
+}
+
+.el-companion-entry-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.el-companion-entry-count {
+  flex: 0 0 auto;
+  font-size: calc(11.5 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-companion-entry-mail.has-unread .el-companion-entry-count {
+  color: var(--el-pink);
+}
+
+/* 未读红点：小圆点，不动 layout */
+.el-companion-dot {
+  position: absolute;
+  top: calc(8 * var(--u));
+  right: calc(10 * var(--u));
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 50%;
+  background: var(--el-error);
+}
+
+.el-companion-dot[hidden] {
+  display: none;
+}
+
+.el-companion-entry-round {
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(3 * var(--u));
+  padding: calc(9 * var(--u)) calc(11 * var(--u));
+  min-width: calc(58 * var(--u));
+}
+
+.el-companion-entry-label {
+  font-size: calc(10.5 * var(--u));
+  line-height: calc(15 * var(--u));
+  color: var(--el-muted);
+  white-space: nowrap;
+}
+
+/* 仪式卡：每日一问 / 晚安。共用同一副卡片皮，靠上边距分开 */
+.el-companion-rituals {
+  margin: calc(12 * var(--u)) 0 0 0;
+}
+
+.el-companion-rituals:empty {
+  display: none;
+}
+
+.el-companion-ritual {
+  margin: 0 0 calc(10 * var(--u)) 0;
+  padding: calc(16 * var(--u)) calc(18 * var(--u)) calc(17 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-surface);
+}
+
+.el-companion-ritual[hidden] {
+  display: none;
+}
+
+.el-companion-ritual:last-child {
+  margin-bottom: 0;
+}
+
+.el-companion-ritual-title {
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  font-weight: 400;
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-muted);
+  text-transform: uppercase;
+}
+
+.el-companion-ask-question {
+  margin: calc(7 * var(--u)) 0 0 0;
+  font-size: calc(16 * var(--u));
+  line-height: calc(26 * var(--u));
+  color: var(--el-text);
+}
+
+/* 输入行：input 弹性占宽，按钮贴右 */
+.el-companion-ask-form {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  margin: calc(11 * var(--u)) 0 0 0;
+}
+
+.el-companion-ask-form[hidden] {
+  display: none;
+}
+
+.el-companion-ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: calc(9 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(11 * var(--u));
+  border: calc(1 * var(--u)) solid var(--el-line);
+  background: var(--el-bg);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(13 * var(--u));
+  line-height: calc(21 * var(--u));
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.el-companion-ask-input::placeholder {
+  color: var(--el-muted);
+}
+
+.el-companion-ask-input:focus {
+  outline: none;
+  border-color: var(--el-pink);
+}
+
+.el-companion-ask-send {
+  flex: 0 0 auto;
+  padding: calc(9 * var(--u)) calc(15 * var(--u));
+  border-radius: calc(11 * var(--u));
+  border: 0;
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(21 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-companion-ask-send:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.el-companion-ask-skip {
+  margin: calc(8 * var(--u)) 0 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-companion-ask-skip[hidden] {
+  display: none;
+}
+
+.el-companion-ask-done {
+  margin: calc(10 * var(--u)) 0 0 0;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  color: var(--el-pink);
+}
+
+.el-companion-ask-done[hidden] {
+  display: none;
+}
+
+.el-companion-night-body {
+  margin: calc(8 * var(--u)) 0 0 0;
+  font-size: calc(15 * var(--u));
+  line-height: calc(26 * var(--u));
+  color: var(--el-text);
+  /* core/ritual.js 的 nightRitual 是三句拼成的多行文本，保留换行 */
+  white-space: pre-line;
+}
+
+.el-companion-night-row {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  margin: calc(12 * var(--u)) 0 0 0;
+}
+
+
+.el-companion-night-ok {
+  flex: 0 0 auto;
+  padding: calc(8 * var(--u)) calc(16 * var(--u));
+  border-radius: calc(11 * var(--u));
+  border: 0;
+  font-family: inherit;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.el-companion-night-ok:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.el-companion-night-later {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 绝区零皮肤：新四块跟 note/between 用同一副硬边卡片 */
+.ellen-app[data-skin='zzz'] .el-companion-checkin,
+.ellen-app[data-skin='zzz'] .el-companion-bond,
+.ellen-app[data-skin='zzz'] .el-companion-ritual,
+.ellen-app[data-skin='zzz'] .el-companion-entry {
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-1);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-t);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-checkin-btn,
+.ellen-app[data-skin='zzz'] .el-companion-ask-send,
+.ellen-app[data-skin='zzz'] .el-companion-night-ok {
+  border-radius: var(--z-r-3);
+  background: var(--z-signal);
+  color: var(--z-signal-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-checkin-btn.is-done {
+  background: transparent;
+  color: var(--z-ink-3);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-bond-stage {
+  font-family: var(--z-font-display);
+  font-size: calc(16 * var(--u));
+  color: var(--z-ink);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-bond-fill {
+  background: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-entry-mail.has-unread,
+.ellen-app[data-skin='zzz'] .el-companion-entry-mail.has-unread .el-companion-entry-count {
+  border-color: var(--z-signal);
+  color: var(--z-signal);
+}
+
+.ellen-app[data-skin='zzz'] .el-companion-dot {
+  background: var(--z-signal);
+}
