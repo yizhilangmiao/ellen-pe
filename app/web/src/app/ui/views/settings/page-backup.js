@@ -305,58 +305,62 @@ export function createBackupPage({ state, onChange } = {}) {
       }
     }
 
+    // 「选文件夹找…」和「打开全盘扫描权限」永远都在：扫到了也能用它们补扫别处
+    function appendLegacyTools() {
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'el-settings-btn is-ghost';
+      pick.textContent = s('settings.legacyPickFolder');
+      pick.addEventListener('click', async () => {
+        pick.disabled = true;
+        try {
+          const chosen = await pickLegacyFolder();
+          if (!chosen || chosen.cancelled) {
+            legacySay(s('settings.legacyCancelled'));
+            return;
+          }
+          const again = await scanLegacy(chosen.treeUri);
+          renderLegacyItems(again);
+        } catch (err) {
+          const msg = (err && (err.code || err.message)) || String(err);
+          legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+        } finally {
+          pick.disabled = false;
+        }
+      });
+      legacyList.append(pick);
+
+      scanPermission()
+        .then((perm) => {
+          if (perm.allFiles) return;
+          const grant = document.createElement('button');
+          grant.type = 'button';
+          grant.className = 'el-settings-btn is-ghost';
+          grant.textContent = s('settings.legacyGrant');
+          grant.addEventListener('click', async () => {
+            grant.disabled = true;
+            try {
+              await requestAllFiles();
+              legacySay(s('settings.legacyGrantHint'));
+            } catch (err) {
+              const msg = (err && (err.code || err.message)) || String(err);
+              legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+            } finally {
+              grant.disabled = false;
+            }
+          });
+          legacyList.prepend(grant);
+        })
+        .catch(() => {});
+    }
+
     function renderLegacyItems(res) {
       legacyList.textContent = '';
       const usable = res.items.filter((it) => it.size > 0);
       const empty = res.items.filter((it) => it.size <= 0);
       if (!usable.length) {
         legacySay(res.oldInstalled ? s('settings.legacyNeedExport') : s('settings.legacyNone'), true);
-        // 没扫到不等于没有：Android 11+ 不让直接列别人的文件夹，给个选文件夹的出口
-        const pick = document.createElement('button');
-        pick.type = 'button';
-        pick.className = 'el-settings-btn is-ghost';
-        pick.textContent = s('settings.legacyPickFolder');
-        pick.addEventListener('click', async () => {
-          pick.disabled = true;
-          try {
-            const chosen = await pickLegacyFolder();
-            if (!chosen || chosen.cancelled) {
-              legacySay(s('settings.legacyCancelled'));
-              return;
-            }
-            const again = await scanLegacy(chosen.treeUri);
-            renderLegacyItems(again);
-          } catch (err) {
-            const msg = (err && (err.code || err.message)) || String(err);
-            legacySay(`${s('settings.legacyFailed')}${msg}`, true);
-          } finally {
-            pick.disabled = false;
-          }
-        });
-        legacyList.append(pick);
-        // 没授权「所有文件访问」的话，再给一个打开权限的入口——授了就真能一键全盘扫
-        scanPermission()
-          .then((perm) => {
-            if (perm.allFiles) return;
-            const grant = document.createElement('button');
-            grant.type = 'button';
-            grant.className = 'el-settings-btn is-ghost';
-            grant.textContent = s('settings.legacyGrant');
-            grant.addEventListener('click', async () => {
-              grant.disabled = true;
-              try {
-                await requestAllFiles();
-                legacySay(s('settings.legacyGrantHint'));
-              } catch (err) {
-                const msg = (err && (err.code || err.message)) || String(err);
-                legacySay(`${s('settings.legacyFailed')}${msg}`, true);
-              } finally {
-                grant.disabled = false;
-              }
-            });
-            legacyList.prepend(grant);
-          })
-          .catch(() => {});
+        appendLegacyTools();
         return;
       }
       legacySay(s('settings.legacyFound').replace('{n}', String(usable.length)));
@@ -396,12 +400,15 @@ export function createBackupPage({ state, onChange } = {}) {
           const r = await importAllLegacy(usable, (step) => {
             legacySay(`${step.index + 1}/${step.total} · ${step.item.name}`);
           });
-          legacySay(`${s('settings.importDone')} ${r.imported} 份，共 ${r.heads} 条记录${r.failed ? `；${r.failed} 份没进来` : ''}。`);
+          legacySay(
+            `${s('settings.importDone')} ${r.imported} 份，共 ${r.heads} 条记录${r.failed ? `；${r.failed} 份没进来` : ''}。`,
+          );
           if (state && state.reload) await state.reload();
           if (onChange) onChange();
         });
         legacyList.append(all);
       }
+      appendLegacyTools();
     }
 
     legacyScan.addEventListener('click', async () => {

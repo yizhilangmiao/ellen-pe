@@ -152,8 +152,9 @@ class EllenArchivePlugin : Plugin() {
         try {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
+                // 别加 EXTRA_MIME_TYPES：.ellenpack 是自定义后缀，系统给它们的 MIME 五花八门
+                // （老包用 DocumentsUI 保存出来的是 text/plain），一限就整批看不见。
                 type = "*/*"
-                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream", "application/zip"))
             }
             startActivityForResult(call, intent, "pickedImport")
         } catch (e: Exception) {
@@ -1260,3 +1261,4 @@ class EllenArchivePlugin : Plugin() {
         const val ATTACH_CHUNK = 64 * 1024
     }
 }
+
