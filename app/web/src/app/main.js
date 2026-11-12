@@ -47,6 +47,7 @@ import { createLetterView } from './ui/views/letter/letter.js';
 import { createStarmapView } from './ui/views/starmap/starmap.js';
 import { createAchievementsView } from './ui/views/achievements/achievements.js';
 import { createAboutPage } from './ui/views/settings/page-about.js';
+import { ensureConfigured as ensureUpdateConfigured } from './core/updates.js';
 import {
   importSnapshot,
   verifyImport,
@@ -1001,6 +1002,9 @@ function sendMessage(text, extra = null) {
 
   // 老数据里已经发生过的事该发的徽章补发一次（首次上这个版本时口径对齐）
   checkAchievements().catch((err) => console.warn('[main] 启动补算徽章失败', err));
+
+  // 更新清单地址：默认指向自建站，装了包就能直接点「检查更新」，不用先去设置页手打 IP
+  ensureUpdateConfigured().catch((err) => console.warn('[main] 同步更新清单地址失败', err));
 
   // —— 主动消息：把素材推给 native，并把待读的取回来落成一条消息 ——
   /** 把「磁盘上已经没有的语音文件」在消息里标成 missing。

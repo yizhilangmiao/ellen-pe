@@ -28,8 +28,27 @@ function writeLocal(patch) {
   }
 }
 
+// 自建更新站（2026-11-13 老大定：不用 OSS、没域名没证书，走服务器固定公网 IP）
+// 换服务器或换 IP 时只需要改这一行 + network_security_config.xml 的明文白名单。
+const DEFAULT_MANIFEST = 'http://120.27.162.122:8080/latest.json';
+
+/** 设过就用设过的（设成空 = 主动关掉更新检查），没设过用默认地址 */
 export function manifestUrl() {
-  return readLocal().manifest || '';
+  const local = readLocal();
+  if (typeof local.manifest === 'string') return local.manifest;
+  return DEFAULT_MANIFEST;
+}
+
+/**
+ * 启动时把清单地址同步给 native。
+ * native 侧 prefs 是空的（重装 / 清数据后）时会一直报「还没有配更新地址」，
+ * 装了新包却点不动更新，看起来像功能坏了。
+ */
+export async function ensureConfigured() {
+  const url = manifestUrl();
+  if (!url) return null;
+  if (!(await available())) return null;
+  return configure(url);
 }
 
 export async function available() {

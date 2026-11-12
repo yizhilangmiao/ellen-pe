@@ -1,3 +1,6 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,6 +10,14 @@ plugins {
 // ndk.abiFilters 与 splits.abi 不能共存，同时写会报 Conflicting configuration。
 val abiSplit = (project.findProperty("ellenAbiSplit") as String?) == "true"
 
+// 正式签名：口令写在 _build\keystore\keystore.properties（不在 git 里）。
+// 没有这个文件时退回 debug 签名 —— 换台机器 / 别人 clone 下来照样能构建，不会因为缺密钥直接失败。
+val keystoreDir = rootProject.file("../_build/keystore")
+val keystorePropsFile = File(keystoreDir, "keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+}
+
 android {
     namespace = "cn.ellen.companion2"
     compileSdk = 36
@@ -15,8 +26,8 @@ android {
         applicationId = "cn.ellen.companion2"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.3.0-m7"
+        versionCode = 2
+        versionName = "0.3.1"
         if (!abiSplit) {
             ndk {
                 abiFilters += listOf("arm64-v8a", "x86_64")
@@ -33,12 +44,25 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                storeFile = File(keystoreDir, keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
         }
         release {
             isMinifyEnabled = false
+            // 有正式签名就用它；没有就退回 debug，保证任何环境都能出包
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

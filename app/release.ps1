@@ -14,6 +14,9 @@
 param(
   [string[]]$Abi = @('arm64-v8a', 'x86_64'),
   [switch]$SkipBuild,
+  # 出正式签名包（assembleRelease，走 _build\keystore 里的密钥）。
+  # 不加时出 debug 包 —— debug 与 release 签名不同，互相不能覆盖安装。
+  [switch]$Sign,
   [string]$Notes = '',
   [string]$BaseUrl = '',
   [string]$Channel = 'stable'
@@ -34,21 +37,23 @@ $version = $vm.Groups[1].Value
 $versionCode = [int]$vc.Groups[1].Value
 
 # ---- 2. 构建（拆包）----
+$variant = if ($Sign) { 'release' } else { 'debug' }
+$task = if ($Sign) { ':app:assembleRelease' } else { ':app:assembleDebug' }
 if (-not $SkipBuild) {
   Push-Location $root
   try {
-    & $gradle ':app:assembleDebug' '-PellenAbiSplit=true' '--console=plain' '-q'
+    & $gradle $task '-PellenAbiSplit=true' '--console=plain' '-q'
     if ($LASTEXITCODE -ne 0) { throw "gradle 拆包构建失败（exit $LASTEXITCODE）" }
   } finally { Pop-Location }
 }
 
-$apkDir = "$root\app\build\outputs\apk\debug"
+$apkDir = "$root\app\build\outputs\apk\$variant"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 # ---- 3. 逐 ABI 取包、改名、算 sha256 ----
 $made = @()
 foreach ($a in $Abi) {
-  $src = Join-Path $apkDir "app-$a-debug.apk"
+  $src = Join-Path $apkDir "app-$a-$variant.apk"
   if (-not (Test-Path $src)) { throw "没找到拆包产物：$src（先跑 -SkipBuild 之前的完整构建，或检查 -PellenAbiSplit）" }
   # 文件名只用 ASCII：中文名进了 URL 会被百分号编码，客户端拼地址容易出错
   $name = "ellen-$version-$a.apk"
@@ -101,4 +106,9 @@ Write-Host ''
 Write-Host "输出目录：$out"
 Get-ChildItem $out | ForEach-Object { Write-Host ("  {0}  {1:N0} B" -f $_.Name, $_.Length) }
 Write-Host ''
-Write-Host '提醒：现在是 debug keystore 签名。正式发给别人之前要先做 release 签名（keystore 别进 git）。'
+if ($Sign) {
+  Write-Host '签名：正式（_build\keystore\ellen-release.jks）'
+  Write-Host '提醒：发版前确认 versionCode 已递增，否则已装的客户端会判「已是最新」，更新根本不会触发。'
+} else {
+  Write-Host '提醒：现在是 debug keystore 签名（与正式签名不能互相覆盖安装）。要发出去就加 -Sign。'
+}
