@@ -270,13 +270,13 @@ export function createBackupPage({ state, onChange } = {}) {
           const where = content && content.origin ? content.origin.platform : '';
           const ok = window.confirm(
             `资料包来自${where || '旧版'}，含 ${preview.heads.length} 条记录、${preview.revisions.length} 次改动。\n`
-            + '导入会覆盖这台手机现在的数据，确定继续？',
+            + '导入会和这台手机的资料合并：两边新增都留下，共有记录去重，不会覆盖。',
           );
           if (!ok) {
             say(s('settings.importCancelled'));
             return;
           }
-          const r = await importSnapshot(snapshot, { merge: false });
+          const r = await importSnapshot(snapshot, { merge: true });
           if (state && state.reload) await state.reload();
           if (onChange) onChange();
           say(`${s('settings.importDone')} ${r.heads} 条记录（${Object.entries(r.kinds).map(([k, v]) => `${k} ${v}`).join('、')}）。`);

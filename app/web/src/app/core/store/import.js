@@ -23,7 +23,7 @@ import {
   reqDone,
   tx,
 } from './db.js';
-import { invalidateProfile, putMeta } from './records.js';
+import { getMeta, invalidateProfile, putMeta } from './records.js';
 import { upgradeMessageValue } from './messages.js';
 
 export const ARCHIVE_MAGIC = 'ELLENPK1\n';
@@ -361,9 +361,11 @@ export async function importSnapshot(snapshot, { merge = false, onProgress } = {
   // 换了一批 profile，缓存必须清，不然按旧 profileId 查索引是空的
   invalidateProfile();
 
-  // 把「当前线程」指到最近活跃的那个，否则导入完打开是空的
+  // 把「当前线程」指到最近活跃的那个，否则导入完打开是空的。
+  // 合并导入时只在原来没有线程（新装的空库）才切，别把人正在聊的那条换掉。
   const threadId = pickRecentThread(heads);
-  if (!merge && threadId) {
+  const current = await getMeta('current-thread', null).catch(() => null);
+  if (threadId && (!merge || !current)) {
     await putMeta('current-thread', threadId);
     await putMeta('current-thread-at', Date.now());
   }

@@ -254,7 +254,7 @@ export const strings = {
     configuredAs: '当前：',
     groupData: '数据与迁移',
     importTitle: '导入旧版资料包',
-    importHint: '旧版艾莲导出的 .ellenpack 文件，里面带着聊天、记忆、手记。',
+    importHint: '旧版艾莲导出的 .ellenpack 文件，里面带着聊天、记忆、手记；可以一个个导，会合到一起。',
     importButton: '选择资料包…',
   exportButton: '导出资料包',
   exportBusy: '正在打包…',
