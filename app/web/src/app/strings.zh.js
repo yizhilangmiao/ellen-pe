@@ -265,6 +265,8 @@ export const strings = {
     legacyNeedExport: '手机里没找到资料包。旧版艾莲还在的话，去它的「设置 → 资料与帮助 → 资料与设备 → 资料文件」点一次「导出聊天资料」，再回来扫。',
     legacyNotOnDevice: '这台设备上没法扫共享存储。',
     legacyPickFolder: '选文件夹找…',
+    legacyGrant: '打开全盘扫描权限',
+    legacyGrantHint: '在系统的「所有文件访问」里允许艾莲，回来再点一次扫描就行。',
     legacyCancelled: '没有选择文件夹。',
     legacyImportAll: '全部导入',
     legacyReading: '正在读 ',
@@ -660,4 +662,5 @@ export function s(key) {
   }
   return typeof node === 'string' ? node : key;
 }
+
 

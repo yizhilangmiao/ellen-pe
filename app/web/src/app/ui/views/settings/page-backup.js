@@ -17,7 +17,7 @@ import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as sp
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
 import { buildManifest } from '../../../core/store/export.js';
-import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder } from '../../../core/legacy.js';
+import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder, scanPermission, requestAllFiles } from '../../../core/legacy.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';
@@ -334,6 +334,29 @@ export function createBackupPage({ state, onChange } = {}) {
           }
         });
         legacyList.append(pick);
+        // 没授权「所有文件访问」的话，再给一个打开权限的入口——授了就真能一键全盘扫
+        scanPermission()
+          .then((perm) => {
+            if (perm.allFiles) return;
+            const grant = document.createElement('button');
+            grant.type = 'button';
+            grant.className = 'el-settings-btn is-ghost';
+            grant.textContent = s('settings.legacyGrant');
+            grant.addEventListener('click', async () => {
+              grant.disabled = true;
+              try {
+                await requestAllFiles();
+                legacySay(s('settings.legacyGrantHint'));
+              } catch (err) {
+                const msg = (err && (err.code || err.message)) || String(err);
+                legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+              } finally {
+                grant.disabled = false;
+              }
+            });
+            legacyList.prepend(grant);
+          })
+          .catch(() => {});
         return;
       }
       legacySay(s('settings.legacyFound').replace('{n}', String(usable.length)));
@@ -477,4 +500,5 @@ export function createBackupPage({ state, onChange } = {}) {
     },
   };
 }
+
 

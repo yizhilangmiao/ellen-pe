@@ -42,6 +42,19 @@ export async function pickLegacyFolder() {
   return call('EllenArchive', 'pickLegacyFolder', {});
 }
 
+/** 有没有「所有文件访问」（授了就能自己全盘扫，不用选文件夹）。 */
+export async function scanPermission() {
+  if (!isNative()) return { allFiles: false, api: 0 };
+  const res = await call('EllenArchive', 'scanPermission', {});
+  return { allFiles: !!res.allFiles, api: Number(res.api || 0) };
+}
+
+/** 打开系统设置里的「所有文件访问」开关。 */
+export async function requestAllFiles() {
+  if (!isNative()) return { opened: false };
+  return call('EllenArchive', 'requestAllFiles', {});
+}
+
 /** 只解析不落库，用来先给个数（多少条记录）。 */
 export async function peekLegacy(uri) {
   const res = await call('EllenArchive', 'openPath', { uri });

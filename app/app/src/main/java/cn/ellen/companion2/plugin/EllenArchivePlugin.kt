@@ -261,6 +261,39 @@ class EllenArchivePlugin : Plugin() {
             }
         } catch (_: Exception) {
         }
+        // 授了「所有文件访问」就自己走一遍常见根目录，找散落在深处的包（微信/QQ 存过来的那种）
+        try {
+            if (android.os.Environment.isExternalStorageManager()) {
+                val roots = listOfNotNull(
+                    Environment.getExternalStorageDirectory(),
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                )
+                val queue = ArrayDeque<Pair<File, Int>>()
+                roots.forEach { queue.add(it to 0) }
+                val visited = mutableSetOf<String>()
+                while (queue.isNotEmpty()) {
+                    val (dir, depth) = queue.removeFirst()
+                    if (depth > 3) continue
+                    if (!visited.add(dir.absolutePath)) continue
+                    val list = try {
+                        dir.listFiles()
+                    } catch (_: Exception) {
+                        null
+                    } ?: continue
+                    for (f in list) {
+                        if (f.isDirectory) {
+                            if (depth < 3) queue.add(f to (depth + 1))
+                            continue
+                        }
+                        val n = f.name
+                        if (!(n.endsWith(".ellenpack") || n.endsWith(".ellenPack"))) continue
+                        push(Uri.fromFile(f).toString(), n, f.length(), f.lastModified(), "walk")
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
         var oldInstalled = false
         try {
             context.packageManager.getPackageInfo("cn.ellen.companion", 0)
@@ -317,6 +350,50 @@ class EllenArchivePlugin : Plugin() {
         out.put("treeName", treeName)
         out.put("treeUri", tree ?: "")
         call.resolve(out)
+    }
+
+    /** 全盘扫描的能力问一句：授了「所有文件访问」就能自己列下载目录，不授就靠 SAF 授权树。 */
+    @PluginMethod
+    fun scanPermission(call: PluginCall) {
+        val out = JSObject()
+        val all = try {
+            android.os.Environment.isExternalStorageManager()
+        } catch (_: Exception) {
+            false
+        }
+        out.put("allFiles", all)
+        out.put("api", android.os.Build.VERSION.SDK_INT)
+        call.resolve(out)
+    }
+
+    /** 去系统设置里把这台手机的「所有文件访问」打开（vivo 在「权限管理 → 所有文件访问」）。 */
+    @PluginMethod
+    fun requestAllFiles(call: PluginCall) {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:" + context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            val out = JSObject()
+            out.put("opened", true)
+            call.resolve(out)
+        } catch (e: Exception) {
+            // 有的系统没有这个页面，退回应用详情页
+            try {
+                val fallback = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:" + context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallback)
+                val out = JSObject()
+                out.put("opened", true)
+                out.put("fallback", true)
+                call.resolve(out)
+            } catch (e2: Exception) {
+                call.reject("打不开系统设置。", "ARCHIVE_UNAVAILABLE")
+            }
+        }
     }
 
     /** 让用户选一次存放资料包的文件夹（Download 之类），按 SAF 授权，之后扫它就不用权限了。 */
