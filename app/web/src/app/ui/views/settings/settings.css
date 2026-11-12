@@ -487,3 +487,47 @@ section[data-view='settings'] .el-settings-entry + .el-settings-entry {
 .ellen-app .el-wiz-key-wrap .el-settings-input {
   padding-right: calc(52 * var(--u));
 }
+
+/* 一键迁移：扫到的旧版资料包列表（点一行就导那一份） */
+.el-legacy-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+}
+
+.el-legacy-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  padding: calc(9 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(11 * var(--u));
+  background: var(--el-current-raised);
+  text-align: left;
+}
+
+.el-legacy-item[data-done='1'] {
+  opacity: 0.55;
+}
+
+.el-legacy-name {
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-current-text);
+  word-break: break-all;
+}
+
+.el-legacy-meta {
+  flex: none;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-current-muted);
+}
+
+.el-legacy-empty {
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-current-muted);
+  opacity: 0.8;
+}

@@ -17,6 +17,7 @@ import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as sp
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
 import { buildManifest } from '../../../core/store/export.js';
+import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder } from '../../../core/legacy.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';
@@ -245,6 +246,159 @@ export function createBackupPage({ state, onChange } = {}) {
       dataCard.append(dataHead, dataHint, dataRow, dataNote);
       el.append(dataCard);
 
+    // —— 从旧版搬过来（一键迁移）——
+    // 老版艾莲的数据在它自己的 sandbox 里读不到，它唯一放出来的就是导出的 .ellenpack；
+    // 这里把共享存储里的包全扫出来，点一下就合并进库，省掉「开选择器一个个挑」。
+    const legacyCard = document.createElement('div');
+    legacyCard.className = 'el-settings-card';
+    const legacyHead = document.createElement('div');
+    legacyHead.className = 'el-settings-head';
+    legacyHead.textContent = s('settings.legacyTitle');
+    const legacyHint = document.createElement('div');
+    legacyHint.className = 'el-settings-hint';
+    legacyHint.textContent = s('settings.legacyHint');
+    const legacyRow = document.createElement('div');
+    legacyRow.className = 'el-settings-row';
+    const legacyScan = document.createElement('button');
+    legacyScan.type = 'button';
+    legacyScan.className = 'el-settings-btn';
+    legacyScan.textContent = s('settings.legacyScan');
+    legacyRow.append(legacyScan);
+    const legacyList = document.createElement('div');
+    legacyList.className = 'el-legacy-list';
+    const legacyNote = document.createElement('div');
+    legacyNote.className = 'el-settings-note';
+    legacyCard.append(legacyHead, legacyHint, legacyRow, legacyList, legacyNote);
+    el.append(legacyCard);
+
+    function legacySay(text, isError) {
+      legacyNote.className = isError ? 'el-settings-note is-error' : 'el-settings-note';
+      legacyNote.textContent = text;
+    }
+
+    function sizeText(bytes) {
+      const n = Number(bytes || 0);
+      if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+      if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+      return `${n} B`;
+    }
+
+    function dateText(at) {
+      const d = new Date(Number(at || 0) || Date.now());
+      return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+    }
+
+    async function importLegacyFile(item, label) {
+      legacySay(`${s('settings.legacyReading')}${item.name}…`);
+      try {
+        const r = await importLegacy(item.uri);
+        const kinds = Object.entries(r.kinds || {}).map(([k, v]) => `${k} ${v}`).join('、');
+        legacySay(`${s('settings.importDone')} ${r.heads} 条记录${kinds ? `（${kinds}）` : ''}。`);
+        if (label) label.dataset.done = '1';
+        if (state && state.reload) await state.reload();
+        if (onChange) onChange();
+        return true;
+      } catch (err) {
+        const msg = (err && (err.code || err.message)) || String(err);
+        legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+        return false;
+      }
+    }
+
+    function renderLegacyItems(res) {
+      legacyList.textContent = '';
+      const usable = res.items.filter((it) => it.size > 0);
+      const empty = res.items.filter((it) => it.size <= 0);
+      if (!usable.length) {
+        legacySay(res.oldInstalled ? s('settings.legacyNeedExport') : s('settings.legacyNone'), true);
+        // 没扫到不等于没有：Android 11+ 不让直接列别人的文件夹，给个选文件夹的出口
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'el-settings-btn is-ghost';
+        pick.textContent = s('settings.legacyPickFolder');
+        pick.addEventListener('click', async () => {
+          pick.disabled = true;
+          try {
+            const chosen = await pickLegacyFolder();
+            if (!chosen || chosen.cancelled) {
+              legacySay(s('settings.legacyCancelled'));
+              return;
+            }
+            const again = await scanLegacy(chosen.treeUri);
+            renderLegacyItems(again);
+          } catch (err) {
+            const msg = (err && (err.code || err.message)) || String(err);
+            legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+          } finally {
+            pick.disabled = false;
+          }
+        });
+        legacyList.append(pick);
+        return;
+      }
+      legacySay(s('settings.legacyFound').replace('{n}', String(usable.length)));
+      for (const it of usable) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'el-legacy-item';
+        const main = document.createElement('span');
+        main.className = 'el-legacy-name';
+        main.textContent = it.name;
+        const meta = document.createElement('span');
+        meta.className = 'el-legacy-meta';
+        meta.textContent = `${dateText(it.at)} · ${sizeText(it.size)}`;
+        row.append(main, meta);
+        row.addEventListener('click', () => {
+          if (row.dataset.busy) return;
+          row.dataset.busy = '1';
+          importLegacyFile(it, row).finally(() => {
+            delete row.dataset.busy;
+          });
+        });
+        legacyList.append(row);
+      }
+      if (empty.length) {
+        const warn = document.createElement('div');
+        warn.className = 'el-legacy-empty';
+        warn.textContent = `${empty.length} 份是空文件（0 B，旧版写盘没成功），搜不到内容。`;
+        legacyList.append(warn);
+      }
+      if (usable.length > 1) {
+        const all = document.createElement('button');
+        all.type = 'button';
+        all.className = 'el-settings-btn is-ghost';
+        all.textContent = `${s('settings.legacyImportAll')}（${usable.length}）`;
+        all.addEventListener('click', async () => {
+          all.disabled = true;
+          const r = await importAllLegacy(usable, (step) => {
+            legacySay(`${step.index + 1}/${step.total} · ${step.item.name}`);
+          });
+          legacySay(`${s('settings.importDone')} ${r.imported} 份，共 ${r.heads} 条记录${r.failed ? `；${r.failed} 份没进来` : ''}。`);
+          if (state && state.reload) await state.reload();
+          if (onChange) onChange();
+        });
+        legacyList.append(all);
+      }
+    }
+
+    legacyScan.addEventListener('click', async () => {
+      legacyScan.disabled = true;
+      legacySay(s('settings.legacyScanning'));
+      try {
+        const res = await scanLegacy();
+        if (!res.supported) {
+          legacySay(s('settings.legacyNotOnDevice'), true);
+          return;
+        }
+        renderLegacyItems(res);
+      } catch (err) {
+        const msg = (err && (err.code || err.message)) || String(err);
+        legacySay(`${s('settings.legacyFailed')}${msg}`, true);
+      } finally {
+        legacyScan.disabled = false;
+      }
+    });
+
       function say(text, isError) {
         dataNote.className = isError ? 'el-settings-note is-error' : 'el-settings-note';
         dataNote.textContent = text;
@@ -323,3 +477,4 @@ export function createBackupPage({ state, onChange } = {}) {
     },
   };
 }
+

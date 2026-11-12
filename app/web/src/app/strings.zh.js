@@ -256,6 +256,19 @@ export const strings = {
     importTitle: '导入旧版资料包',
     importHint: '旧版艾莲导出的 .ellenpack 文件，里面带着聊天、记忆、手记；可以一个个导，会合到一起。',
     importButton: '选择资料包…',
+    legacyTitle: '从旧版搬过来',
+    legacyHint: '扫一遍手机里的旧版资料包，点一下就搬进这台手机。只合并，不覆盖现在的资料。',
+    legacyScan: '扫描旧版资料',
+    legacyScanning: '正在翻手机里的资料包…',
+    legacyFound: '找到 {n} 份资料包，点一份直接导入。',
+    legacyNone: '手机里没找到 .ellenpack 资料包。',
+    legacyNeedExport: '手机里没找到资料包。旧版艾莲还在的话，去它的「设置 → 资料与帮助 → 资料与设备 → 资料文件」点一次「导出聊天资料」，再回来扫。',
+    legacyNotOnDevice: '这台设备上没法扫共享存储。',
+    legacyPickFolder: '选文件夹找…',
+    legacyCancelled: '没有选择文件夹。',
+    legacyImportAll: '全部导入',
+    legacyReading: '正在读 ',
+    legacyFailed: '这份没导进来：',
   exportButton: '导出资料包',
   exportBusy: '正在打包…',
   exportDone: '导出好了。',
@@ -647,3 +660,4 @@ export function s(key) {
   }
   return typeof node === 'string' ? node : key;
 }
+

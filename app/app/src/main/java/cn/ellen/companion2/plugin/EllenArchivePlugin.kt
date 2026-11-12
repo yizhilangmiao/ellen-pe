@@ -1,9 +1,12 @@
 package cn.ellen.companion2.plugin
 
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.util.Base64
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -40,6 +43,9 @@ class EllenArchivePlugin : Plugin() {
 
     private var exportCall: PluginCall? = null
     private var importCall: PluginCall? = null
+    /** 用户为「扫资料包」授权过的目录树（SAF），只存内存；重进页面再选一次就行。 */
+    private var legacyTree: String? = null
+    private var legacyFolderCall: PluginCall? = null
 
     private fun cacheFile(name: String): File =
         File(context.cacheDir, name).apply { parentFile?.mkdirs() }
@@ -169,7 +175,201 @@ class EllenArchivePlugin : Plugin() {
             return
         }
         try {
-            var restored = 0
+            target.resolve(importFrom(uri))
+        } catch (e: Exception) {
+            target.reject("读资料包失败：${e.message ?: e.javaClass.simpleName}", "ARCHIVE_READ_FAILED")
+        }
+    }
+
+    /**
+     * 按 uri 直接读一个资料包（不弹选择器）。一键迁移用它：扫到的文件挨个喂进来，
+     * 附件照样还原到 filesDir/attachments，返回形状与 pickImport 一致。
+     */
+    @PluginMethod
+    fun openPath(call: PluginCall) {
+        val raw = call.getString("uri").orEmpty()
+        if (raw.isEmpty()) {
+            call.reject("缺少 uri。", "ARCHIVE_NO_URI")
+            return
+        }
+        try {
+            call.resolve(importFrom(Uri.parse(raw)))
+        } catch (e: Exception) {
+            call.reject("读资料包失败：${e.message ?: e.javaClass.simpleName}", "ARCHIVE_READ_FAILED")
+        }
+    }
+
+    /**
+     * 扫一遍手机上可能躺着的老版资料包（.ellenpack / .ellenPack）：MediaStore 全盘登记 + 下载/文档目录兜底。
+     * 顺便告诉 web 旧版艾莲还在不在，界面文案好据此换口径。
+     */
+    @PluginMethod
+    fun scanLegacy(call: PluginCall) {
+        val items = JSONArray()
+        val seen = mutableSetOf<String>()
+        fun push(uri: String, name: String, size: Long, at: Long, source: String) {
+            val key = "$name|$size"
+            if (name.isEmpty() || seen.contains(key)) return
+            seen.add(key)
+            val o = JSObject()
+            o.put("uri", uri)
+            o.put("name", name)
+            o.put("size", size)
+            o.put("at", at)
+            o.put("source", source)
+            items.put(o)
+        }
+        val collection = MediaStore.Files.getContentUri("external")
+        try {
+            val cols = arrayOf(
+                MediaStore.Files.FileColumns._ID,
+                MediaStore.Files.FileColumns.DISPLAY_NAME,
+                MediaStore.Files.FileColumns.SIZE,
+                MediaStore.Files.FileColumns.DATE_MODIFIED,
+            )
+            val sel = "(${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?) OR (${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?)"
+            val args = arrayOf("%.ellenpack", "%.ellenPack")
+            context.contentResolver.query(collection, cols, sel, args, null)?.use { c ->
+                val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                val nameCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                val sizeCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
+                val dateCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
+                while (c.moveToNext()) {
+                    val id = c.getLong(idCol)
+                    val uri = ContentUris.withAppendedId(collection, id).toString()
+                    push(uri, c.getString(nameCol) ?: "", c.getLong(sizeCol), c.getLong(dateCol) * 1000L, "media")
+                }
+            }
+        } catch (_: Exception) {
+            // MediaStore 上没有就靠下面的目录兜底，别让整个扫描失败
+        }
+        try {
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            for (dir in listOfNotNull(downloads, documents, File(downloads, "艾莲"))) {
+                val list = try {
+                    dir.listFiles()
+                } catch (_: Exception) {
+                    null
+                } ?: continue
+                for (f in list) {
+                    if (!f.isFile) continue
+                    val n = f.name
+                    if (!(n.endsWith(".ellenpack") || n.endsWith(".ellenPack"))) continue
+                    push(Uri.fromFile(f).toString(), n, f.length(), f.lastModified(), "dir")
+                }
+            }
+        } catch (_: Exception) {
+        }
+        var oldInstalled = false
+        try {
+            context.packageManager.getPackageInfo("cn.ellen.companion", 0)
+            oldInstalled = true
+        } catch (_: Exception) {
+        }
+        // 授权过的目录（用户点过「选文件夹」的那种）：这层最靠谱，
+        // Android 11+ 直接列 /sdcard/Download 是要权限的，SAF 授权的树不用。
+        val tree = call.getString("treeUri")
+            ?: legacyTree
+            ?: legacyPrefs().getString("treeUri", null)
+            ?: readState().optString("directory").takeIf { it.isNotBlank() }
+        var treeName = ""
+        if (!tree.isNullOrBlank()) {
+            try {
+                val treeUri = Uri.parse(tree)
+                treeName = DocumentsContract.getTreeDocumentId(treeUri).substringAfterLast(':').ifBlank { "Documents" }
+                val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+                    treeUri,
+                    DocumentsContract.getTreeDocumentId(treeUri),
+                )
+                context.contentResolver.query(
+                    children,
+                    arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_SIZE,
+                        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                    ),
+                    null,
+                    null,
+                    null,
+                )?.use { c ->
+                    while (c.moveToNext()) {
+                        val docId = c.getString(0) ?: continue
+                        val name = c.getString(1) ?: continue
+                        if (!(name.endsWith(".ellenpack") || name.endsWith(".ellenPack"))) continue
+                        val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                        push(
+                            docUri.toString(),
+                            name,
+                            if (c.isNull(2)) 0L else c.getLong(2),
+                            if (c.isNull(3)) 0L else c.getLong(3),
+                            "tree",
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        val out = JSObject()
+        out.put("items", items)
+        out.put("oldInstalled", oldInstalled)
+        out.put("treeName", treeName)
+        out.put("treeUri", tree ?: "")
+        call.resolve(out)
+    }
+
+    /** 让用户选一次存放资料包的文件夹（Download 之类），按 SAF 授权，之后扫它就不用权限了。 */
+    @PluginMethod
+    fun pickLegacyFolder(call: PluginCall) {
+        legacyFolderCall = call
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                putExtra("android.content.extra.SHOW_ADVANCED", true)
+            }
+            startActivityForResult(call, intent, "pickedLegacyFolder")
+        } catch (e: Exception) {
+            legacyFolderCall = null
+            call.reject("这台机器没有文件夹选择器。", "ARCHIVE_UNAVAILABLE")
+        }
+    }
+
+    @ActivityCallback
+    private fun pickedLegacyFolder(call: PluginCall?, result: androidx.activity.result.ActivityResult) {
+        val target = legacyFolderCall ?: call
+        legacyFolderCall = null
+        if (target == null) return
+        val uri = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+            val out = JSObject()
+            out.put("cancelled", true)
+            target.resolve(out)
+            return
+        }
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        } catch (_: Exception) {
+        }
+        legacyTree = uri.toString()
+        try {
+            legacyPrefs().edit().putString("treeUri", uri.toString()).apply()
+        } catch (_: Exception) {
+        }
+        val out = JSObject()
+        out.put("cancelled", false)
+        out.put("treeUri", uri.toString())
+        out.put("treeName", DocumentsContract.getTreeDocumentId(uri).substringAfterLast(':').ifBlank { "Documents" })
+        target.resolve(out)
+    }
+
+
+    /** 真正的读包逻辑：pickImport / openPath 共用。 */
+    private fun importFrom(uri: Uri): JSObject {
+        var restored = 0
             val missing = mutableListOf<String>()
             val kept = mutableListOf<String>()
             val manifestText = context.contentResolver.openInputStream(uri)?.use { input ->
@@ -256,10 +456,7 @@ class EllenArchivePlugin : Plugin() {
             out.put("missingFiles", names(missing))
             out.put("keptFiles", names(kept))
             out.put("cancelled", false)
-            target.resolve(out)
-        } catch (e: Exception) {
-            target.reject("读资料包失败：${e.message ?: e.javaClass.simpleName}", "ARCHIVE_READ_FAILED")
-        }
+            return out
     }
 
     // —— 自动备份 ——
@@ -284,6 +481,9 @@ class EllenArchivePlugin : Plugin() {
     private var backupArmed = false
 
     private fun prefs() = context.getSharedPreferences("ellen-backup-v1", android.content.Context.MODE_PRIVATE)
+
+    /** 只存「扫旧版资料时授权过的文件夹」，跟备份目录分开，互不影响。 */
+    private fun legacyPrefs() = context.getSharedPreferences("ellen-legacy-v1", android.content.Context.MODE_PRIVATE)
 
     private fun readState(): JSONObject {
         val raw = prefs().getString("state", "") ?: ""
