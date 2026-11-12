@@ -253,7 +253,7 @@ class EllenUpdatesPlugin : Plugin() {
                     put("publishedAt", json.optString("publishedAt"))
                     put("apk", JSObject().apply {
                         put("sha256", sha)
-                        put("url", apk.optString("url"))
+                        put("url", absoluteUrl(url, apk.optString("url")))
                         put("sizeBytes", apk.optLong("sizeBytes", 0L))
                     })
                 }
@@ -304,6 +304,20 @@ class EllenUpdatesPlugin : Plugin() {
         return sha
     }
 
+    /**
+     * 清单里的 apk.url 可能是相对文件名（release.ps1 默认这么写，对应「发布通道先留空」）。
+     * 直接丢给 java.net.URL 会 MalformedURLException: no protocol，所以以清单地址为基准解析。
+     */
+    private fun absoluteUrl(base: String, raw: String): String {
+        if (raw.isEmpty() || raw.contains("://")) return raw
+        return try {
+            java.net.URL(java.net.URL(base), raw).toString()
+        } catch (e: Exception) {
+            Log.w("EllenUpdates", "相对地址解析失败：$raw", e)
+            raw
+        }
+    }
+
     private fun describe(e: Exception): String {
         val detail = "${e.javaClass.simpleName}: ${e.message.orEmpty()}".take(160)
         return "更新未完成，请检查网络后重试。（$detail）"
@@ -323,7 +337,7 @@ class EllenUpdatesPlugin : Plugin() {
             return
         }
         val apk = latest.optJSONObject("apk")
-        val url = apk?.optString("url").orEmpty()
+        val url = absoluteUrl(manifestUrl(), apk?.optString("url").orEmpty())
         val sha = apk?.optString("sha256").orEmpty()
         val total = apk?.optLong("sizeBytes", 0L) ?: 0L
         if (url.isEmpty() || sha.isEmpty()) {

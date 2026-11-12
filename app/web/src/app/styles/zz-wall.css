@@ -13,6 +13,11 @@
 .ellen-app[data-skin='zzz'] .el-chat-page {
   position: relative;
   isolation: isolate;
+  /* 改成 relative 之后这里就不再吃 inset:0 的定位宽度了，页面会按内容撑成 max-content
+     （实测真机 360 的屏撑到 420，贴右边的气泡全被切掉）。显式占满父级，别靠内容算宽度。 */
+  width: 100%;
+  flex: 0 0 100%;
+  min-width: 0;
   background: var(--z-bg);
   /* 默认档：深夜（JS 未接时段时与底栏 LIVE 的「在线」状态词不冲突） */
   --wp: url('../assets/wall-night.webp');

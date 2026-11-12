@@ -368,7 +368,8 @@ export function createChatView() {
           sit.alt = st.label || st.id;
           sit.src = url;
           box.append(sit);
-          box.classList.add('is-tappable');
+          // 表情贴纸自带透明底：气泡底色留着就成了一个黑方块，把底去掉只留图
+          box.classList.add('is-tappable', 'is-sticker');
           box.addEventListener('click', () => {
             if (suppressTapUntil > Date.now()) return;
             openViewer(sit.currentSrc || sit.src);

@@ -768,6 +768,11 @@
   background: var(--el-surface);
 }
 .el-msg-expr.is-tappable { cursor: pointer; }
+/* 贴纸自带透明底，气泡底色留着会变成黑方块 */
+.el-msg-expr.is-sticker {
+  background: transparent;
+  border-radius: 0;
+}
 .el-msg-expr-img {
   width: 100%;
   height: 100%;
