@@ -531,3 +531,53 @@ section[data-view='settings'] .el-settings-entry + .el-settings-entry {
   color: var(--el-current-muted);
   opacity: 0.8;
 }
+/* 旧版资料包每一行右侧的「导入」：整行本来就能点，但没有按钮样子老大不敢点 */
+.el-legacy-item .el-legacy-go {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: calc(5 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: color-mix(in srgb, var(--el-pink) 18%, transparent);
+  color: var(--el-pink);
+  font-size: calc(12 * var(--u));
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.el-legacy-item.is-busy .el-legacy-go {
+  opacity: 0.55;
+}
+
+.el-legacy-item.is-busy .el-legacy-go::after {
+  content: '…';
+}
+/* 导入结果卡：一次导入后立刻显示「多少 → 多少」，光看数字就知道进没进来 */
+.el-legacy-result {
+  margin: calc(10 * var(--u)) 0 calc(4 * var(--u));
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(14 * var(--u));
+  background: color-mix(in srgb, var(--el-success, #6fd3b0) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--el-success, #6fd3b0) 32%, transparent);
+}
+
+.el-legacy-result-head {
+  margin: 0 0 calc(6 * var(--u));
+  font-size: calc(13 * var(--u));
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--el-success, #6fd3b0);
+}
+
+.el-legacy-result-line {
+  margin: 0;
+  font-size: calc(12 * var(--u));
+  line-height: 1.6;
+  color: var(--el-text-dim);
+}
+
+.el-legacy-result-line.is-strong {
+  margin-top: calc(4 * var(--u));
+  font-size: calc(13 * var(--u));
+  font-weight: 600;
+  color: var(--el-text);
+}

@@ -16,6 +16,7 @@ import { PLATFORMS as ASR_PLATFORMS, loadConfig as loadAsrConfig, saveConfig as 
 import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakVoice, stop as stopVoice, state as voiceState, readKey as readVoiceKey, writeKey as writeVoiceKey, clearKey as clearVoiceKey } from '../../../core/speech.js';
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
+import { count as storeCount } from '../../../core/store/db.js';
 import { buildManifest } from '../../../core/store/export.js';
 import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder, scanPermission, requestAllFiles } from '../../../core/legacy.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
@@ -288,15 +289,73 @@ export function createBackupPage({ state, onChange } = {}) {
       return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
     }
 
+    // 探针：导入前后各数一次库里的记录数，界面上直接给「多少 → 多少」，
+    // 不用去翻库也能判断这次到底进没进来。
+    async function headsTotal() {
+      try {
+        return await storeCount('data-heads');
+      } catch (err) {
+        return -1;
+      }
+    }
+
+    function showLegacyResult(name, before, after, r) {
+      const old = legacyCard.querySelector('.el-legacy-result');
+      if (old) old.remove();
+      const box = document.createElement('div');
+      box.className = 'el-legacy-result';
+      const added = before >= 0 && after >= 0 ? after - before : Number(r.heads || 0);
+      const head = document.createElement('p');
+      head.className = 'el-legacy-result-head';
+      head.textContent =
+        added > 0
+          ? `已导入 · ${name}`
+          : `没有新增 · ${name}`;
+      const line1 = document.createElement('p');
+      line1.className = 'el-legacy-result-line';
+      const kinds = Object.entries(r.kinds || {})
+        .map(([k, v]) => `${KIND_TEXT[k] || k} ${v}`)
+        .join('、');
+      line1.textContent = added > 0
+        ? `这次进来 ${added} 条${kinds ? `：${kinds}` : ''}`
+        : '这份包里的记录库里都已经有了，按记录 id 去重后没有新增。';
+      const line2 = document.createElement('p');
+      line2.className = 'el-legacy-result-line is-strong';
+      line2.textContent =
+        before >= 0 && after >= 0
+          ? `库里总记录 ${before} → ${after}`
+          : `库里现在 ${after >= 0 ? after : '?'} 条`;
+      box.append(head, line1, line2);
+      legacyNote.after(box);
+      return added;
+    }
+
+    const KIND_TEXT = {
+      message: '消息',
+      memory: '记忆',
+      journal: '手记',
+      attachment: '附件',
+      call: '通话',
+      thread: '会话',
+      profile: '角色',
+    };
+
     async function importLegacyFile(item, label) {
       legacySay(`${s('settings.legacyReading')}${item.name}…`);
+      const before = await headsTotal();
       try {
         const r = await importLegacy(item.uri);
-        const kinds = Object.entries(r.kinds || {}).map(([k, v]) => `${k} ${v}`).join('、');
-        legacySay(`${s('settings.importDone')} ${r.heads} 条记录${kinds ? `（${kinds}）` : ''}。`);
-        if (label) label.dataset.done = '1';
         if (state && state.reload) await state.reload();
         if (onChange) onChange();
+        const after = await headsTotal();
+        const added = showLegacyResult(item.name, before, after, r);
+        const kinds = Object.entries(r.kinds || {}).map(([k, v]) => `${KIND_TEXT[k] || k} ${v}`).join('、');
+        legacySay(
+          added > 0
+            ? `${s('settings.importDone')} ${r.heads} 条记录${kinds ? `（${kinds}）` : ''}。`
+            : '这份包里的记录库里都已经有了，没有新增。',
+        );
+        if (label && added > 0) label.dataset.done = '1';
         return true;
       } catch (err) {
         const msg = (err && (err.code || err.message)) || String(err);
@@ -374,14 +433,20 @@ export function createBackupPage({ state, onChange } = {}) {
         const meta = document.createElement('span');
         meta.className = 'el-legacy-meta';
         meta.textContent = `${dateText(it.at)} · ${sizeText(it.size)}`;
-        row.append(main, meta);
-        row.addEventListener('click', () => {
+        const go = document.createElement('span');
+        go.className = 'el-legacy-go';
+        go.textContent = s('settings.legacyImportOne');
+        row.append(main, meta, go);
+        const run = () => {
           if (row.dataset.busy) return;
           row.dataset.busy = '1';
+          row.classList.add('is-busy');
           importLegacyFile(it, row).finally(() => {
             delete row.dataset.busy;
+            row.classList.remove('is-busy');
           });
-        });
+        };
+        row.addEventListener('click', run);
         legacyList.append(row);
       }
       if (empty.length) {
@@ -507,5 +572,7 @@ export function createBackupPage({ state, onChange } = {}) {
     },
   };
 }
+
+
 
 
