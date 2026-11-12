@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ 系统闪屏（SplashScreen API）。
+     注意：这里覆盖同名 style，必须把 values/styles.xml 里的 item 全部重抄一遍，
+     否则 v31 设备上丢掉 windowBackground / 状态栏配色。 -->
+<resources>
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_bg</item>
+        <item name="android:statusBarColor">@color/ellen_bg</item>
+        <item name="android:navigationBarColor">@color/ellen_bg</item>
+        <item name="android:alertDialogTheme">@style/EllenAlertDialog</item>
+        <item name="alertDialogTheme">@style/EllenAlertDialog</item>
+
+        <!-- 31+ 系统闪屏：底走深色，图标用头像徽章，退出时不再出现白色底 -->
+        <item name="android:windowSplashScreenBackground">@color/ellen_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_ellen</item>
+    </style>
+</resources>

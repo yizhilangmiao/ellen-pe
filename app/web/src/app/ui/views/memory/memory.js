@@ -8,7 +8,14 @@
 import { s } from '../../../strings.zh.js';
 import { iconEl } from '../../icons.js';
 import { openMemoryEditor } from '../../memory-editor.js';
-import { createMemory, updateMemory, removeMemory } from '../../../core/memory.js';
+import {
+  createMemory,
+  updateMemory,
+  removeMemory,
+  retireMemory,
+  restoreMemory,
+  splitByState,
+} from '../../../core/memory.js';
 import { readUnderstanding, maybeRefresh as refreshUnderstanding } from '../../../core/understanding.js';
 import { loadModelConfig, isUsable } from '../../../core/config.js';
 import { listLatest } from '../../../core/store/library.js';
@@ -144,23 +151,90 @@ function paintMemoryRows(host, rows, onChanged) {
   grow();
 }
 
+// R3 的界面文案。先放在这里，最后统一并进 strings.zh.js ——
+// 别人的文件里加 key 容易被同批改动覆盖，文案自己留着不会丢。
+const MEMORY_STATE_TEXT = {
+  superseded: '已翻篇',
+  retired: '别再提',
+};
+
+function clockLabel(at) {
+  const d = new Date(at || Date.now());
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * 「这条是从哪几句来的」。
+ * 光看一条总结没法判断她记错没有；把原话摊在下面，他才能一眼看出是哪次对话被理解歪了。
+ */
+function sourceList(item) {
+  const v = item.value || {};
+  const refs = Array.isArray(v.sourceRefs) ? v.sourceRefs.filter((r) => r && r.text) : [];
+  const box = document.createElement('div');
+  box.className = 'el-memory-src';
+  if (!refs.length) {
+    const none = document.createElement('div');
+    none.className = 'el-memory-src-none';
+    none.textContent = '这条没有留下出处（早期版本记的）。';
+    box.append(none);
+    return box;
+  }
+  const head = document.createElement('div');
+  head.className = 'el-memory-src-head';
+  head.textContent = '记自这几句';
+  box.append(head);
+  for (const r of refs.slice(-4)) {
+    const row = document.createElement('div');
+    row.className = 'el-memory-src-row';
+    const who = document.createElement('span');
+    who.className = 'el-memory-src-who';
+    who.textContent = r.role === 'assistant' ? '我' : '他';
+    const text = document.createElement('span');
+    text.className = 'el-memory-src-text';
+    text.textContent = r.text;
+    const at = document.createElement('span');
+    at.className = 'el-memory-src-at';
+    at.textContent = r.at ? clockLabel(r.at) : '';
+    row.append(who, text, at);
+    box.append(row);
+  }
+  return box;
+}
+
 function memoryCard(item, onChanged) {
   const card = document.createElement('article');
   card.className = 'el-memory-card';
   card.dataset.memoryId = item.headId;
 
+  const v = item.value || {};
+  const state = v.state || 'active';
+  if (state !== 'active') card.classList.add(`is-${state}`);
+
+  const head = document.createElement('div');
+  head.className = 'el-memory-head';
   const mark = document.createElement('div');
   mark.className = 'el-memory-mark';
   mark.append(iconEl('book'));
+  head.append(mark);
+  // 角标：翻篇/退役的条目还在列表里（能点回来看看她原来怎么记的），
+  // 但要一眼看出它现在不算数了，否则他改口之后会以为她记岔了。
+  if (MEMORY_STATE_TEXT[state]) {
+    const badge = document.createElement('span');
+    badge.className = `el-memory-state is-${state}`;
+    badge.textContent = MEMORY_STATE_TEXT[state];
+    head.append(badge);
+  }
 
   const title = document.createElement('h2');
   title.className = 'el-memory-title';
-  const v = item.value || {};
   title.textContent = v.title || v.subject || '一段回忆';
 
   const body = document.createElement('p');
   body.className = 'el-memory-body';
   body.textContent = v.summary || v.body || '';
+
+  const sources = sourceList(item);
 
   const more = document.createElement('button');
   more.type = 'button';
@@ -168,7 +242,7 @@ function memoryCard(item, onChanged) {
   more.innerHTML = `${s('memory.openMemory')}<span class="el-memory-arrow">→</span>`;
   more.addEventListener('click', () => card.classList.toggle('is-expanded'));
 
-  // 改 / 删：自动抽出来的东西一定有错的时候，得能就地改。
+  // 改 / 删 / 别再提：自动抽出来的东西一定有错的时候，得能就地改。
   // 用 stopPropagation 是因为卡片外层的「翻开这段回忆」是个 button，别让点击冒泡过去。
   const tools = document.createElement('div');
   tools.className = 'el-memory-tools';
@@ -176,6 +250,10 @@ function memoryCard(item, onChanged) {
   editBtn.type = 'button';
   editBtn.className = 'el-memory-tool';
   editBtn.textContent = s('memory.editMemory');
+  const muteBtn = document.createElement('button');
+  muteBtn.type = 'button';
+  muteBtn.className = 'el-memory-tool';
+  muteBtn.textContent = state === 'retired' ? '恢复' : '别再提';
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
   delBtn.className = 'el-memory-tool is-danger';
@@ -189,6 +267,21 @@ function memoryCard(item, onChanged) {
       onDelete: () => removeMemory(item.headId),
     });
     if (res !== 'cancelled' && typeof onChanged === 'function') onChanged();
+  });
+
+  // 「别再提」：留档但不召回。跟删除的区别 —— 删了她连聊过都不知道，
+  // 下一句同样的内容又被记一遍；退役是「知道，但不再主动拿出来说」。
+  muteBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    muteBtn.disabled = true;
+    try {
+      if (state === 'retired') await restoreMemory(item.headId);
+      else await retireMemory(item.headId);
+      if (typeof onChanged === 'function') onChanged();
+    } catch (err) {
+      console.error('[memory] 状态切换失败', err);
+      muteBtn.disabled = false;
+    }
   });
   // 删：就地二次确认，**绝不打开编辑面板**（老版本这里错调了 openMemoryEditor，
   // 于是点「删」弹出来的是「改」的界面）。首点只进入「待确认」，3 秒不点自动还原。
@@ -224,9 +317,9 @@ function memoryCard(item, onChanged) {
       disarmDelete();
     }
   });
-  tools.append(editBtn, delBtn);
+  tools.append(editBtn, muteBtn, delBtn);
 
-  card.append(mark, title, body, tools, more);
+  card.append(head, title, body, sources, tools, more);
   return card;
 }
 
@@ -586,13 +679,24 @@ export function createMemoryView() {
           if (state.tab === 'past') {
             hint.textContent = s('memory.pastHint');
             const rows = await listLatest('memory', { limit: 0 });
+            // 在用的排在前面；翻篇/退役的留在下面 —— 留档的意义就是「能翻回去看他原来怎么说的」，
+            // 但混在一起会让人以为她记着两份互相矛盾的事实。
+            const grouped = splitByState(rows);
+            const cold = [...grouped.superseded, ...grouped.retired].sort(
+              (a, b) => (Number((b.value || {}).updatedAt) || b.at || 0) - (Number((a.value || {}).updatedAt) || a.at || 0),
+            );
+            const ordered = [...grouped.active, ...cold];
             list.replaceChildren();
 
             const bar = document.createElement('div');
             bar.className = 'el-memory-bar';
             const count = document.createElement('span');
             count.className = 'el-memory-count';
-            count.textContent = rows.length ? `${rows.length} 条` : '';
+            count.textContent = rows.length
+              ? cold.length
+                ? `${grouped.active.length} 条 · ${cold.length} 条不算数了`
+                : `${rows.length} 条`
+              : '';
             const addBtn = document.createElement('button');
             addBtn.type = 'button';
             addBtn.className = 'el-memory-add';
@@ -610,14 +714,17 @@ export function createMemoryView() {
               list.append(emptyBox(s('memory.emptyTitle'), s('memory.emptyAddHint')));
             } else {
               // 第二参是「数据动过了」的回调：编辑面板存/删之后重载这一页
-              paintMemoryRows(list, rows, () => load());
+              paintMemoryRows(list, ordered, () => load());
             }
           } else if (state.tab === 'shared') {
             hint.textContent = s('memory.sharedHint');
             // 共同经历 = scope 标记为 shared 的记忆（两人一起经历过的），
             // 卡片直接复用 memoryCard()：改/删那一套（.el-memory-tools）只实现一次。
+            // 只取 active：翻篇的「一起去过」不该继续算作共同经历。
             const all = await listLatest('memory', { limit: 0 });
-            const rows = all.filter((r) => ((r.value || {}).scope || '') === 'shared');
+            const rows = all.filter(
+              (r) => ((r.value || {}).scope || '') === 'shared' && (!r.value.state || r.value.state === 'active'),
+            );
             list.replaceChildren();
             if (!rows.length) {
               list.append(emptyBox(s('memory.empty'), s('memory.sharedHint')));

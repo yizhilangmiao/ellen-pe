@@ -11,6 +11,7 @@
 import { listLatest, earliestMessageAt } from './store/library.js';
 import { getMeta, putMeta, appendRecord } from './store/records.js';
 import { ask } from './chat/oneshot.js';
+import { loadAffect, derivedMood } from './affect.js';
 
 const RELATIONSHIPS = [
   { id: 'lover', label: '恋人' },
@@ -68,8 +69,28 @@ function moodCard(item) {
   };
 }
 
-/** 最新心情。没有记录时返回 null，页面显示「待了解」。 */
-export async function currentMood() {
+/**
+ * 七维派生出来的「此刻」（E4）。
+ * 为什么以它为准、不再问一次模型：模型那条 6 小时一跳、只有一个词、没有强度；
+ * 七维是连续量，相处页要的是「现在」。契约仍是 {mood, note}，页面一个字都不用改。
+ * persist:false —— 展示是只读路径，不该顺手把状态快照写下去（写盘留给发送路径）。
+ */
+export async function affectMood(now = Date.now()) {
+  try {
+    const state = await loadAffect({ now, persist: false });
+    const d = derivedMood(state);
+    if (!d || !d.mood) return null;
+    return { mood: d.mood, note: d.note || '', at: now, headId: null, source: 'affect' };
+  } catch (err) {
+    console.warn('[companion] 七维读不出来，退回旧情绪记录', err);
+    return null;
+  }
+}
+
+/** 最新心情：先由七维派生，读不到才退回库里那条 emotion 记录（老包的数据继续能用）。 */
+export async function currentMood(now = Date.now()) {
+  const derived = await affectMood(now);
+  if (derived) return derived;
   const rows = await listLatest('emotion', { limit: 1 });
   if (!rows.length) return null;
   const card = moodCard(rows[0]);

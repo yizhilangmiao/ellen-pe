@@ -13,10 +13,58 @@ import { keepAlive } from '../background.js';
 import { readChatPrefs } from '../chatprefs.js';
 import { splitReply, shouldSplit } from '../reply-split.js';
 import { extractTone, toneEnabled } from '../tone.js';
+import { readVisionConfig, visionPlan, resolveVisionTarget, buildVisionParts, downscalePlan, FRAME_MAX_SIDE } from '../vision.js';
+import { readDocument } from '../documents.js';
 
 // 单块密文上限：native 每次最多给 0x4000 原始字节（21848 个 base64 字符），
 // 这里只是给个防御性上限，正常永远碰不到。
 const MAX_CHUNKS = 4096;
+
+/**
+ * 最后一条用户消息带的图（没有就 null）。
+ * 只认「最近这条」——她说的是眼下这件事，不该把很久以前发的图再送一遍。
+ * @returns {{uri:string}|null}
+ */
+function lastUserImageUri(list = []) {
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const m = list[i];
+    if (!m || m.role !== 'user' || m.pending) continue;
+    return m.image && m.image.path ? { uri: String(m.image.path) } : null;
+  }
+  return null;
+}
+
+function lastIndexOfRole(messages, role) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) if (messages[i].role === role) return i;
+  return -1;
+}
+
+/** 缩到长边 maxSide 的 JPEG（base64）。没有 canvas 就原样返回，绝不因为缩图失败丢掉这一轮。 */
+async function shrinkToJpeg(base64, mimeType, maxSide) {
+  const raw = String(base64 || '');
+  if (!raw || typeof document === 'undefined' || typeof Image === 'undefined') return raw;
+  try {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('这张图解不开'));
+      img.src = `data:${mimeType || 'image/jpeg'};base64,${raw}`;
+    });
+    const plan = downscalePlan({ width: img.naturalWidth, height: img.naturalHeight, maxSide: maxSide || FRAME_MAX_SIDE });
+    if (plan.scale >= 1) return raw;
+    const cv = document.createElement('canvas');
+    cv.width = plan.width;
+    cv.height = plan.height;
+    const ctx2d = cv.getContext('2d');
+    if (!ctx2d) return raw;
+    ctx2d.drawImage(img, 0, 0, plan.width, plan.height);
+    const out = String(cv.toDataURL('image/jpeg', 0.7)).split(',')[1] || '';
+    return out || raw;
+  } catch (err) {
+    console.warn('[chat] 缩图失败，按原图送', err);
+    return raw;
+  }
+}
 
 /** 拆条时段间留白用。 */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -185,7 +233,8 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
       let sys = systemPrompt;
       if (typeof getSystemPrompt === 'function') {
         try {
-          sys = await getSystemPrompt();
+          // query 交给人格卡层做世界书命中：没有这句话，三层加载只剩常驻卡
+          sys = await getSystemPrompt({ query: trimmed });
         } catch (err) {
           console.warn('[chat] 取人设失败，用空 system', err);
         }
@@ -197,7 +246,8 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
       let recalled = [];
       if (prefs.recall) {
         try {
-          recalled = await recall(trimmed, { limit: prefs.recallLimit });
+          // scorer:'semantic' = 字面分 + 概念分取大（同义句才召得回来）；scorer 内部抛错会自己退回字面
+          recalled = await recall(trimmed, { limit: prefs.recallLimit, scorer: 'semantic' });
         } catch (err) {
           console.warn('[chat] 召回失败，这次不带记忆', err);
         }
@@ -210,11 +260,35 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
       }
       state.setRecall?.(recalled.map((r) => ({ kind: r.kind, title: r.title, score: r.score })));
 
+      // 排期 §7：视觉只在最后一轮真正送图 —— 历史里的图仍是「（发了一张图）」纯文字，
+      // 这样她看得见你此刻拍的这张，又不会把整段历史的图重发一遍。
+      let sendCfg = cfg;
+      try {
+        const pending = lastUserImageUri(state.getMessages());
+        if (pending) {
+          const vision = await readVisionConfig();
+          const plan = visionPlan({ vision, chat: cfg });
+          if (plan.usable) {
+            const doc = await readDocument(pending.uri);
+            const b64 = await shrinkToJpeg(doc.base64, doc.mimeType, vision.maxSide);
+            const idx = lastIndexOfRole(messages, 'user');
+            if (b64 && idx >= 0) {
+              const said = String(messages[idx].content || '').trim() || '（看看这个）';
+              messages[idx] = { role: 'user', content: buildVisionParts({ jpegBase64: b64, text: said }) };
+              sendCfg = resolveVisionTarget({ vision, chat: cfg });
+            }
+          }
+        }
+      } catch (err) {
+        // 图没送出去只是「她这次没看见」，不该把这一轮聊天搞挂
+        console.warn('[chat] 这一轮的图没送出去，退回纯文字', err);
+      }
+
       // 思考模式：聊天偏好优先，没设就跟随模型自身默认
       const think = prefs.thinking !== 'default' ? prefs.thinking : cfg.thinking || 'default';
 
       const body = JSON.stringify({
-        model: cfg.model,
+        model: sendCfg.model,
         stream: true,
         messages,
         ...(think && think !== 'default' ? { thinking: { type: think } } : {}),
@@ -222,8 +296,8 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
 
       const head = await call('EllenModelHttp', 'open', {
         requestId: rid,
-        url: cfg.endpoint,
-        apiKey: cfg.apiKey,
+        url: sendCfg.endpoint,
+        apiKey: sendCfg.apiKey,
         body,
       });
 

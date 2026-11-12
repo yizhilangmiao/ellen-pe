@@ -56,3 +56,6 @@ desktop.ini
 
 # ── 事故抢救物（APK 反编译源，192 MB，定稿后可删）──
 /_recover-app/
+
+# ── 临时探针（跑完即弃）──
+/_tools/_tmp/

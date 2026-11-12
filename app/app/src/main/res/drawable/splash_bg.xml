@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 冷启动背景：整屏深色（跟 web 皮肤 el-bg #17191F 对齐）＋ 正中一枚圆形头像徽章。
+     用它替换 android:windowBackground，启动第一帧就是深色，不再是白屏。
+     item 的 width/height 需要 API 23+，本项目 minSdk 24，可以直接用。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="@color/ellen_bg" />
+    </item>
+    <item
+        android:width="132dp"
+        android:height="132dp"
+        android:gravity="center">
+        <bitmap
+            android:gravity="fill"
+            android:src="@drawable/splash_ellen" />
+    </item>
+</layer-list>

@@ -3,10 +3,16 @@
 // 格式必须与 import.js / 旧包**逐字段对齐**，否则导出的包自己都读不回来：
 //   manifest v1 = { format, version:1, package, files }                     恰好 4 键
 //   package     = { content, checksum }                                     恰好 2 键
-//   content     = { format, formatVersion:1, packageId, origin, exportedAt,
-//                   snapshot, media }                                       恰好 7 键
+//   content     = { format, formatVersion:2, packageId, origin, exportedAt,
+//                   snapshot, media, lore }                                 7 键 + 可选 lore
 //   snapshot    = { schemaVersion:4, profiles, records }                    恰好 3 键
 //   records[]   = 一次改动（revision），不是 head —— 导入端按 id 分组重放
+//
+// content.formatVersion 1 → 2（2026-11-13）：多了 lore（用哪张角色卡）。
+// 为什么抬版本号而不是悄悄加一个键：老版本 App 的 parsePackage 是**严格键集**校验，
+// 悄悄加键会让它报「资料包内容字段无效」——用户看到的是「包坏了」。抬版本后它报的是
+// 「不支持此资料包格式或版本」，意思对，也不会让人以为数据丢了。
+// 反过来老包（version 1、没有 lore）仍然能导入：import.js 认 1 和 2。
 //
 // schemaVersion 3 → 4（2026-11-12）：消息 value 里多了 type/recalled/quoteOf/segIndex/
 // segCount/image/tone。新字段**就在 value 里原样带出去**（slimRevision 不裁 value），
@@ -21,9 +27,10 @@
 // 附件字节仍然留在设备上，换机只保留清单。要带字节得先把附件落成文件，
 // 那是 M8 之后的事（见 _verify\M7-备份.md）。
 import { STORE_HEADS, STORE_PROFILES, STORE_REVISIONS, count, openDb, reqDone } from './db.js';
-import { ARCHIVE_FORMAT, SNAPSHOT_SCHEMA_VERSION, TRANSFER_FORMAT } from './import.js';
+import { ARCHIVE_FORMAT, CONTENT_FORMAT_VERSION, SNAPSHOT_SCHEMA_VERSION, TRANSFER_FORMAT } from './import.js';
 import { deviceId, platform } from './records.js';
 import { readDocument } from '../documents.js';
+import { readLoreSelection } from '../lore.js';
 
 /** 一屏读多少条（大库靠游标分页，别一次全拉进内存炸掉 WebView）。 */
 const PAGE = 2000;
@@ -202,14 +209,18 @@ export async function buildManifest({ now = Date.now() } = {}) {
   // 语音（及将来的聊天附件）要不要一起打：默认打，超上限就按「新的优先」截断，
   // 截掉的仍在库里、只是不进这个包 —— 用户看到的是 stats.attachmentsSkipped。
   const attachments = await collectAttachments(records);
+  // lore：把「现在用的是哪张角色卡」一起带走。角色卡本身在包里没有字节（它在 bundle 里），
+  // 这里只记选择——换手机后不该莫名其妙变回原作向。
+  const lore = readLoreSelection();
   const content = {
     format: TRANSFER_FORMAT,
-    formatVersion: 1,
+    formatVersion: CONTENT_FORMAT_VERSION,
     packageId: `pkg:${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     origin: { deviceId: deviceId(), platform: platform() },
     exportedAt: now,
     snapshot,
     media: { mode: attachments.files.length ? 'include' : 'metadata-only', requiredIds: [] },
+    lore,
   };
   const contentText = JSON.stringify(content);
   const pkg = { content, checksum: await sha256Hex(contentText) };
@@ -235,6 +246,7 @@ export async function buildManifest({ now = Date.now() } = {}) {
       attachmentsBytes: attachments.bytes,
       attachmentsSkipped: attachments.skipped,
       manifestBytes: new TextEncoder().encode(manifestText).length,
+      loreCardId: lore.cardId,
     },
   };
 }

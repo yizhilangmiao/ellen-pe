@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ellen_pink">#FFE4B8CD</color>
+    <!-- 启动图标后景的基准色（自适应图标实际用的是渐变 PNG；这个色给 v31 闪屏 / 第三方引用兜底） -->
+    <color name="ic_launcher_background">#FFF4D7E4</color>
     <color name="ellen_bg">#FF17191F</color>
     <!-- 原生对话框不跟 web 皮肤走，单独给暗色底，否则白底浅字糊成一片 -->
     <color name="ellen_dialog_bg">#FF23262E</color>

@@ -405,3 +405,117 @@
 .ellen-app[data-skin='zzz'] .el-understanding-foot {
   border-top-color: color-mix(in srgb, var(--z-ink-paper) 16%, transparent);
 }
+
+/* ============================================================
+ * R3：记忆的来源与状态（2026-11-13）
+ * 单位一律 calc(N * var(--u))，基准屏 432 CSS 宽 —— 手机版不写裸像素。
+ * 状态只降调、不变色：这不是报错，是「这条现在不算数了」。
+ * ============================================================ */
+.el-memory-head {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  margin-bottom: calc(6 * var(--u));
+}
+
+.el-memory-head .el-memory-mark {
+  margin-bottom: 0;
+}
+
+.el-memory-state {
+  padding: calc(1 * var(--u)) calc(7 * var(--u));
+  border-radius: calc(4 * var(--u));
+  border: 1px solid color-mix(in srgb, var(--el-ink) 22%, transparent);
+  color: var(--el-muted);
+  font-size: calc(10.5 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  line-height: 1.7;
+}
+
+.el-memory-state.is-retired {
+  border-color: color-mix(in srgb, var(--el-ink) 34%, transparent);
+  color: var(--el-ink);
+  opacity: 0.8;
+}
+
+/* 翻篇/退役的卡片整体压暗：还能读，但不像在用的事实 */
+.el-memory-card.is-superseded,
+.el-memory-card.is-retired {
+  background: color-mix(in srgb, var(--el-paper) 72%, var(--el-surface));
+  box-shadow: none;
+}
+
+.el-memory-card.is-superseded .el-memory-title,
+.el-memory-card.is-retired .el-memory-title {
+  opacity: 0.7;
+  font-size: calc(15.5 * var(--u));
+}
+
+/* 来源：默认收起，点「翻开这段回忆」才展开 —— 卡片首屏要留给她写的那句话 */
+.el-memory-src {
+  display: none;
+  margin: calc(10 * var(--u)) 0 0;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: color-mix(in srgb, var(--el-ink) 4%, transparent);
+}
+
+.el-memory-card.is-expanded .el-memory-src {
+  display: block;
+}
+
+.el-memory-src-head {
+  margin-bottom: calc(6 * var(--u));
+  font-size: calc(10.5 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-memory-src-row {
+  display: grid;
+  grid-template-columns: calc(20 * var(--u)) 1fr;
+  gap: calc(2 * var(--u)) calc(6 * var(--u));
+  padding: calc(5 * var(--u)) 0;
+  border-top: 1px solid color-mix(in srgb, var(--el-ink) 8%, transparent);
+  font-size: calc(11.5 * var(--u));
+  line-height: 1.7;
+  color: var(--el-text);
+}
+
+.el-memory-src-row:first-of-type {
+  border-top: 0;
+}
+
+.el-memory-src-who {
+  grid-row: span 2;
+  color: var(--el-muted);
+  font-size: calc(11 * var(--u));
+}
+
+.el-memory-src-text {
+  word-break: break-word;
+  opacity: 0.9;
+}
+
+.el-memory-src-at {
+  grid-column: 2;
+  color: var(--el-muted);
+  font-size: calc(10 * var(--u));
+}
+
+.el-memory-src-none {
+  font-size: calc(11.5 * var(--u));
+  color: var(--el-muted);
+  line-height: 1.7;
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-state {
+  border-color: color-mix(in srgb, var(--z-ink-paper) 24%, transparent);
+  color: var(--z-ink-paper);
+  border-radius: var(--z-r-3);
+  font-family: var(--z-font-display);
+}
+
+.ellen-app[data-skin='zzz'] .el-memory-src {
+  background: color-mix(in srgb, var(--z-ink-paper) 8%, transparent);
+}

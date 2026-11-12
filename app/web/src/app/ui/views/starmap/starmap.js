@@ -20,6 +20,7 @@ import './starmap.css';
 const KINDS = ['chat', 'journal', 'memory', 'letter'];
 
 let corePromise = null;
+let affectPromise = null;
 function starmapCore() {
   if (!corePromise) {
     corePromise = import('../../../core/starmap.js').catch((err) => {
@@ -28,6 +29,26 @@ function starmapCore() {
     });
   }
   return corePromise;
+}
+
+// 排期 E5-③：中心星（整条带的「核」）颜色跟着情绪档位走。
+// 只染这一颗；事件星那套随机色是专门要的（starmap.js:190 那段注释），混进来就分不清谁是谁。
+const BAND_TINT = {
+  inner: '#9aa6bd',
+  hint: '#c9a7c4',
+  ask: '#e78ba6',
+  approach: '#f27a97',
+  direct: '#ff6b86',
+};
+
+function affectCore() {
+  if (!affectPromise) {
+    affectPromise = import('../../../core/affect.js').catch((err) => {
+      console.warn('[starmap] core/affect.js 还不可用', err);
+      return null;
+    });
+  }
+  return affectPromise;
 }
 
 function t(key, fallback) {
@@ -83,6 +104,7 @@ export function createStarmapView({ state } = {}) {
   let padTop = 0;
   let contentH = 0;
   let colors = {};
+  let centerColor = null; // 今日情绪档位给中心星染的色；读不到就用 colors.pink
   let lastTapAt = 0;
 
   let rafId = 0;
@@ -478,12 +500,12 @@ export function createStarmapView({ state } = {}) {
       ctx.globalCompositeOperation = 'lighter';
       // 核心给大一点：它是整条带子的「核」，太小就只剩一个点撑不起场；
       // 但别太大 —— 第一版 halo 15 直接糊成一盏灯，压到 10。
-      drawStar(vw / 2, cy, 5.4 * unit, colors.pink, 0.5 * fade, { halo: 9, glow: 0.66, core: 0.7 });
-      drawStar(vw / 2, cy, 4.2 * unit, colors.pink, 0.95 * fade, { halo: 6.6, glow: 0.58 });
+      drawStar(vw / 2, cy, 5.4 * unit, centerColor || colors.pink, 0.5 * fade, { halo: 9, glow: 0.66, core: 0.7 });
+      drawStar(vw / 2, cy, 4.2 * unit, centerColor || colors.pink, 0.95 * fade, { halo: 6.6, glow: 0.58 });
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.42 * fade;
-      ctx.strokeStyle = colors.pink;
+      ctx.strokeStyle = centerColor || colors.pink;
       ctx.lineWidth = Math.max(1, 1 * unit);
       ctx.beginPath();
       ctx.arc(vw / 2, cy, 10 * unit, 0, Math.PI * 2);
@@ -1013,12 +1035,31 @@ export function createStarmapView({ state } = {}) {
     }
   }
 
+  function loadCenterTint() {
+    affectCore()
+      .then(async (mod) => {
+        if (!mod || destroyed) return null;
+        const st = await mod.loadAffect({ persist: false });
+        if (destroyed) return null;
+        const id = mod.snapshot(st).band.id;
+        const next = BAND_TINT[id] || null;
+        if (next && next !== centerColor) {
+          centerColor = next;
+          if (root) root.setAttribute('data-band', id);
+          schedule();
+        }
+        return null;
+      })
+      .catch(() => {});
+  }
+
   function render(container, mountProps = {}) {
     root = container;
     props = mountProps || {};
     buildShell(container);
     measure();
     readColors();
+    loadCenterTint();
     const injected = props.data;
     if (injected) setData(injected);
     else {

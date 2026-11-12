@@ -236,6 +236,24 @@ function mergeIds(a, b) {
   return [...out];
 }
 
+/**
+ * 取走晚安仪式寄存的情绪附录（E5）。
+ *
+ * 为什么放在这里补：晚安（22 点后）经常比手记早 —— 那会儿手记还没有，附录只能先寄存在
+ * ritual 的 meta 里。手记一写就把它接上，这一天的手记才带得住「她那天什么状态」。
+ * 动态 import：ritual 会拉起 affect 两层（数值 + 事件表），手记是低频动作，
+ * 不值得让启动路径替它加载。
+ */
+async function takeMoodAppendix() {
+  try {
+    const ritual = await import('./ritual.js');
+    return typeof ritual.takeMoodAppendix === 'function' ? await ritual.takeMoodAppendix() : '';
+  } catch (err) {
+    console.warn('[journal] 取不到情绪附录', err);
+    return '';
+  }
+}
+
 let running = false;
 
 /**
@@ -260,7 +278,10 @@ export async function maybeCompose({ config, messages, at = Date.now() }) {
   try {
     const previous = await todayJournal(at - 86400000);
     const entry = await compose({ config, messages: gate.messages, previous, at });
-    const res = await writeJournal({ ...entry, day: gate.day, at });
+    // 晚安时先寄存的情绪附录，趁这一篇补进去（手记在手记之后写的那天就靠这一行）
+    const appendix = await takeMoodAppendix();
+    const thoughts = [entry.thoughts, appendix].filter(Boolean).join('\n\n');
+    const res = await writeJournal({ ...entry, thoughts, day: gate.day, at });
     return { ...res, title: entry.title };
   } finally {
     running = false;

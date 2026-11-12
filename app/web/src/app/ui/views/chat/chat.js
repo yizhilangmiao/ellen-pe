@@ -2,6 +2,7 @@
 // （§6.5 第 1 条：视图单向依赖；验收 grep 本文件出现 fetch(/registerPlugin 必须 0 条）。
 // 真正的发送走 props.onSend（由 app 层注入，app 层再交给 core/chat 会话）。
 import { s } from '../../../strings.zh.js';
+import { push } from '../../router.js';
 import { iconEl } from '../../icons.js';
 import { renderRichText } from '../../richtext.js';
 import { speak, stop as stopSpeaking, plain, synthesizeUrl } from '../../../core/speech.js';
@@ -9,6 +10,22 @@ import { readDocument, toBlobUrl, revokeAll } from '../../../core/documents.js';
 import { readVolume, writeVolume, volumeSupported, flushVolume, onVolumeChange } from '../../../core/volume.js';
 import { pickImage, mediaSupported } from '../../../core/media.js';
 import { STICKERS, STICKER_FAVORITES, stickerById, stickerUrl } from '../../../assets/stickers.js';
+import {
+  MAX_CUSTOM_STICKERS,
+  customStickerUrl,
+  customStickerUrlSync,
+  customStickers,
+  deleteCustomSticker,
+  ensureCustomStickers,
+  importCustomSticker,
+  isCustomStickerId,
+  isKept,
+  noteHerSticker,
+  onCustomStickersChange,
+  prefetchCustomStickers,
+  releaseCustomUrls,
+  toggleKeepSticker,
+} from '../../../core/sticker-library.js';
 import './chat.css';
 
 // 语音态文案。lead 在改 strings.zh.js，这里先用本地常量，别两头改同一个文件。
@@ -115,8 +132,10 @@ export function createChatView() {
         messages: props.messages ? props.messages.slice() : [],
         model: props.model || null,
         busy: false,
-        // 输入条两态：text（文本框） / voice（按住说话）
-        mode: 'text',
+        // 输入区三态：text（键盘） / voice（按住说话） / panel（「+」面板），彼此互斥。
+        // 空串 = 还没落定：mount 末尾的 setMode('text', false) 会一次性把 DOM 摆到键盘态
+        // （早返回的幂等判断需要「当前不是 text」才肯干活，所以初值不能写 'text'）。
+        mode: '',
       };
 
       el.classList.add('el-chat-page');
@@ -125,8 +144,19 @@ export function createChatView() {
       const stream = document.createElement('div');
       stream.className = 'el-chat-stream';
 
+      // —— 输入区骨架：三行 + 一块面板（照 QQ 的排法重排）——
+      // 为什么不再是一行：一行里塞 8 个图标时，输入框被压到 150u 上下，写半句就折行；
+      // 发送键又和常驻动作挤在同一排，右拇指每次都要在两个小图标之间挑。
+      //   ① .el-composer-entry   输入框独占一行（语音态换成整条「按住说话」）
+      //   ② .el-composer-sendrow 发送/停止，有字或在等回复时才出现，自己一行靠右
+      //   ③ .el-composer-tools   三个常驻动作（语音/键盘、表情、+），固定靠右下
+      //   ④ .el-chat-panel       点「+」升起的面板
       const composer = document.createElement('div');
       composer.className = 'el-chat-composer';
+
+      // 第一行：输入框独占整行。它不能和任何动作按钮同排，否则「占满宽度」就是假的。
+      const entry = document.createElement('div');
+      entry.className = 'el-composer-entry';
 
       const field = document.createElement('textarea');
       field.className = 'el-composer-field';
@@ -181,7 +211,49 @@ export function createChatView() {
       stopBtn.setAttribute('aria-label', s('chat.stop'));
       stopBtn.hidden = true;
 
-      composer.append(micBtn, keyboardBtn, field, holdBtn, stopBtn, sendBtn);
+      entry.append(field, holdBtn);
+
+      // 第二行：发送 / 停止，靠右独占一行。
+      // 发送是「这一下真要发出去」的决定性动作，混进图标堆里最容易误触；
+      // 没有字时整行收起（有字才显示），输入区平时保持两行高度。
+      const sendRow = document.createElement('div');
+      sendRow.className = 'el-composer-sendrow';
+      sendRow.hidden = true;
+      sendRow.append(sendBtn, stopBtn);
+
+      const tools = document.createElement('div');
+      tools.className = 'el-composer-tools';
+
+      // 「+」：三个常驻动作里最右那个，点开是面板态。再点一次收回键盘态。
+      const plusBtn = document.createElement('button');
+      plusBtn.type = 'button';
+      plusBtn.className = 'el-composer-plus';
+      plusBtn.append(iconEl('plus'));
+      plusBtn.setAttribute('aria-label', s('chat.panelAria'));
+      plusBtn.setAttribute('aria-expanded', 'false');
+
+      // 顺序照拇指动线：语音/键盘切换 → 表情 → +
+      tools.append(micBtn, keyboardBtn, plusBtn);
+
+      // 第三行下面那块面板。它挂在 composer 里（不是 fixed 遮罩）：
+      // 面板一长高，flex 就把高度从 .el-chat-stream 里拿走，消息列表被顶起来，
+      // 最后几条不会被盖住 —— 遮挡问题从布局上消失，不需要自己算偏移。
+      const panel = document.createElement('div');
+      panel.className = 'el-chat-panel';
+      panel.hidden = true;
+
+      const panelGrid = document.createElement('div');
+      panelGrid.className = 'el-chat-panel-grid';
+
+      // 「我的表情」页签的内容容器：这一轮只有空态，
+      // 下一条任务往 renderPanelMine() 里填真内容即可（入口已经通，不用再改面板）。
+      const panelMine = document.createElement('div');
+      panelMine.className = 'el-chat-panel-mine';
+      panelMine.hidden = true;
+
+      panel.append(panelGrid, panelMine);
+
+      composer.append(entry, sendRow, tools, panel);
 
       // 系统条：技术性失败（HTTP 404 / 钥匙不对）只在这里出现一行，不塞进她的气泡里。
       // 评审原话「404 进系统条」：错误不是她说的话，长得像气泡就会让人以为是她在推卸。
@@ -217,6 +289,25 @@ export function createChatView() {
       hud.append(hudWave, hudTimer, hudHint);
 
       el.append(stream, systemStrip, composer, hud);
+
+      // 顶栏通话入口：聊天页右上角一颗浮钮，点它 push 全屏通话页。
+      // 为什么不放进 composer：通话不是「输入方式」，混在输入区会被当成第四个动作；
+      // 也不塞进 app 顶栏（那是 main.js 的地盘，多人在改），所以就地浮在这里。
+      const callBtn = document.createElement('button');
+      callBtn.type = 'button';
+      callBtn.className = 'el-chat-call-btn';
+      callBtn.setAttribute('aria-label', sOr('chat.callEntry', '语音通话'));
+      callBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ' +
+        'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M6.5 3.5h3l1.5 4-2 1.4a11.5 11.5 0 0 0 6.1 6.1l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"></path>' +
+        '</svg>';
+      callBtn.addEventListener('click', () => {
+        // 进通话页先把输入区收回键盘态：面板/语音态留在下面，回来时不会半开着。
+        setMode('text', false, false);
+        props.onOpenCall ? props.onOpenCall() : push('call');
+      });
+      el.append(callBtn);
 
       let dismissedAt = -1;
 
@@ -354,26 +445,58 @@ export function createChatView() {
           box.append(ph);
         };
 
-        // 表情包：素材在本包里（assets/stickers/*.webp），不需要读文档、不需要异步解码
+        // 表情包：包内素材直接给 URL；用户导入的那批要先从原生读回字节（异步），
+        // 所以先进「加载中」态，拿到 blob URL 再贴 src —— 不然会闪一下占位再跳图。
         if (msg.stickerId) {
           const st = stickerById(msg.stickerId);
           const url = st ? stickerUrl(st) : '';
-          if (!url) {
+          const custom = isCustomStickerId(msg.stickerId);
+          if (!url && !custom) {
             placeholder(sOr('msg.expressionPlaceholder', 'msg.expressionEmpty'));
             return box;
           }
           const sit = document.createElement('img');
           sit.className = 'el-msg-expr-img';
           sit.decoding = 'async';
-          sit.alt = st.label || st.id;
-          sit.src = url;
+          sit.alt = (st && st.label) || msg.stickerId;
+          if (url) sit.src = url;
           box.append(sit);
+          if (!url) {
+            // 自定义表情：占位淡一点，图到了再显形。读失败（文件被清理掉）就退回占位文字，
+            // 别留一个永远空白的方块
+            box.classList.add('is-loading');
+            customStickerUrl(msg.stickerId)
+              .then((real) => {
+                if (!real) {
+                  box.classList.remove('is-loading');
+                  sit.remove();
+                  placeholder(sOr('msg.expressionPlaceholder', 'msg.expressionEmpty'));
+                  return;
+                }
+                sit.src = real;
+                box.classList.remove('is-loading');
+              })
+              .catch(() => {
+                box.classList.remove('is-loading');
+              });
+          }
           // 表情贴纸自带透明底：气泡底色留着就成了一个黑方块，把底去掉只留图
           box.classList.add('is-tappable', 'is-sticker');
           box.addEventListener('click', () => {
             if (suppressTapUntil > Date.now()) return;
             openViewer(sit.currentSrc || sit.src);
           });
+          // 她发出来的这张在「性格层」记一笔：要不要自动收藏由 core 的纯函数判
+          // （没有情绪证据就不动，别替用户决定）。写在渲染里是因为这是唯一
+          // 「她真的发出去了」的地方 —— 池子挑中但被丢掉的图不该记账。
+          if (msg.role !== 'user') {
+            noteHerSticker({
+              id: msg.stickerId,
+              slot: (st && st.slot) || '',
+              src: custom ? 'custom' : 'builtin',
+              mood: String(props.mood || ''),
+            }).catch(() => {});
+          }
           return box;
         }
 
@@ -465,6 +588,20 @@ export function createChatView() {
 
       let sheetOpen = false;
 
+      /** 表情 sheet 开着时对「自定义表情清单」的订阅；关掉 sheet 必须退订，否则闭包攥着整棵 DOM。 */
+      let stickerSheetUnsubs = [];
+
+      function clearStickerSheetSubs() {
+        stickerSheetUnsubs.forEach((fn) => {
+          try {
+            fn();
+          } catch (err) {
+            /* 退订失败不用管，反正下一次重开会重建 */
+          }
+        });
+        stickerSheetUnsubs = [];
+      }
+
       /**
        * 开一个底部 sheet。
        * @param {string} title 标题（空串 = 不显示标题行）
@@ -488,6 +625,9 @@ export function createChatView() {
       function closeSheet() {
         if (!sheetOpen) return;
         sheetOpen = false;
+        // 表情 sheet 的订阅在这里退：sheetList 马上要被清空，
+        // 留着订阅只会在下一次清单变化时对着已摘掉的节点重画
+        if (typeof clearStickerSheetSubs === 'function') clearStickerSheetSubs();
         sheetMask.classList.remove('is-open');
         sheet.classList.remove('is-open');
         sheet.hidden = true;
@@ -632,6 +772,33 @@ export function createChatView() {
             run: () => saveImageOf(msg),
           });
         }
+        // 她发的表情：收藏 = 记进她「会想再发一次」的池子（包内 s0xx 和自定义 u:xxx 都认）。
+        // 只对她这一侧开放 —— 自己发出去的那张本来就在库里，没有「收藏自己」这回事。
+        const isSticker = msg.type === 'expression' && !!msg.stickerId;
+        if (!recalled && !mine && isSticker) {
+          const kept = isKept(msg.stickerId);
+          rows.push({
+            label: kept ? s('msg.stickerUnkeep') : s('msg.stickerKeep'),
+            run: () => {
+              toggleKeepSticker(msg.stickerId, {
+                slot: (stickerById(msg.stickerId) || {}).slot || '',
+              })
+                .then((nowKept) => flashStickerNote(nowKept ? s('msg.stickerKept') : s('msg.stickerUnkept')))
+                .catch(() => {});
+            },
+          });
+        }
+        // 自己发的自定义表情：删掉它（只在「我的」里也有，但这里更顺手）
+        if (!recalled && mine && isSticker && isCustomStickerId(msg.stickerId)) {
+          rows.push({
+            label: s('msg.stickerDelete'),
+            run: () => {
+              deleteCustomSticker(msg.stickerId)
+                .then((ok) => flashStickerNote(ok ? s('msg.stickerDeleted') : s('msg.stickerDeleteFail')))
+                .catch(() => flashStickerNote(s('msg.stickerDeleteFail')));
+            },
+          });
+        }
         if (msg.quoteOf && typeof props.onShowQuote === 'function') {
           rows.push({ label: s('msg.menuShowQuote'), run: () => props.onShowQuote(msg.quoteOf) });
         }
@@ -664,46 +831,15 @@ export function createChatView() {
         });
       }
 
-      // —— 音量台（A5）：输入条左侧的小喇叭 → 底部面板 ——
-      const volBtn = document.createElement('button');
-      volBtn.type = 'button';
-      volBtn.className = 'el-composer-volume';
-      volBtn.append(iconEl('volume'));
-      volBtn.setAttribute('aria-label', s('volume.title'));
-      composer.insertBefore(volBtn, micBtn);
-
-      // —— 发图（A6 的入口）：只有 app 层给了 onPickImage 才出现 ——
-      // 不给就不显示按钮：一个点了没反应的「+」，比没有这个按钮更让人恼火。
-      let pickBtn = null;
+      // —— 音量（A5）：面板里的「音量」磁贴就是静音开关，长按才给滑杆 ——
+      // 没有原生音量能力时整块磁贴不建：改不动系统音量的按钮，只会让人以为界面在骗人。
+      let volumeTile = null;
+      // 选图重入锁：系统选择器不能同时开两个，第二个会把第一个顶掉，回来的结果就对不上号。
       let pickingImage = false;
 
-      if (typeof props.onPickImage === 'function') {
-        pickBtn = document.createElement('button');
-        pickBtn.type = 'button';
-        pickBtn.className = 'el-composer-image';
-        pickBtn.append(iconEl('plus'));
-        // 文案键还没落（msg.menuPickImage）：s() 缺键会原样返回 key，
-        // Lead 补进 strings.zh.js 之后这里自动变成人话，不必回来改。
-        pickBtn.setAttribute('aria-label', s('msg.menuPickImage'));
-        pickBtn.addEventListener('click', async () => {
-          if (pickingImage || !mediaSupported()) return;
-          pickingImage = true;
-          pickBtn.disabled = true;
-          try {
-            const picked = await pickImage();
-            // picked:false = 用户取消 / 浏览器环境 / 上一次还没回来，都不用说话
-            if (picked && picked.picked) await props.onPickImage(picked);
-          } catch (err) {
-            console.warn('[chat] 选图失败', err);
-          } finally {
-            pickingImage = false;
-            pickBtn.disabled = false;
-          }
-        });
-        composer.insertBefore(pickBtn, volBtn);
-      }
-
       // —— 表情面板（A1）：素材已经在包里（225 张 webp），分「常用 + 三套」，一页 8 个 ——
+      // 打开的是底部 sheet（浮层）：先把键盘和面板收掉，
+      // 否则 sheet 下面还压着键盘，关掉后人会以为「点了没反应」。
       let stickerBtn = null;
       if (typeof props.onSticker === 'function') {
         stickerBtn = document.createElement('button');
@@ -711,11 +847,18 @@ export function createChatView() {
         stickerBtn.className = 'el-composer-sticker';
         stickerBtn.append(iconEl('smile'));
         stickerBtn.setAttribute('aria-label', s('msg.stickerPanel'));
-        stickerBtn.addEventListener('click', () => openStickers());
-        composer.insertBefore(stickerBtn, pickBtn || volBtn);
+        stickerBtn.addEventListener('click', () => {
+          setMode('text', false, false);
+          field.blur();
+          openStickers();
+        });
+        tools.insertBefore(stickerBtn, plusBtn);
       }
 
       const STICKER_PAGE = 8;
+
+      /** 导入进行中：选择器是单槽的，连点两下第二下只会拿到 MEDIA_BUSY。 */
+      let importing = false;
 
       /**
        * 「常用」在前，其余按素材里真实的套名分组（套名是中文：米仔 / 绝区零官方 / 丽都漫步）。
@@ -740,61 +883,140 @@ export function createChatView() {
         return pools;
       }
 
+      /**
+       * 表情面板。第一页永远是「我的」（自己导入的），后面才是包内的常用 + 三套。
+       *
+       * 为什么「我的」放最前：导入一张图的人，下一步一定是想发出去；
+       * 把它排在四五个包内页签后面，等于让人每次先翻三页。
+       *
+       * 长按删除做成「页内确认条」而不是再弹一层 sheet：
+       * 二次 sheet 会盖掉当前页签和页码，取消回来就不知道自己刚才在哪了。
+       *
+       * 永远从「我的」页开：外部入口（「+」面板的「我的表情」磁贴）只需要落到
+       * 自己的表情上，不猜包内页签的序号 —— 页签数量取决于素材分组，写死 1/2/3 早晚错位。
+       */
       function openStickers() {
         const pools = stickerPools();
+        clearStickerSheetSubs();
         let tab = 0;
         let page = 0;
+        // 待删除的自定义表情 id（长按后出现在顶部确认条里，点「删除」才真删）
+        let pendingDelete = '';
+        let unsubscribe = null;
+
         openSheet('', (list) => {
           const wrap = document.createElement('div');
           wrap.className = 'el-stk';
           const tabs = document.createElement('div');
           tabs.className = 'el-stk-tabs';
+          const confirm = document.createElement('div');
+          confirm.className = 'el-stk-confirm';
           const grid = document.createElement('div');
           grid.className = 'el-stk-grid';
           const pager = document.createElement('div');
           pager.className = 'el-stk-pager';
-          wrap.append(tabs, grid, pager);
+          wrap.append(tabs, confirm, grid, pager);
           list.append(wrap);
 
+          /** 「我的」页：导入磁贴 + 已导入的格子，按 8 格一页。 */
+          const mineEntries = () => [
+            { add: true, id: '__add__' },
+            ...customStickers().map((it) => ({ add: false, item: it })),
+          ];
+
+          const paintConfirm = () => {
+            confirm.innerHTML = '';
+            if (!pendingDelete) {
+              confirm.hidden = true;
+              return;
+            }
+            confirm.hidden = false;
+            const tip = document.createElement('span');
+            tip.className = 'el-stk-confirm-tip';
+            tip.textContent = s('msg.stickerDeleteHint');
+            const no = document.createElement('button');
+            no.type = 'button';
+            no.className = 'el-stk-confirm-btn';
+            no.textContent = s('msg.stickerCancel');
+            no.addEventListener('click', () => {
+              pendingDelete = '';
+              paintConfirm();
+            });
+            const yes = document.createElement('button');
+            yes.type = 'button';
+            yes.className = 'el-stk-confirm-btn is-danger';
+            yes.textContent = s('msg.stickerDelete');
+            yes.addEventListener('click', () => {
+              const target = pendingDelete;
+              pendingDelete = '';
+              paintConfirm();
+              // 删完重画：清单变化会通过订阅再触发一次 paint，这里先本地收一格免得闪
+              deleteCustomSticker(target)
+                .then((ok) => {
+                  if (!ok) flashStickerNote(s('msg.stickerDeleteFail'));
+                })
+                .catch(() => flashStickerNote(s('msg.stickerDeleteFail')));
+            });
+            confirm.append(tip, no, yes);
+          };
+
           const paint = () => {
-            const pool = pools[tab] || pools[0];
-            const pages = Math.max(1, Math.ceil(pool.list.length / STICKER_PAGE));
+            const isMine = tab === 0;
+            const pool = isMine ? null : pools[tab - 1] || pools[0];
+            const total = isMine ? mineEntries().length : pool.list.length;
+            const pages = Math.max(1, Math.ceil(total / STICKER_PAGE));
             if (page >= pages) page = pages - 1;
 
             tabs.innerHTML = '';
+            const myTab = document.createElement('button');
+            myTab.type = 'button';
+            myTab.className = 'el-stk-tab' + (isMine ? ' is-on' : '');
+            myTab.textContent = s('msg.stickerMine');
+            myTab.addEventListener('click', () => {
+              tab = 0;
+              page = 0;
+              pendingDelete = '';
+              paint();
+            });
+            tabs.append(myTab);
             pools.forEach((p, i) => {
               const b = document.createElement('button');
               b.type = 'button';
-              b.className = 'el-stk-tab' + (i === tab ? ' is-on' : '');
+              b.className = 'el-stk-tab' + (tab === i + 1 ? ' is-on' : '');
               b.textContent = p.label;
               b.addEventListener('click', () => {
-                tab = i;
+                tab = i + 1;
                 page = 0;
+                pendingDelete = '';
                 paint();
               });
               tabs.append(b);
             });
 
             grid.innerHTML = '';
-            pool.list.slice(page * STICKER_PAGE, page * STICKER_PAGE + STICKER_PAGE).forEach((st) => {
-              const cell = document.createElement('button');
-              cell.type = 'button';
-              cell.className = 'el-stk-cell';
-              cell.setAttribute('aria-label', st.label || st.id);
-              const im = document.createElement('img');
-              im.src = stickerUrl(st);
-              im.alt = st.label || st.id;
-              im.decoding = 'async';
-              im.loading = 'lazy';
-              cell.append(im);
-              cell.addEventListener('click', () => {
-                closeSheet();
-                if (typeof props.onSticker === 'function') {
-                  props.onSticker({ id: st.id, file: st.file, label: st.label || '' });
+            paintConfirm();
+
+            if (isMine) {
+              const slice = mineEntries().slice(page * STICKER_PAGE, page * STICKER_PAGE + STICKER_PAGE);
+              slice.forEach((ent) => {
+                if (ent.add) {
+                  grid.append(addStickerCell());
+                  return;
                 }
+                grid.append(customStickerCell(ent.item, (id) => {
+                  pendingDelete = id;
+                  paintConfirm();
+                }));
               });
-              grid.append(cell);
-            });
+              // 预取本页缩略图：一格一格亮起来很难看，而且面板本来就是「一眼挑一张」
+              prefetchCustomStickers(
+                slice.filter((e) => !e.add).map((e) => e.item.id),
+              );
+            } else {
+              pool.list.slice(page * STICKER_PAGE, page * STICKER_PAGE + STICKER_PAGE).forEach((st) => {
+                grid.append(builtinStickerCell(st));
+              });
+            }
 
             pager.innerHTML = '';
             if (pages > 1) {
@@ -827,8 +1049,151 @@ export function createChatView() {
             }
           };
 
+          /** 包内那一格：本来就是同步 URL，照旧。 */
+          function builtinStickerCell(st) {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'el-stk-cell';
+            cell.setAttribute('aria-label', st.label || st.id);
+            const im = document.createElement('img');
+            im.src = stickerUrl(st);
+            im.alt = st.label || st.id;
+            im.decoding = 'async';
+            im.loading = 'lazy';
+            cell.append(im);
+            cell.addEventListener('click', () => {
+              closeSheet();
+              if (typeof props.onSticker === 'function') {
+                props.onSticker({ id: st.id, file: st.file, label: st.label || '' });
+              }
+            });
+            return cell;
+          }
+
+          /** 「导入」磁贴：永远在第一格，空表时它也是唯一的格子。 */
+          function addStickerCell() {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'el-stk-cell is-add';
+            cell.setAttribute('aria-label', s('msg.stickerAdd'));
+            cell.append(iconEl('plus'));
+            const count = document.createElement('span');
+            count.className = 'el-stk-add-count';
+            count.textContent = `${customStickers().length}/${MAX_CUSTOM_STICKERS}`;
+            cell.append(count);
+            cell.addEventListener('click', () => {
+              runImport(cell);
+            });
+            return cell;
+          }
+
+          /** 用户自己那张：URL 是异步来的，先占位再贴；长按进入删除确认。 */
+          function customStickerCell(item, askDelete) {
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'el-stk-cell is-custom';
+            cell.setAttribute('aria-label', item.label || item.name);
+            const im = document.createElement('img');
+            im.alt = item.label || item.name;
+            im.decoding = 'async';
+            im.loading = 'lazy';
+            const known = customStickerUrlSync(item.id);
+            if (known) im.src = known;
+            else {
+              cell.classList.add('is-loading');
+              customStickerUrl(item.id).then((url) => {
+                cell.classList.remove('is-loading');
+                if (url) im.src = url;
+                else cell.classList.add('is-missing');
+              });
+            }
+            cell.append(im);
+
+            // 长按删除：用 pointer 事件而不是 contextmenu —— WebView 里长按图片
+            // 会先弹系统菜单，contextmenu 拿不到干净的一次事件。
+            let timer = 0;
+            let moved = false;
+            let startAt = 0;
+            const clear = () => {
+              if (timer) clearTimeout(timer);
+              timer = 0;
+              moved = false;
+            };
+            cell.addEventListener('pointerdown', (ev) => {
+              if (ev.button !== undefined && ev.button !== 0) return;
+              moved = false;
+              startAt = Date.now();
+              timer = setTimeout(() => {
+                timer = 0;
+                if (moved) return;
+                askDelete(item.id);
+              }, 550);
+            });
+            cell.addEventListener('pointermove', () => {
+              if (!timer) return;
+              if (Date.now() - startAt > 120) moved = true;
+              clear();
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach((name) => {
+              cell.addEventListener(name, clear);
+            });
+            cell.addEventListener('contextmenu', (ev) => ev.preventDefault());
+            cell.addEventListener('click', () => {
+              // 长按已触发过删除确认时，抬手那一下不该把图发出去
+              if (timer || Date.now() - startAt < 250) return;
+              closeSheet();
+              if (typeof props.onSticker === 'function') {
+                props.onSticker({ id: item.id, file: item.name, label: item.label || '' });
+              }
+            });
+            return cell;
+          }
+
           paint();
+          // 导入/删除之后清单会变，页签内容要跟着重画（不然删了还留在格子里）
+          unsubscribe = onCustomStickersChange(() => {
+            if (pendingDelete) return; // 确认条还开着，别在用户点「删除」前把格子换掉
+            paint();
+          });
+          stickerSheetUnsubs.push(unsubscribe);
         });
+      }
+
+      /**
+       * 一句轻提示（导入成功 / 删掉了 / 已收藏）。
+       * 挂到视图根节点而不是 sheetList：长按菜单点完那一行 sheet 就关了，
+       * 提示要是跟着 sheet 一起消失，用户会以为「刚才那下没生效」。
+       */
+      function flashStickerNote(text) {
+        const node = document.createElement('div');
+        node.className = 'el-stk-note';
+        node.textContent = text;
+        el.append(node);
+        setTimeout(() => node.remove(), 1800);
+      }
+
+      /** 导入一张自定义表情。原生负责缩放/判动图，这里只处理结果与提示。 */
+      async function runImport(cell) {
+        if (importing) return;
+        importing = true;
+        if (cell) cell.classList.add('is-busy');
+        try {
+          const res = await importCustomSticker({
+            slot: '',
+            label: '',
+          });
+          if (res) flashStickerNote(s('msg.stickerImported'));
+        } catch (err) {
+          const code = (err && err.code) || '';
+          if (code === 'STICKER_LIMIT') flashStickerNote(s('msg.stickerLimit'));
+          else if (code === 'MEDIA_TOO_LARGE' || code === 'STICKER_TOO_LARGE') {
+            flashStickerNote(s('msg.stickerTooLarge'));
+          } else if (code === 'STICKER_NO_NATIVE') flashStickerNote(s('msg.stickerImportUnsupported'));
+          else flashStickerNote(`${s('msg.stickerImportFail')}${code || ''}`);
+        } finally {
+          importing = false;
+          if (cell) cell.classList.remove('is-busy');
+        }
       }
 
       let volume = 60;
@@ -843,10 +1208,18 @@ export function createChatView() {
         return Math.max(0, Math.min(100, n));
       }
 
-      /** 面板/按钮的显示。只在有控件时才碰 DOM。 */
+      /** 面板磁贴 / sheet 控件的显示。只在有控件时才碰 DOM。 */
       function paintVolumeUi(supported) {
         const ok = typeof supported === 'boolean' ? supported : volumeSupported();
-        volBtn.classList.toggle('is-muted', muted);
+        // 磁贴是每次开面板现建的：这里只管「当前这一块」的样子，别去创建它
+        if (volumeTile) {
+          volumeTile.classList.toggle('is-muted', muted);
+          volumeTile.setAttribute('aria-pressed', muted ? 'true' : 'false');
+          const ico = volumeTile.querySelector('.el-chat-panel-ico');
+          if (ico) ico.replaceChildren(iconEl(muted ? 'muted' : 'volume'));
+          const sub = volumeTile.querySelector('.el-chat-panel-sub');
+          if (sub) sub.textContent = muted ? s('volume.muted') : `${volume}%`;
+        }
         if (!volUi) return;
         if (volUi.slider.value !== String(volume)) volUi.slider.value = String(volume);
         volUi.slider.disabled = !ok;
@@ -922,7 +1295,229 @@ export function createChatView() {
         });
       }
 
-      volBtn.addEventListener('click', () => openVolumePanel());
+      // ============================================================
+      // 「+」面板：按「本机真能做」的能力现生成磁贴
+      // 这一轮的实际清单（2026-11）：
+      //   · 相册     app 层给了 onPickImage 且在原生壳里（mediaSupported）
+      //   · 拍照     只有能力表里有 CAMERA / app 层给了 onTakePhoto 才建（当前壳没有相机通路）
+      //   · 我的表情 永远在，占位页签，下一条任务接
+      //   · 音量     只有原生能改系统音量才建（volumeSupported），行为 = 静音开关
+      // 空着的面板比一排点了没反应的按钮诚实，所以缺能力的项一律不建节点。
+      // ============================================================
+
+      let panelTab = 'tools';
+
+      /**
+       * 一块磁贴。icon 传节点或返回节点的函数（音量表要随静音状态换图标）。
+       * keepOpen=true 的动作不关闭面板（切页签、切静音这类「还想继续看」的操作）。
+       */
+      function panelTile(spec) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'el-chat-panel-tile';
+        tile.dataset.tile = spec.key;
+
+        const ico = document.createElement('span');
+        ico.className = 'el-chat-panel-ico';
+        ico.append(typeof spec.icon === 'function' ? spec.icon() : spec.icon);
+
+        const label = document.createElement('span');
+        label.className = 'el-chat-panel-label';
+        label.textContent = spec.label;
+
+        tile.append(ico, label);
+        if (spec.sub) {
+          const sub = document.createElement('span');
+          sub.className = 'el-chat-panel-sub';
+          sub.textContent = spec.sub;
+          tile.append(sub);
+        }
+        if (typeof spec.run === 'function') {
+          tile.addEventListener('click', () => {
+            // 关面板必须走 setMode('text')，不能只 closePanel()：
+            // 后者只收 DOM，state.mode 还停在 'panel' —— 下次点「+」会被当成
+            // 「面板已经开着，再点=收起」，结果弹出键盘、面板不出现。
+            // focusInput=false：选图/拍照马上要开系统界面，这里别把软键盘顶起来。
+            if (!spec.keepOpen) setMode('text', false, false);
+            spec.run();
+          });
+        }
+        if (typeof spec.long === 'function') {
+          // Android WebView 的长按走 contextmenu；音量滑杆这条进阶入口挂在这儿
+          tile.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            setMode('text', false, false);
+            spec.long();
+          });
+        }
+        return tile;
+      }
+
+      /** 相册：和旧「+」按钮同一条路（core/media.js 的 pickImage → app 层 onPickImage）。 */
+      async function pickFromAlbum() {
+        if (pickingImage || !mediaSupported() || typeof props.onPickImage !== 'function') return;
+        pickingImage = true;
+        try {
+          const picked = await pickImage();
+          // picked:false = 用户取消 / 浏览器环境 / 上一次还没回来，都不用说话
+          if (picked && picked.picked) await props.onPickImage(picked);
+        } catch (err) {
+          console.warn('[chat] 选图失败', err);
+        } finally {
+          pickingImage = false;
+        }
+      }
+
+      /**
+       * 拍照能力探测。core/media.js 目前只有 pickImage / saveToAlbum，
+       * 所以默认没有相机 —— 别在这里假装调一个不存在的原生方法，
+       * 那正是「按钮点了没反应」那一类老 bug 的来源。
+       */
+      function cameraSupported() {
+        if (typeof props.onTakePhoto === 'function') return true;
+        const caps = props.capabilities;
+        if (Array.isArray(caps)) return caps.includes('CAMERA');
+        if (caps && typeof caps === 'object') return caps.CAMERA === true;
+        return false;
+      }
+
+      function albumTile() {
+        return panelTile({
+          key: 'album',
+          icon: iconEl('background'),
+          label: s('chat.panelAlbum'),
+          run: () => pickFromAlbum(),
+        });
+      }
+
+      function cameraTile() {
+        // icons.js 里没有相机图标（那文件不归这条任务改），就地手写一个同规格的
+        const cam = document.createElement('span');
+        cam.className = 'el-icon';
+        cam.setAttribute('aria-hidden', 'true');
+        cam.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"></path>' +
+          '<circle cx="12" cy="13" r="3.2"></circle>' +
+          '</svg>';
+        return panelTile({
+          key: 'camera',
+          icon: cam,
+          label: s('chat.panelCamera'),
+          run: () => {
+            if (typeof props.onTakePhoto === 'function') props.onTakePhoto();
+          },
+        });
+      }
+
+      function mineTile() {
+        return panelTile({
+          key: 'mine',
+          icon: iconEl('smile'),
+          label: s('chat.panelMine'),
+          // 不再进面板里的占位页：直接开表情 sheet 的第一页（「我的」），
+          // 那里才是真正的导入 / 收藏 / 长按删除。两处各写一套必然走偏。
+          run: () => {
+            setMode('text', false, false);
+            openStickers();
+          },
+        });
+      }
+
+      function volumeTileEl() {
+        return panelTile({
+          key: 'volume',
+          icon: () => iconEl(muted ? 'muted' : 'volume'),
+          label: s('chat.panelVolume'),
+          sub: muted ? s('volume.muted') : `${volume}%`,
+          keepOpen: true,
+          // 面板里这块就是「静音开关」；要连续调音量走长按 → 滑杆 sheet
+          run: () => applyVolume(muted ? lastLoud || 60 : 0),
+          long: () => openVolumePanel(),
+        });
+      }
+
+      /**
+       * 「我的表情」占位页。
+       * 下一条任务接法：把这里换成真实的表情管理（收藏 / 上传 / 长按删除）。
+       * 入口已经通了 —— plusBtn 打开面板后点「我的表情」磁贴，
+       * 或者外部直接 api.openComposerPanel('mine')；磁贴本身不用改。
+       */
+      function renderPanelMine() {
+        panelMine.innerHTML = '';
+
+        const head = document.createElement('div');
+        head.className = 'el-chat-panel-head';
+
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'el-chat-panel-back';
+        back.append(iconEl('back'));
+        back.setAttribute('aria-label', s('chat.panelBack'));
+        back.addEventListener('click', () => openPanel('tools'));
+
+        const title = document.createElement('span');
+        title.className = 'el-chat-panel-title';
+        title.textContent = s('chat.panelMine');
+
+        head.append(back, title);
+
+        const empty = document.createElement('p');
+        empty.className = 'el-chat-panel-empty';
+        empty.textContent = s('chat.panelMineEmpty');
+
+        panelMine.append(head, empty);
+      }
+
+      /** 面板内容按「这一瞬间的能力」重建：静音状态、原生能力都可能在这期间变过。 */
+      function paintPanel() {
+        panelGrid.innerHTML = '';
+        volumeTile = null;
+
+        const tiles = [];
+        if (typeof props.onPickImage === 'function' && mediaSupported()) tiles.push(albumTile());
+        if (cameraSupported()) tiles.push(cameraTile());
+        tiles.push(mineTile());
+        if (volumeSupported()) {
+          volumeTile = volumeTileEl();
+          tiles.push(volumeTile);
+        }
+        tiles.forEach((tile) => panelGrid.append(tile));
+
+        panelGrid.hidden = panelTab !== 'tools';
+        panelMine.hidden = panelTab !== 'mine';
+        if (panelTab === 'mine') renderPanelMine();
+        paintVolumeUi();
+      }
+
+      /**
+       * 开面板。它是 composer 最后一个子节点：一长高，flex 就从 .el-chat-stream 里
+       * 拿走对应高度 —— 消息列表被顶起来，最后几条不会被面板盖住。
+       */
+      function openPanel(tab = 'tools') {
+        panelTab = tab === 'mine' ? 'mine' : 'tools';
+        paintPanel();
+        panel.hidden = false;
+        plusBtn.setAttribute('aria-expanded', 'true');
+        // 同一帧里改 transform 不会触发过渡，必须等下一帧
+        requestAnimationFrame(() => panel.classList.add('is-open'));
+        // 顶起之后仍然停在最后一条，别让人以为消息被吃掉了几条
+        stream.scrollTop = stream.scrollHeight;
+      }
+
+      function closePanel() {
+        if (panel.hidden) return;
+        panel.classList.remove('is-open');
+        // 直接收，不做退场：退场动画会让 stream 的高度晚一帧才回来，滚动位置会跳
+        panel.hidden = true;
+        panelGrid.innerHTML = '';
+        panelMine.innerHTML = '';
+        panelTab = 'tools';
+        volumeTile = null;
+        plusBtn.setAttribute('aria-expanded', 'false');
+      }
+
 
       // 原生按档位取整，set 回来的是「真实百分比」：必须回填，否则界面显示 37%、手机实际 40%。
       const offVolume = onVolumeChange((snap) => {
@@ -1040,27 +1635,52 @@ export function createChatView() {
         }, 1400);
       }
 
-      /** 两态切换。用户点的（notify=true）要告诉 app 层，初始化时不通知。 */
-      function setMode(next, notify = true) {
-        const mode = next === 'voice' ? 'voice' : 'text';
+      /**
+       * 三态互斥：text（键盘） / voice（按住说话） / panel（「+」面板）。
+       * 切走时先把上一个态带出来的东西收干净 —— 面板收起、录音作废、键盘落下：
+       *   · 进 voice：收面板 + 失焦（键盘落下去），只留「按住说话」；
+       *   · 进 panel：收语音（正在录的那条作废）+ 失焦，面板顶起消息流；
+       *   · 进 text ：收面板 + 收起录音浮层，焦点回到输入框。
+       * 同一态的重复调用直接返回：不然「再点一次 +」会先走一遍关闭流程，把面板自己关掉。
+       * 第三个参数 focusInput=false 用于「只要收起、别把键盘叫起来」（开浮层前）。
+       */
+      function setMode(next, notify = true, focusInput = true) {
+        const mode = next === 'voice' ? 'voice' : next === 'panel' ? 'panel' : 'text';
+        const prev = state.mode;
+        if (prev === mode) {
+          // panel 重复进来要重画（切页签 / 能力变了），其它态直接当作已就位
+          if (mode === 'panel') openPanel(panelTab);
+          return;
+        }
         state.mode = mode;
+
         const voice = mode === 'voice';
+        const panelMode = mode === 'panel';
+
+        if (!panelMode) closePanel();
+
+        if (prev === 'voice' && !voice) {
+          // 从语音态切走：还在录的那条直接作废，别留半段录音在后台
+          holdPointer = null;
+          if (props.voice) props.voice.cancel();
+          hud.hidden = true;
+        }
+
         composer.classList.toggle('is-voice', voice);
+        composer.classList.toggle('is-panel', panelMode);
         micBtn.hidden = voice;
         keyboardBtn.hidden = !voice;
         field.hidden = voice;
         holdBtn.hidden = !voice;
-        if (voice) {
-          field.blur();
-        } else {
-          // 从语音态切回键盘：还在录的那条直接作废，别留半段录音在后台
-          holdPointer = null;
-          if (props.voice) props.voice.cancel();
-          hud.hidden = true;
-          field.focus();
-        }
+
+        if (mode === 'text' && focusInput) field.focus();
+        else field.blur();
+
+        if (panelMode) openPanel(panelTab);
+
         syncBusy();
-        if (notify && props.onVoiceMode) props.onVoiceMode(mode);
+        // app 层只认两态：面板态对它是「文字态」（面板不该把人当成在说话）
+        if (notify && props.onVoiceMode) props.onVoiceMode(voice ? 'voice' : 'text');
       }
 
       function renderEmpty() {
@@ -1490,9 +2110,13 @@ export function createChatView() {
 
       function syncBusy() {
         const voice = state.mode === 'voice';
-        sendBtn.hidden = state.busy || voice;
+        // 发送只在「有字要发」时才出现（QQ/微信同款），所以整行跟着它一起收：
+        // 空输入区里挂着一个半透明的发送键，会让人以为按了能发空消息。
+        const canSend = !state.busy && !voice && !!field.value.trim();
+        sendBtn.hidden = !canSend;
         stopBtn.hidden = !state.busy;
-        sendBtn.disabled = state.busy || voice || !field.value.trim();
+        sendBtn.disabled = !canSend;
+        sendRow.hidden = sendBtn.hidden && stopBtn.hidden;
         // 她在说话的时候不许开新录音：一次只跑一条
         holdBtn.disabled = state.busy;
       }
@@ -1579,8 +2203,43 @@ export function createChatView() {
           voice.release();
         }
       });
-      micBtn.addEventListener('click', () => setMode('voice'));
+      // 麦克风：短按 = 切到语音态（QQ 同款，键盘落下、出现「按住说话」）；
+      // 长按 = 同一条路，只是提前在 pointerdown 上就进态 —— 手指还按着的时候
+      // 输入条已经换成按住说话了，抬起来正好接上 holdBtn 的 press。
+      let micHoldTimer = null;
+      const clearMicHold = () => {
+        if (micHoldTimer) {
+          clearTimeout(micHoldTimer);
+          micHoldTimer = null;
+        }
+      };
+      micBtn.addEventListener('pointerdown', () => {
+        clearMicHold();
+        micHoldTimer = setTimeout(() => {
+          micHoldTimer = null;
+          setMode('voice');
+        }, 180);
+      });
+      micBtn.addEventListener('pointerup', clearMicHold);
+      micBtn.addEventListener('pointercancel', clearMicHold);
+      micBtn.addEventListener('pointerleave', clearMicHold);
+      micBtn.addEventListener('click', () => {
+        clearMicHold();
+        setMode('voice');
+      });
       keyboardBtn.addEventListener('click', () => setMode('text'));
+
+      // 「+」：面板态再点一次 = 把键盘叫回来（同键盘按钮的手感），其它态进面板。
+      plusBtn.addEventListener('click', () => {
+        if (state.mode === 'panel') setMode('text');
+        else setMode('panel');
+      });
+
+      // 面板开着时点输入框：先收面板再让键盘起来。
+      // 监听 focus 而不是 click —— 外部（api.focus）也会把焦点给它，两种入口都要收面板。
+      field.addEventListener('focus', () => {
+        if (state.mode === 'panel') setMode('text');
+      });
 
       function setRecording(on) {
         micBtn.classList.toggle('is-recording', !!on);
@@ -1600,6 +2259,13 @@ export function createChatView() {
       render();
       syncBusy();
       setMode('text', false);
+      // 自定义表情的清单在 IndexedDB 里，读出来之前 stickerById 认不出 u:xxx，
+      // 首屏那几条表情会先画成占位。读完补一次 render：只在真有自定义表情时才多这一趟。
+      ensureCustomStickers()
+        .then(() => {
+          if (customStickers().length) render();
+        })
+        .catch(() => {});
       // 控制器每次状态变化都会喊一声；主入口是 props.voice 的 onState，这里只是
       // 多一条订阅通道（老版本 main.js 还没接 onState 时不至于完全没有反馈）。
       if (voice && typeof voice.subscribe === 'function') {
@@ -1644,7 +2310,8 @@ export function createChatView() {
           sheet.remove();
           sheetMask.remove();
           viewer.remove();
-          if (pickBtn) pickBtn.remove();
+          // 面板里挂着磁贴和「我的表情」节点，视图走了要连容器一起清干净
+          closePanel();
           imageCache.clear();
           // 最后一次拖动可能还在节流窗口里：视图走了也要把音量落地，否则人就白拖了
           flushVolume();
@@ -1658,6 +2325,10 @@ export function createChatView() {
           clipCache.clear();
           voiceCache.clear();
           revokeAll();
+          // 自定义表情的 blob URL 是这一层自己建的（不复用 documents 的缓存），
+          // 视图走了也要自己撤，否则切页几次就把几十 MB 留在内存里
+          clearStickerSheetSubs();
+          releaseCustomUrls();
         },
         // 供 app 层推送状态
         setMessages(list) {
@@ -1728,6 +2399,16 @@ export function createChatView() {
           openMessageMenu(msg);
           return true;
         },
+        /**
+         * 直接打开「+」面板，可指定页签（'tools' / 'mine'）。
+         * 下一轮做「我的表情」时从这里进：不必让用户先点 + 再点磁贴，
+         * 也不用再改面板结构 —— 页签容器和返回键已经在了。
+         */
+        openComposerPanel(tab) {
+          setMode('panel');
+          if (tab === 'mine') openPanel('mine');
+          return state.mode;
+        },
       };
       // 验收临时探针：页面显式置 window.__ellenChatDebug 才暴露（验完删）
       if (window.__ellenChatDebug) {
@@ -1742,6 +2423,8 @@ export function createChatView() {
           volumeOf: () => ({ volume, muted }),
           rowsOf: (msg) => menuRowsFor(msg).map((row) => row.label),
           shapeOf,
+          openComposerPanel: (tab) => api.openComposerPanel(tab),
+          panelOf: () => ({ mode: state.mode, tab: panelTab, open: !panel.hidden }),
         };
       }
       return api;

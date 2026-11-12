@@ -41,6 +41,82 @@ function overlapScore(query, target) {
   return hit / Math.sqrt(target.size || 1);
 }
 
+// —— R2：语义召回（可注入 scorer）——
+//
+// 为什么不上向量库：这条路的实测是 446 ms（见 readLatestOneTx 的注释），
+// 向量化要么每句话多一次 embedding 请求、要么本地跑模型 —— 前者把召回从毫秒拖成秒级，
+// 后者在安卓 WebView 里要背一份模型文件。用「同义词表 + 实体概念表」能拿到大部分收益：
+// 「那部电影没看完」和「电影我睡着了」共享「电影」这个概念，字面分 0.45、概念分接近 1。
+//
+// 两张表的分工：
+//   CONCEPTS 是「在聊什么」（电影 / 睡 / 吃 / 累 …），词与词之间算同一个概念；
+//   tokens() 的二元组仍是「具体那件事」（豆豆 / 吊坠），概念只补它接不住的换词。
+export const CONCEPTS = [
+  ['movie', ['电影', '片子', '影片', '看片', '院线', '上映', '影院', '剧情', '电视剧', '剧']],
+  ['unfinished', ['没看完', '看到一半', '没接着看', '半途', '断在', '没看完', '没听完', '没读完']],
+  ['sleep', ['睡', '睡着', '睡过去', '打盹', '眯', '困', '枕头', '被子', '失眠', '熬夜', '作息']],
+  ['food', ['吃', '饭', '菜', '外卖', '点菜', '下馆子', '奶茶', '咖啡', '辣', '甜', '口味', '忌口']],
+  ['tired', ['累', '疲', '乏', '撑不住', '没力气', '上班', '加班', '忙']],
+  ['mood', ['烦', '难过', '委屈', '生气', '焦虑', '压力', '哭', 'emo', '不爽']],
+  ['happy', ['开心', '高兴', '笑', '爽', '舒服', '惊喜']],
+  ['body', ['疼', '痛', '病', '药', '过敏', '发烧', '感冒', '体检', '牙', '胃']],
+  ['pet', ['猫', '狗', '宠物', '养', '豆豆', '铲屎']],
+  ['people', ['妈', '爸', '父母', '哥', '姐', '弟', '妹', '朋友', '同事', '老板', '室友', '同学']],
+  ['work', ['工作', '上班', '项目', '客户', '公司', '辞职', '面试', '出差', '开会']],
+  ['study', ['课', '考', '作业', '学校', '毕业', '论文', '老师', '背书']],
+  ['like', ['喜欢', '讨厌', '爱', '中意', '偏爱', '最想']],
+  ['plan', ['打算', '计划', '准备', '要买', '存钱', '报名', '约好', '下次']],
+  ['rel', ['在一起', '告白', '称呼', '想你', '分手', '喜欢我', '爱我']],
+];
+
+/** 词 → 概念 id。同一张表两边共用，所以「同义」就是「同一个概念」。 */
+const CONCEPT_WORDS = (() => {
+  const out = [];
+  for (const [id, words] of CONCEPTS) for (const w of words) out.push([id, w]);
+  // 长词先判：「电视剧」不能只算成「剧」，「没看完」不该被「看」吃掉
+  out.sort((a, b) => b[1].length - a[1].length);
+  return out;
+})();
+
+/** 一段文字里出现了哪些概念（索引期算一次，查询期算一次）。 */
+export function conceptsOf(text) {
+  const src = String(text || '');
+  const out = new Set();
+  if (!src) return out;
+  for (const [id, w] of CONCEPT_WORDS) if (src.includes(w)) out.add(id);
+  return out;
+}
+
+/** 字面分（旧的 overlapScore，抽成可注入的 scorer）。 */
+export function literalScorer() {
+  return (query, item) => overlapScore(query.tokens, item && item.bag);
+}
+
+/** 概念重合分：命中几个概念，按「这条记录有几个概念」归一。 */
+export function conceptScore(qConcepts, tConcepts) {
+  if (!qConcepts || !qConcepts.size || !tConcepts || !tConcepts.size) return 0;
+  let hit = 0;
+  for (const c of tConcepts) if (qConcepts.has(c)) hit++;
+  return hit / Math.sqrt(tConcepts.size);
+}
+
+/**
+ * 语义 scorer：max(字面, 0.85 × 概念分)。
+ * 为什么乘 0.85：单靠一个概念（比如都提到「电影」）就满分的话，凡是聊过的电影都会挤进来；
+ * 压到 0.85 之后它仍明显高于字面分，但压不过「概念 + 字面都中」的那一条。
+ * 为什么用 max 而不是加权求和：字面中得很好的那条不该被概念分稀释（文档：合分用 max）。
+ */
+export function semanticScorer({ weight = 0.85 } = {}) {
+  return (query, item) => {
+    const literal = overlapScore(query.tokens, item && item.bag);
+    const sem = weight * conceptScore(query.concepts, item && item.concepts);
+    return Math.max(literal, sem);
+  };
+}
+
+/** 默认 scorer 的名字：调用方写 `scorer: 'semantic'` 也行，省得自己拼。 */
+export const SCORERS = { literal: literalScorer, semantic: semanticScorer };
+
 function textOfEntry(entry) {
   const v = entry.value || {};
   if (entry.kind === 'memory') {
@@ -154,6 +230,54 @@ function readLatestOneTx(kinds) {
   }));
 }
 
+/**
+ * 这条记录能不能被召回。
+ *
+ * R1：记忆有状态了，只有 active 的算数 ——
+ *   已翻篇（superseded）是「旧说法」，召回回来她会拿旧事实回答他；
+ *   已退役（retired）是「别再提」，召回回来等于把他的话当耳旁风。
+ * 老数据没有 state 字段（undefined）一律当 active，不能因为升级就把以前的记忆静音。
+ * 这里也在索引层过滤：兜底分支（一句没对上时退回最近几条）同样走这个索引，
+ * 放行到打分之后再筛会漏掉它。
+ */
+export function recallable(entry) {
+  const v = entry && entry.value;
+  if (!v) return true;
+  if (v.state && v.state !== 'active') return false;
+  if (v.muted) return false;
+  return true;
+}
+
+/**
+ * 建一条索引项。
+ *
+ * `view` 是给 scorer 的唯一入口：只有 kind / at / evidenceAt / text / bag / concepts，
+ * **没有 entry.value.state**。状态闸（recallable）在索引层就筛完了，scorer 想绕过也没有把手。
+ * 这不是洁癖：以后谁接一个第三方 scorer，都不该有机会把「已翻篇」「别再提」的记忆塞回来。
+ */
+function makeItem(kind, entry) {
+  const text = textOfEntry(entry).slice(0, 240);
+  const value = entry.value || {};
+  const item = {
+    kind,
+    entry,
+    at: entry.at || 0,
+    // evidenceAt：这条事实「发生」的时间（记忆里会带），比写入时间更贴近「多久以前的事」
+    evidenceAt: Number(value.evidenceAt) || Number(entry.at) || 0,
+    bag: tokens(text),
+    concepts: conceptsOf(text),
+  };
+  item.view = {
+    kind: item.kind,
+    at: item.at,
+    evidenceAt: item.evidenceAt,
+    text,
+    bag: item.bag,
+    concepts: item.concepts,
+  };
+  return item;
+}
+
 async function buildIndex(sources) {
   const entries = [];
   let all = null;
@@ -166,7 +290,8 @@ async function buildIndex(sources) {
 
   if (all) {
     for (const entry of all) {
-      entries.push({ kind: entry.kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
+      if (!recallable(entry)) continue;
+      entries.push(makeItem(entry.kind, entry));
     }
   } else {
     for (const kind of sources) {
@@ -178,7 +303,8 @@ async function buildIndex(sources) {
         continue;
       }
       for (const entry of list) {
-        entries.push({ kind, entry, at: entry.at || 0, bag: tokens(textOfEntry(entry)) });
+        if (!recallable(entry)) continue;
+        entries.push(makeItem(kind, entry));
       }
     }
   }
@@ -192,21 +318,93 @@ async function buildIndex(sources) {
   return entries;
 }
 
-export async function recall(text, { limit = 6, minScore = 0.16, sources = ['memory', 'journal'] } = {}) {
-  const q = tokens(text);
+/** 时间加权系数。文档给的就是 0.15：只做轻微加权，不让「新的」压掉「对的」。 */
+export const RECENCY_WEIGHT = 0.15;
+const RECENCY_SPAN_MS = 90 * 24 * 3600 * 1000;
+
+/** scorer 炸过一次就别每条消息都刷屏（一个进程只吵一次）。 */
+let scorerWarned = false;
+
+/** scorer 传字符串就查表，传函数就用它，不传（或写错名字）= 字面。 */
+export function pickScorer(scorer) {
+  if (typeof scorer === 'function') return scorer;
+  if (typeof scorer === 'string') {
+    const factory = SCORERS[scorer];
+    if (typeof factory === 'function') return factory();
+  }
+  return literalScorer();
+}
+
+/** 查询侧的三样东西：原文、二元组、概念。 */
+export function queryOf(text) {
+  const src = String(text || '');
+  return { text: src, tokens: tokens(src), concepts: conceptsOf(src) };
+}
+
+/** 一条记录的打分视角（见 makeItem 里 view 的说明）。给测试与外部 scorer 用。 */
+export function entryView(entry) {
+  const e = entry || {};
+  const text = textOfEntry(e).slice(0, 240);
+  return {
+    kind: e.kind || '',
+    at: e.at || 0,
+    evidenceAt: Number((e.value || {}).evidenceAt) || Number(e.at) || 0,
+    text,
+    bag: tokens(text),
+    concepts: conceptsOf(text),
+  };
+}
+
+/**
+ * 也算一次分，但 scorer 抛错/返回垃圾时静默退回字面分。
+ *
+ * 为什么降级而不是抛上去：召回是每条消息都要走的路，一个第三方 scorer 的 bug
+ * 不该让「她突然想不起任何事」。宁可这轮只是字面匹配，也不能整段召回消失。
+ */
+export function scoreEntry(query, view, scorer = null) {
+  const literal = overlapScore(query.tokens, view.bag);
+  if (typeof scorer !== 'function') return literal;
+  try {
+    const v = Number(scorer(query, view));
+    if (!Number.isFinite(v)) return literal;
+    return Math.max(0, Math.min(1, v));
+  } catch (err) {
+    if (!scorerWarned) {
+      scorerWarned = true; // 每进程只吵一次，别把控制台刷满
+      console.warn('[recall] scorer 出错，退回字面分：', err);
+    }
+    return literal;
+  }
+}
+
+/**
+ * 召回与这句话相关的记忆。
+ * @param {string} text 用户刚说的话
+ * @param {{limit?: number, minScore?: number, sources?: string[],
+ *          scorer?: Function|'literal'|'semantic', now?: number}} [opts]
+ *   scorer(query, view) → 0..1；不传 = 字面分（与改造前完全一致）。
+ *   想要语义召回传 semanticScorer() 或字符串 'semantic'。
+ * @returns {Promise<Array<{kind,title,body,score,at}>>}
+ */
+export async function recall(
+  text,
+  { limit = 6, minScore = 0.16, sources = ['memory', 'journal'], scorer = null, now = Date.now() } = {},
+) {
+  const q = queryOf(text);
+  const fn = scorer ? pickScorer(scorer) : null;
   const rows = [];
   const cached = indexCache && Date.now() - indexCache.at < INDEX_TTL_MS ? indexCache : null;
   const index = cached ? cached.entries : await buildIndex(sources);
   for (const item of index) {
-    const score = overlapScore(q, item.bag);
-    rows.push({ kind: item.kind, entry: item.entry, score, at: item.at });
+    const score = scoreEntry(q, item.view || item, fn);
+    rows.push({ kind: item.kind, entry: item.entry, score, at: item.at, evidenceAt: item.evidenceAt || item.at });
   }
 
-  const now = Date.now();
   const scored = rows.map((r) => {
-    // 时间只做轻微加权：三个月内线性，之后归零
-    const age = Math.max(0, now - (r.at || now));
-    const recency = Math.max(0, 1 - age / (90 * 24 * 3600 * 1000)) * 0.15;
+    // 时间只做轻微加权：三个月内线性，之后归零。
+    // 用 evidenceAt（事情发生的时间）而不是入库时间 —— 补录的旧事不该因为「刚写进去」而排到前面。
+    const age = Math.max(0, now - (r.evidenceAt || r.at || now));
+    const recency = Math.max(0, 1 - age / RECENCY_SPAN_MS) * RECENCY_WEIGHT;
     return { ...r, total: r.score + recency };
   });
 

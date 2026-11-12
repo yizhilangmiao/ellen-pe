@@ -7,8 +7,10 @@
 //   files[]     = { id, sha256, sizeBytes, mimeType } 或 { id, name, sha256, sizeBytes, mimeType }
 //                 （后者带 name，语音附件用：name 就是 filesDir/attachments 里的文件名）
 //   package     = { content, checksum }
-//   content     = { format:'ellen-companion-transfer', formatVersion:1, packageId,
-//                   origin:{deviceId,platform}, exportedAt, snapshot, media }               恰好 7 键
+//   content     = { format:'ellen-companion-transfer', formatVersion:1|2, packageId,
+//                   origin:{deviceId,platform}, exportedAt, snapshot, media,
+//                   lore?:{cardId} }         v1 恰好 7 键；v2 = 7 键 + 可选 lore
+//                   lore 是手机版 2026-11-13 加的：记「用哪张角色卡」。老包没这个键，照常导入。
 //   snapshot    = { schemaVersion, profiles:[], records:[] }                                恰好 3 键
 //                  schemaVersion 1/2/3/4 都收；4 是当前（消息加了 type/recalled/quoteOf…）。
 //                  读到老版本时按迁移规则把 message 的 value 就地补齐，老备份照样能导进来。
@@ -25,10 +27,21 @@ import {
 } from './db.js';
 import { getMeta, invalidateProfile, putMeta } from './records.js';
 import { upgradeMessageValue } from './messages.js';
+import { applyLoreSelection, cardLabel, isKnownCard } from '../lore.js';
 
 export const ARCHIVE_MAGIC = 'ELLENPK1\n';
 export const ARCHIVE_FORMAT = 'ellen-companion-archive';
 export const TRANSFER_FORMAT = 'ellen-companion-transfer';
+/**
+ * content 版本：1 = 老包（7 键，没有 lore）；2 = 带 lore（用哪张角色卡）。
+ * 读的时候两个都认，写的时候写 2 —— 老包必须能导进来，这是兼容底线。
+ */
+export const CONTENT_FORMAT_VERSION = 2;
+/** content 的基础键（v1 就有）；lore 是 v2 追加的可选键。 */
+const CONTENT_BASE_KEYS = ['format', 'formatVersion', 'packageId', 'origin', 'exportedAt', 'snapshot', 'media'];
+/** 包里带角色卡时给用户看的提示语；文案先落在这里，strings.zh.js 由 Lead 统一收。 */
+export const LORE_PACK_HINT = '这份包含角色卡';
+
 /**
  * 当前导出的快照版本。3 → 4 只加了消息字段，容器结构没变。
  * 定义在这里（而不是 export.js）是因为 export.js 已经 import 本文件，
@@ -56,6 +69,12 @@ function keysAre(obj, expected) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
   const k = Object.keys(obj).sort().join('|');
   return k === [...expected].sort().join('|');
+}
+
+/** 只要求「这些键都在」，不要求恰好等于（给可选字段用）。 */
+function hasKeys(obj, required) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  return required.every((k) => Object.prototype.hasOwnProperty.call(obj, k));
 }
 
 /**
@@ -153,10 +172,17 @@ export function parsePackage(pkg) {
     throw fail('INVALID_PACKAGE', '资料包封装字段无效。');
   }
   const content = decoded.content;
-  if (!keysAre(content, ['format', 'formatVersion', 'packageId', 'origin', 'exportedAt', 'snapshot', 'media'])) {
+  if (!hasKeys(content, CONTENT_BASE_KEYS)) {
     throw fail('INVALID_PACKAGE', '资料包内容字段无效。');
   }
-  if (content.format !== TRANSFER_FORMAT || content.formatVersion !== 1) {
+  // 严格键集校验换成「基础键都在 + 多出来的键必须是认识的」：
+  // 这样 lore（v2）能过，拼错的字段名或被人塞进来的野字段还是会被拦。
+  const extra = Object.keys(content).filter((k) => !CONTENT_BASE_KEYS.includes(k));
+  if (extra.some((k) => k !== 'lore')) {
+    throw fail('INVALID_PACKAGE', '资料包内容字段无效。');
+  }
+  if (content.format !== TRANSFER_FORMAT
+    || (content.formatVersion !== 1 && content.formatVersion !== CONTENT_FORMAT_VERSION)) {
     throw fail('UNSUPPORTED_VERSION', '不支持此资料包格式或版本。');
   }
   if (typeof content.packageId !== 'string' || !content.packageId) {
@@ -278,12 +304,50 @@ export function rebuildHeads(records) {
   return { heads, revisions, stats: { heads: heads.length, revisions: revisions.length, dropped } };
 }
 
+/**
+ * 包里的 lore 只装一个 cardId。
+ * 校验失败**不阻断导入**：角色卡选择丢了不影响聊天数据，为一颗字段把整包判死是本末倒置。
+ */
+function parseLore(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cardId = raw.cardId;
+  if (typeof cardId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,31}$/.test(cardId)) return null;
+  return { cardId };
+}
+
+/**
+ * 这份包带不带角色卡——导入前提示用。
+ * 为什么单独一个函数：提示要出现在 page-backup 的确认框里，那里只拿得到 content。
+ */
+export function describeLorePack(content) {
+  const lore = content && typeof content === 'object' ? parseLore(content.lore) : null;
+  if (!lore) return null;
+  const known = isKnownCard(lore.cardId);
+  return {
+    cardId: known ? lore.cardId : null,
+    label: known ? cardLabel(lore.cardId) : '',
+    hint: known
+      ? `${LORE_PACK_HINT}：${cardLabel(lore.cardId)}`
+      : `${LORE_PACK_HINT}（这张卡本机没有，导入后仍用当前的）`,
+  };
+}
+
+/** 导入后把包里的角色卡选择写回本地；只在用户确认导入之后调，别在解析阶段就改人设。 */
+export function applyLorePack(content) {
+  const info = describeLorePack(content);
+  if (!info || !info.cardId) return null;
+  return applyLoreSelection({ cardId: info.cardId });
+}
+
 /** 从 manifest 一路走到 snapshot。 */
 export function extractSnapshot(manifest) {
   const parsed = manifest && manifest.manifest ? manifest.manifest : manifest;
   if (!parsed || parsed.format !== ARCHIVE_FORMAT) throw fail('INVALID_ARCHIVE_MANIFEST', '清单不对。');
   const { content } = parsePackage(parsed.package);
-  return { snapshot: parseSnapshot(content.snapshot), content };
+  // lore / loreHint 一并交出去：page-backup 要在确认框里说「这份包含角色卡」，
+  // 确认之后再用 applyLorePack(content) 落盘；这里只解析不动状态。
+  const lore = parseLore(content.lore);
+  return { snapshot: parseSnapshot(content.snapshot), content, lore, loreHint: describeLorePack(content) };
 }
 
 /**

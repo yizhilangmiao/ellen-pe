@@ -15,7 +15,7 @@ import { call, requestId } from '../../../core/native/bridge.js';
 import { PLATFORMS as ASR_PLATFORMS, loadConfig as loadAsrConfig, saveConfig as saveAsrConfig, clearConfig as clearAsrConfig, localState } from '../../../core/asr.js';
 import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakVoice, stop as stopVoice, state as voiceState, readKey as readVoiceKey, writeKey as writeVoiceKey, clearKey as clearVoiceKey } from '../../../core/speech.js';
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
-import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
+import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot, applyLorePack } from '../../../core/store/import.js';
 import { count as storeCount } from '../../../core/store/db.js';
 import { buildManifest } from '../../../core/store/export.js';
 import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder, scanPermission, requestAllFiles } from '../../../core/legacy.js';
@@ -510,7 +510,7 @@ export function createBackupPage({ state, onChange } = {}) {
             return;
           }
           const parsed = parseManifest(picked.manifestText);
-          const { snapshot, content } = extractSnapshot(parsed);
+          const { snapshot, content, loreHint } = extractSnapshot(parsed);
           const preview = rebuildHeads(snapshot.records);
           if (!preview.heads.length) {
             say(s('settings.importEmpty'));
@@ -519,13 +519,17 @@ export function createBackupPage({ state, onChange } = {}) {
           const where = content && content.origin ? content.origin.platform : '';
           const ok = window.confirm(
             `资料包来自${where || '旧版'}，含 ${preview.heads.length} 条记录、${preview.revisions.length} 次改动。\n`
-            + '导入会和这台手机的资料合并：两边新增都留下，共有记录去重，不会覆盖。',
+            + '导入会和这台手机的资料合并：两边新增都留下，共有记录去重，不会覆盖。'
+            // 角色卡单独说一句：包里的卡会替掉本机选择，不提前讲清就是偷偷改人设
+            + (loreHint ? `\n${loreHint.hint}。` : ''),
           );
           if (!ok) {
             say(s('settings.importCancelled'));
             return;
           }
           const r = await importSnapshot(snapshot, { merge: true });
+          // 记录落盘之后再写卡：用户取消上面那一下时，人设一点都不能动
+          if (loreHint && loreHint.cardId) applyLorePack(content);
           if (state && state.reload) await state.reload();
           if (onChange) onChange();
           say(`${s('settings.importDone')} ${r.heads} 条记录（${Object.entries(r.kinds).map(([k, v]) => `${k} ${v}`).join('、')}）。`);

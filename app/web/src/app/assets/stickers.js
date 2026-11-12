@@ -3,6 +3,12 @@
 //   id=13 绝区零官方 48 张 / id=14 米仔 26 张 / id=16 绝区零「丽都漫步」系列 154 张（3 张重复已去，实际 151）
 // 处理：等比缩放至长边 ≤320，居中贴 320×320 透明画布，WebP q88；合计 1.9 MB
 // 素材版权归米哈游所有，仅作个人非商业使用
+//
+// 这个文件只放「常量表 + 查表函数」。用户导入的表情不在这里：
+// 它们的清单在 core/sticker-library.js（meta `ellen.stickers.v1`），字节在 filesDir/stickers/。
+// 这里只做一件事 —— 查不到包内 id 时回落到那张表（见文件末尾 stickerById）。
+import { customStickerById, customStickerUrlSync, isCustomStickerId } from '../core/sticker-library.js';
+
 export const STICKER_SETS = [
   { key: "lido", label: "丽都漫步", count: 151 },
   { key: "official", label: "绝区零", count: 48 },
@@ -237,9 +243,47 @@ export const STICKERS = [
   { id: "s228", file: "s228.webp", label: "丽都漫步-哲", set: "丽都漫步", kind: "character" },
 ];
 
-export function stickerById(id) { return STICKERS.find((s) => s.id === id) || null; }
+/**
+ * 按 id 找一张表情：包内素材优先，认不出就回落「用户自己导入的表」。
+ *
+ * 为什么回落放在这里而不是让每个调用方自己判断：
+ *   `stickerId` 是消息里唯一的凭据（表情消息不落文件路径），凡是拿 id 找图的地方
+ *   —— 气泡、面板、她回表情的池子 —— 都得能同时认出 s0xx 和 u:xxx，
+ *   否则自定义表情会变成「发出去是空白」「她永远挑不到」。
+ *
+ * 返回的自定义条目故意把文件名放在 `file` 字段（和包内条目同形），
+ * 原生那侧叫 `name` —— 上层代码只认 `file`，别为了内部字段名到处写分支。
+ */
+export function stickerById(id) {
+  const hit = STICKERS.find((s) => s.id === id);
+  if (hit) return hit;
+  const custom = customStickerById(id);
+  if (!custom) return null;
+  return {
+    id: custom.id,
+    file: custom.name,
+    label: custom.label || '',
+    slot: custom.slot || '',
+    custom: true,
+    animated: custom.animated === true,
+  };
+}
+
 const STICKER_FILES = import.meta.glob("./stickers/*.webp", { eager: true, import: "default" });
-export function stickerUrl(sticker) { return STICKER_FILES[`./stickers/${sticker.file}`] || ""; }
+
+/**
+ * 拿可以直接塞进 `<img src>` 的地址。
+ *
+ * 自定义表情的字节在 filesDir/stickers/ 里，必须走原生读回 + blob URL，
+ * 而那是异步的 —— 渲染函数里不能 await。所以这里只回「已经加载过」的 URL：
+ *   有 → 直接显示；没有 → 回空串，界面先占位，等 customStickerUrl() resolve 再贴。
+ * 这条约定写在这里，比在三个调用点各写一次 try/await 便宜。
+ */
+export function stickerUrl(sticker) {
+  if (!sticker) return '';
+  if (isCustomStickerId(sticker.id)) return customStickerUrlSync(sticker.id);
+  return STICKER_FILES[`./stickers/${sticker.file}`] || "";
+}
 
 // 首屏常用 12 张（面板第一页），按语义槽位挑的，可随时换
 export const STICKER_FAVORITES = [

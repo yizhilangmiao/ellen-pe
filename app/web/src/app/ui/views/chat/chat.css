@@ -174,23 +174,44 @@
   color: #963451;
 }
 
-/* —— 输入栏 —— */
+/* —— 输入栏 ——
+ * 排期2：从「一行塞 8 个图标」改成纵向四段（QQ/微信同构）：
+ *   ① entry  输入框（或语音态下的「按住说话」）独占一行，吃满宽度
+ *   ② sendrow 发送/停止，只有该出现时才占位
+ *   ③ tools  常驻三键：语音/键盘、表情、「+」
+ *   ④ panel  「+」展开的能力面板
+ * 为什么竖着排：输入框要的是宽度（中文长句换行要看得见），
+ * 按钮要的是「不会误触」；两者抢同一行时，只能牺牲其中一个。
+ * 竖排之后发送键也不再贴着麦克风 —— 打错字按到发送是最贵的手误。 */
 .el-chat-composer {
   flex: none;
   display: flex;
-  align-items: flex-end;
-  gap: calc(8 * var(--u));
+  flex-direction: column;
+  gap: calc(6 * var(--u));
   padding: calc(8 * var(--u)) calc(12 * var(--u));
   padding-bottom: calc(8 * var(--u) + var(--el-safe-bottom));
   border-top: 1px solid var(--el-line);
   background: var(--el-bg);
 }
 
+/* ① 输入行 */
+.el-composer-entry {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(8 * var(--u));
+  /* 四段全部写死 100% 宽：绝区零皮肤那份 .el-chat-composer{ align-items:center }
+   * 是行向布局时代的遗留（那个文件不归这条任务改），
+   * 它会让纵向 flex 的子项缩成内容宽 —— 子项自己占满就不受它影响。 */
+  width: 100%;
+}
+
+/* 输入框：独占整行。min-width:0 是 flex 子项能真的缩下去的前提 */
 .el-composer-field {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
-  /* 46px 是物理下限：本机 u=0.84，46u 只有 38.6px，手指按下去会抖 */
-  min-height: max(calc(46 * var(--u)), 46px);
+  /* 46u 是手感下限：本机 u≈0.84 时约 39px，再矮手指按下去会抖 */
+  min-height: calc(46 * var(--u));
   max-height: calc(126 * var(--u));
   padding: calc(10 * var(--u)) calc(14 * var(--u));
   border-radius: calc(20 * var(--u));
@@ -201,6 +222,157 @@
   line-height: calc(24 * var(--u));
   resize: none;
   outline: none;
+}
+
+/* ② 发送行：靠右、单独一行，有字才出现（空的时候整行 hidden，输入区矮一截） */
+.el-composer-sendrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(8 * var(--u));
+  width: 100%;
+}
+/* hidden 属性会被 display:flex 盖掉，必须显式让位 */
+.el-composer-sendrow[hidden] { display: none; }
+
+/* ③ 常驻三键：右下角，等距，拇指一划就到 */
+.el-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  width: 100%;
+}
+
+/* 拇指动线照 QQ：语音/键盘贴左（切换键），表情和「+」贴右（要频繁点的两个）。
+   用 margin-left:auto 撑开中间空档，而不是 space-between —— 语音态下 mic 被 keyboard 顶掉，
+   space-between 会让剩下两个键漂到奇怪的位置。 */
+.el-composer-tools > .el-composer-sticker {
+  margin-left: auto;
+}
+
+/* 「+」：和语音/表情同一尺寸，转 45° 就是个叉（面板态用旋转表示「再点=收起」） */
+.el-composer-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  border-radius: 50%;
+  color: var(--el-chat-action);
+  transition: transform 200ms ease;
+}
+.el-composer-plus .el-icon svg {
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+}
+.el-chat-composer.is-panel .el-composer-plus {
+  transform: rotate(45deg);
+  color: var(--el-primary);
+}
+
+/* ④ 「+」面板。
+ * 它是 composer 里最后一个子节点，不是 fixed 浮层：
+ * 面板长高 → flex 从 .el-chat-stream 里拿走同样高度 → 消息列表被顶起来，
+ * 最后几条永远看得见。用 fixed 的话得自己算滚动补偿，键盘一出现就全错。 */
+.el-chat-panel {
+  overflow: hidden;
+  width: 100%;
+  max-height: calc(240 * var(--u));
+  padding: calc(10 * var(--u));
+  border-radius: calc(16 * var(--u));
+  border: 1px solid var(--el-line);
+  background: var(--el-surface);
+  /* 只做「向上顶出来」的位移与淡入：高度是布局自然长的，不做 height 动画（会抖滚动位置） */
+  transform: translateY(calc(8 * var(--u)));
+  opacity: 0;
+  transition: transform 180ms ease, opacity 160ms ease;
+}
+.el-chat-panel[hidden] { display: none; }
+.el-chat-panel.is-open { transform: translateY(0); opacity: 1; }
+
+.el-chat-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(8 * var(--u));
+}
+.el-chat-panel-grid[hidden] { display: none; }
+
+.el-chat-panel-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(5 * var(--u));
+  min-width: 0;
+  padding: calc(10 * var(--u)) calc(4 * var(--u));
+  border-radius: calc(14 * var(--u));
+  background: var(--el-bg);
+  color: var(--el-text);
+  text-align: center;
+}
+.el-chat-panel-tile:active { transform: scale(0.97); }
+.el-chat-panel-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  border-radius: 50%;
+  background: var(--el-surface);
+  color: var(--el-chat-action);
+}
+.el-chat-panel-ico .el-icon svg {
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+}
+.el-chat-panel-label {
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.el-chat-panel-sub {
+  font-size: calc(10.5 * var(--u));
+  line-height: calc(14 * var(--u));
+  color: var(--el-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「我的表情」页签：面板里换页而不是再开一层浮层，返回键留在原地 */
+.el-chat-panel-mine[hidden] { display: none; }
+.el-chat-panel-head {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  padding-bottom: calc(8 * var(--u));
+}
+.el-chat-panel-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  border-radius: calc(999 * var(--u));
+  color: var(--el-muted);
+}
+.el-chat-panel-back .el-icon svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.el-chat-panel-title {
+  font-size: calc(13.5 * var(--u));
+  color: var(--el-text);
+}
+.el-chat-panel-empty {
+  margin: 0;
+  padding: calc(18 * var(--u)) calc(10 * var(--u)) calc(20 * var(--u));
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-muted);
+  text-align: center;
 }
 
 .ellen-app[data-theme='light'] .el-composer-field {
@@ -218,8 +390,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: max(calc(44 * var(--u)), 46px);
-  height: max(calc(44 * var(--u)), 46px);
+  width: calc(46 * var(--u));
+  height: calc(46 * var(--u));
   border-radius: calc(999 * var(--u));
   background: var(--el-primary);
   color: var(--el-primary-ink);
@@ -235,8 +407,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: max(calc(44 * var(--u)), 46px);
-  height: max(calc(44 * var(--u)), 46px);
+  width: calc(46 * var(--u));
+  height: calc(46 * var(--u));
   border-radius: calc(999 * var(--u));
   background: var(--el-error-bg);
   color: var(--el-error);
@@ -284,8 +456,8 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: max(calc(44 * var(--u)), 46px);
-  height: max(calc(44 * var(--u)), 46px);
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   border-radius: 50%;
   color: var(--el-chat-action);
   flex: 0 0 auto;
@@ -422,16 +594,18 @@
 .el-msg-clip-note[hidden] { display: none; }
 
 /* —— 语音输入：按住说话 —— */
-/* 语音态：输入框和发送键收起来，只留键盘键 + 按住说话的整条横条 */
-.el-chat-composer.is-voice {
+/* 语音态：输入框收起，entry 行里只剩一条吃满宽度的「按住说话」。
+ * 不再写 align-items:center —— composer 现在是纵向的，横向对齐交给 entry 自己。 */
+.el-chat-composer.is-voice .el-composer-entry {
   align-items: center;
 }
 .el-composer-hold {
   flex: 1 1 auto;
   min-width: 0;
-  height: calc(38 * var(--u));
+  /* 和输入框同高：切换时输入区不跳高度，手指不会落在错位的地方 */
+  height: calc(46 * var(--u));
   padding: 0 calc(14 * var(--u));
-  border-radius: calc(10 * var(--u));
+  border-radius: calc(20 * var(--u));
   border: 1px solid var(--el-line);
   background: var(--el-surface);
   color: var(--el-text);
@@ -461,8 +635,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(38 * var(--u));
-  height: calc(38 * var(--u));
+  /* 和麦克风/+ 同尺寸：三个键在一条线上换位（语音态 ↔ 键盘态）时不跳宽 */
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   border-radius: calc(999 * var(--u));
   color: var(--el-muted);
   background: transparent;
@@ -477,7 +652,9 @@
 .el-voice-hud {
   position: fixed;
   left: 50%;
-  bottom: calc(88 * var(--u) + var(--el-safe-bottom));
+  /* 88u 是「单行输入条」时代的偏移；现在输入区是 entry + tools 两行，
+   * 浮层要抬到按住说话那条上面（约 46u + 44u + 间距），否则压着说话条挡视线 */
+  bottom: calc(124 * var(--u) + var(--el-safe-bottom));
   transform: translateX(-50%);
   z-index: 60;
   display: flex;
@@ -752,7 +929,7 @@
   margin: 0;
   padding: calc(2 * var(--u)) calc(6 * var(--u));
   border-radius: calc(999 * var(--u));
-  background: color-mix(in srgb, #000 55%, transparent);
+  background: rgba(0, 0, 0, 0.55);
   color: #fff;
 }
 
@@ -799,7 +976,7 @@
   align-items: center;
   justify-content: center;
   padding: calc(16 * var(--u));
-  background: color-mix(in srgb, #000 88%, transparent);
+  background: rgba(0, 0, 0, 0.88);
   opacity: 0;
   transition: opacity 160ms ease-out;
 }
@@ -817,7 +994,7 @@
   position: fixed;
   inset: 0;
   z-index: 95;
-  background: color-mix(in srgb, #000 45%, transparent);
+  background: rgba(0, 0, 0, 0.45);
   opacity: 0;
   transition: opacity 160ms ease-out;
 }
@@ -892,24 +1069,11 @@
   text-align: center;
 }
 
-/* —— 输入条左侧两个键（音量 / 发图）—— */
-.el-composer-volume,
-.el-composer-image {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: max(calc(38 * var(--u)), 40px);
-  height: max(calc(38 * var(--u)), 40px);
-  border-radius: 50%;
-  color: var(--el-chat-action);
-}
-.el-composer-volume .el-icon svg,
-.el-composer-image .el-icon svg {
-  width: calc(19 * var(--u));
-  height: calc(19 * var(--u));
-}
-.el-composer-volume.is-muted { color: var(--el-error); }
+/* —— 音量 ⚠ 已并入「+」面板 —— */
+/* 旧的 .el-composer-volume / .el-composer-image 两个行内键在排期2撤掉了：
+ * 它们本该占的位置是新面板里的磁贴。规则一并删除，
+ * 免得以后有人照着残留样式又往输入行里塞按钮。 */
+.el-chat-panel-tile.is-muted { color: var(--el-error); }
 
 /* —— 音量面板 —— */
 .el-volume-row {
@@ -1000,20 +1164,21 @@
 }
 
 /* —— 表情面板（A1）：素材在包内，一页 8 个，四列两行 —— */
+/* 表情键现在是常驻三键之一（44u），和麦克风/「+」同一套尺寸 */
 .el-composer-sticker {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: max(calc(38 * var(--u)), 40px);
-  height: max(calc(38 * var(--u)), 40px);
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
   border-radius: 50%;
   color: var(--el-chat-action);
 }
 
 .el-composer-sticker .el-icon svg {
-  width: calc(19 * var(--u));
-  height: calc(19 * var(--u));
+  width: calc(21 * var(--u));
+  height: calc(21 * var(--u));
 }
 
 .el-stk {
@@ -1095,4 +1260,152 @@
 .el-stk-page {
   color: var(--el-text-dim, rgba(240, 237, 241, 0.62));
   font-size: calc(12 * var(--u));
+}
+
+/* —— 自定义表情（排期2 §3）—— */
+
+/* 长按后的确认条：压在页签和格子中间，不遮住要删的那张（否则人不知道自己在删哪个） */
+.el-stk-confirm {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  padding: calc(6 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
+  /* 危险提示用很淡的一层粉：够看出「这不是普通操作」，又不至于整条通红 */
+  background: rgba(255, 120, 150, 0.14);
+}
+
+.el-stk-confirm[hidden] {
+  display: none;
+}
+
+.el-stk-confirm-tip {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--el-text, #f3eef2);
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+}
+
+.el-stk-confirm-btn {
+  flex: none;
+  padding: calc(5 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: var(--el-fill-2, rgba(255, 255, 255, 0.08));
+  color: var(--el-text, #f3eef2);
+  font-size: calc(12 * var(--u));
+}
+
+.el-stk-confirm-btn.is-danger {
+  background: var(--el-pink, #ff9fc6);
+  color: #1a1116;
+  font-weight: 600;
+}
+
+/* 「导入」磁贴：和表情格子同尺寸，图标 + 计数，一眼看出还能存几张 */
+.el-stk-cell.is-add {
+  flex-direction: column;
+  gap: calc(4 * var(--u));
+  border: calc(1 * var(--u)) dashed rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: var(--el-text-dim, rgba(240, 237, 241, 0.62));
+  aspect-ratio: 1 / 1;
+}
+
+.el-stk-cell.is-add svg {
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+}
+
+.el-stk-add-count {
+  font-size: calc(10 * var(--u));
+  line-height: 1.2;
+  opacity: 0.72;
+}
+
+.el-stk-cell.is-add.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 自定义表情要先从原生读回字节：加载中淡一点，读不到（文件被清掉了）标红提示 */
+.el-stk-cell.is-custom.is-loading img {
+  opacity: 0.25;
+}
+
+.el-stk-cell.is-custom.is-missing {
+  border: calc(1 * var(--u)) solid rgba(255, 120, 150, 0.5);
+}
+
+.el-stk-cell.is-custom.is-missing::after {
+  content: '?';
+  position: absolute;
+  color: var(--el-text-dim, rgba(240, 237, 241, 0.62));
+  font-size: calc(14 * var(--u));
+}
+
+.el-stk-cell.is-custom {
+  position: relative;
+}
+
+/* 轻提示：浮在输入区上方，等 1.8 秒自己走。挂视图根节点，所以用 fixed 定位 */
+.el-stk-note {
+  position: fixed;
+  left: 50%;
+  bottom: calc(118 * var(--u) + var(--el-safe-bottom));
+  transform: translateX(-50%);
+  z-index: 97;
+  padding: calc(7 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: rgba(20, 14, 18, 0.86);
+  color: var(--el-text, #f3eef2);
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+  pointer-events: none;
+  animation: el-stk-note-in 0.16s ease-out;
+}
+
+@keyframes el-stk-note-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(6 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* 自定义表情气泡在等字节回来：先淡淡地占位，别让 96u 的方块突然弹出来 */
+.el-msg-expr.is-loading .el-msg-expr-img {
+  opacity: 0.3;
+}
+
+/* 顶栏通话入口：右上角一颗浮钮（task-10）。
+ * 为什么浮着而不占一行：聊天页的竖向空间全给了消息流，为一个大按钮再切一条横带不值。
+ * 位置压在 stream 的上内边距里（10u），不盖住第一条气泡的正文。 */
+.el-chat-call-btn {
+  position: absolute;
+  top: calc(2 * var(--u));
+  right: calc(10 * var(--u));
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  border-radius: 50%;
+  color: var(--el-muted);
+  background: color-mix(in srgb, var(--el-surface) 72%, transparent);
+  box-shadow: 0 0 0 1px var(--el-line);
+  backdrop-filter: blur(calc(6 * var(--u)));
+}
+
+.el-chat-call-btn svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+
+.el-chat-call-btn:active {
+  color: var(--el-pink);
 }

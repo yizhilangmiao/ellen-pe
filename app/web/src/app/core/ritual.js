@@ -4,6 +4,8 @@
 // 用「本地日序取模」既保证同一天永远同一句，又保证相邻两天必不同。
 import { getMeta, putMeta } from './store/records.js';
 import { dayKey } from './bond.js';
+import { loadAffect, snapshot, dayStats } from './affect.js';
+import { activeGrudges } from './affect-events.js';
 
 export const META_KEY = 'ritual-v1';
 
@@ -58,7 +60,7 @@ function dayIndex(now) {
 }
 
 export function defaultState() {
-  return { lastAskDay: '', lastAskText: '', lastGoodnightDay: '' };
+  return { lastAskDay: '', lastAskText: '', lastGoodnightDay: '', moodAppendix: '' };
 }
 
 export function normalizeState(raw) {
@@ -68,6 +70,8 @@ export function normalizeState(raw) {
     lastAskDay: typeof raw.lastAskDay === 'string' ? raw.lastAskDay : '',
     lastAskText: typeof raw.lastAskText === 'string' ? raw.lastAskText : '',
     lastGoodnightDay: typeof raw.lastGoodnightDay === 'string' ? raw.lastGoodnightDay : '',
+    // E5：今天还没写手记时，情绪附录先寄存在这里，等手记一写就补进去
+    moodAppendix: typeof raw.moodAppendix === 'string' ? raw.moodAppendix : '',
   };
 }
 
@@ -134,8 +138,126 @@ export async function markFire(kind, now = Date.now(), text = '') {
     state.lastAskDay = day;
     if (text) state.lastAskText = String(text).slice(0, 200);
   }
+  // E5：晚安这一刻顺手把今天的情绪沉淀进手记。
+  // 为什么挂在这里而不是界面里：界面有四个入口会道晚安（聊天页、相处页、通知、后台），
+  // 每个都加一次「记得写情绪」迟早漏一个；markFire 是它们唯一的必经点。
+  if (kind === 'goodnight') {
+    try {
+      const res = await attachJournalMood({ now });
+      state.moodAppendix = res && res.ok ? '' : (res && res.appendix) || '';
+    } catch (err) {
+      // 手记写不进去不能拖垮晚安这句话；但附录也别丢 —— 先寄存在 meta 里，手记一写就补上。
+      console.warn('[ritual] 情绪附录没写进手记', err);
+      try {
+        state.moodAppendix = moodAppendix(await loadAffect({ now }), now);
+      } catch (e2) {
+        console.warn('[ritual] 情绪附录连算都算不出', e2);
+      }
+    }
+  }
   await putMeta(META_KEY, state);
   return state;
+}
+
+// —— E5：情绪沉淀 ——
+
+/** 附录开头这个标记是「替换」用的：同一篇手记里只留最新的一份情绪，不一天叠一段。 */
+const APPENDIX_TAG = '（情绪）';
+
+const GRUDGE_LABEL = { leave: '说要走', lie: '撒谎', force: '硬来', scold: '凶了一句' };
+
+function hhmm(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * 今天情绪的几句话，写进手记的「想法」段。
+ *
+ * 为什么用文字而不是塞 JSON：手记是给人看的，他翻到这一篇要能读出那天她的状态；
+ * 结构化数字（moodAvg / dimsAtClose / peak）在 dayStats / snapshot 里都有，需要的时候再取。
+ * 字数压在 150 汉字内 —— 手记正文才是主角，附录不能盖过它。
+ */
+export function moodAppendix(state, now = Date.now()) {
+  const s = snapshot(state);
+  const d = dayStats(state, now);
+  const bits = [`今天平均 ${d.moodAvg}、最高 ${d.moodPeak}（${hhmm(d.peakAt)}）。`];
+  bits.push(`收工时是「${s.mood.mood}」，${s.mood.note}`);
+  const cold = [];
+  if (s.cold.body) cold.push('身体冷');
+  if (s.cold.words) cold.push('话冷');
+  if (s.cold.heart) cold.push('心冷');
+  if (cold.length) bits.push(`${cold.join('、')}。`);
+  const grudges = activeGrudges(state, now);
+  if (grudges.length) {
+    const kinds = [...new Set(grudges.map((g) => GRUDGE_LABEL[g.kind] || g.kind))];
+    bits.push(`还没过去：${kinds.join('、')}。`);
+  }
+  return `${APPENDIX_TAG}${bits.join('')}`;
+}
+
+/**
+ * 取走寄存的情绪附录（取完就清）。
+ *
+ * 谁会用：手记在晚安之后才写的那天 —— 晚安时手记还不存在，附录只能先存着，
+ * 等手记一落库就由 journal 那边把它拿过去补上。清空是必须的：不清的话，
+ * 第二天的第一篇手记会带上昨天的情绪。
+ */
+export async function takeMoodAppendix() {
+  const state = await readState();
+  const text = String(state.moodAppendix || '').trim();
+  if (!text) return '';
+  state.moodAppendix = '';
+  try {
+    await putMeta(META_KEY, state);
+  } catch (err) {
+    console.warn('[ritual] 情绪附录清不掉', err);
+  }
+  return text;
+}
+
+/** 把手记里旧的附录摘掉（同一天重写只留最新一份）。 */
+export function stripAppendix(thoughts) {
+  const src = String(thoughts || '');
+  if (!src.includes(APPENDIX_TAG)) return src.trim();
+  return src
+    .split(/\n{2,}/)
+    .filter((seg) => !seg.trim().startsWith(APPENDIX_TAG))
+    .join('\n\n')
+    .trim();
+}
+
+/**
+ * 把情绪附录补进今天这篇手记。
+ *
+ * 为什么用动态 import 取 journal：journal 链上挂着 oneshot（网络）和 localStorage（偏好），
+ * 而 ritual 在启动时就被人 import。挪进函数里，晚安之前一个字节都不加载。
+ * hooks 只为测试留口子（塞假的 journal / 假的状态读取），生产路径不传。
+ *
+ * @returns {Promise<{ok:boolean, reason?:string, appendix:string, day?:string}>}
+ */
+export async function attachJournalMood({ now = Date.now(), hooks = {} } = {}) {
+  const load = hooks.loadAffect || loadAffect;
+  const journal = hooks.journal || (await import('./journal.js'));
+  const state = await load({ now });
+  const appendix = moodAppendix(state, now);
+  const existing = await journal.todayJournal(now);
+  if (!existing) {
+    // 今天还没写手记：不新开一篇空日记（那会在手记列表里留一条只有情绪的空壳），
+    // 交给 markFire 存进 ritual 的 moodAppendix，手记一写就能补上。
+    return { ok: false, reason: 'noJournal', appendix };
+  }
+  const value = existing.value || {};
+  await journal.writeJournal({
+    title: value.title || '今天',
+    diary: value.diary || '',
+    thoughts: [stripAppendix(value.thoughts), appendix].filter(Boolean).join('\n\n'),
+    day: value.day || dayKey(now),
+    sourceIds: [],
+    at: now,
+  });
+  return { ok: true, appendix, day: value.day || dayKey(now) };
 }
 
 /**

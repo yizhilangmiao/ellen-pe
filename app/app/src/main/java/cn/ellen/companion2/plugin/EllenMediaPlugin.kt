@@ -12,8 +12,10 @@ import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Base64
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -29,7 +31,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 聊天里的图片：选图（SAF）与存相册。只做两件事：pickImage / saveToAlbum。
+ * 聊天里的图片：选图（SAF）、存相册，以及自定义表情的导入/读取/删除。
+ *
+ * 照片三条（pickImage / saveToAlbum / 内部压缩）：
  *
  * 为什么用 ACTION_OPEN_DOCUMENT 而不是 READ_MEDIA_IMAGES：系统相册选择器是「用户亲手指定一张」，
  * 根本没给 app 读整个相册的授权，所以不需要任何读权限；Android 13 那套细分媒体权限也就完全不用碰。
@@ -51,7 +55,20 @@ class EllenMediaPlugin : Plugin() {
     /** 挂起的选择器 Call：Activity 被回收时要清掉，否则那个 Promise 永远不落地。 */
     private var pickCall: PluginCall? = null
 
+    /**
+     * 「导入自定义表情」挂起的选择器 Call。
+     * 和 pickCall 分开记：两条流程都要挡住第二个选择器（Android 上第二个会把第一个顶掉，
+     * 回来的 Uri 就和发起方对不上号），但各自要能认出「是我的那一张还没回来」。
+     */
+    private var stickerCall: PluginCall? = null
+
     private fun photosDir(): File = File(context.filesDir, "photos").apply { mkdirs() }
+
+    /**
+     * 自定义表情落点。和 photos/ 分开：photos 是「发给她的照片」（1080 长边），
+     * stickers 是「她能用的表情」（512 长边、300KB），混在一起迟早互相清理错。
+     */
+    private fun stickersDir(): File = File(context.filesDir, "stickers").apply { mkdirs() }
 
     private fun attachmentsDir(): File = File(context.filesDir, "attachments")
 
@@ -357,6 +374,342 @@ class EllenMediaPlugin : Plugin() {
         }
     }
 
+    // ───────────────────────── 自定义表情（排期2 §3） ─────────────────────────
+    //
+    // 为什么这一摊放在原生，而不是 JS 里读 base64 再解码：
+    //   1) 用户从相册挑的可能是一张 4000×3000、6 MB 的原图，过桥成 base64 再涨 1/3，
+    //      WebView 里再 decode 一次 —— 一台中端机就是两三秒白屏 + 一百多 MB 峰值内存；
+    //   2) 动图（gif / 动画 webp）一旦被 JS 重新编码就会变成一张静态图，
+    //      这个损失在 web 层补救不回来，只有在拿到原始字节的地方才好判断。
+    // 所以：选图、缩放、压体积、判动图、写盘、读回字节，全在这一层做完；
+    // web 层只负责「清单（meta）与界面」。清单不放原生：那是随消息库一起备份的东西。
+
+    /**
+     * importSticker({requestId?, maxSide=512, maxBytes=307200})
+     *   → {picked:false}
+     *   | {picked:true, name, mimeType, bytes, width, height, animated, id}
+     *
+     * 落点 filesDir/stickers/u_<ts>.<ext>，名称只由原生生成（不接受调用方传名，防 ../）。
+     * 取消照样 resolve({picked:false})，和 pickImage 一个口径。
+     */
+    @PluginMethod
+    fun importSticker(call: PluginCall) {
+        if (pickCall != null || stickerCall != null) {
+            call.reject("上一张图还在挑。", "MEDIA_BUSY")
+            return
+        }
+        stickerCall = call
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                // 只给 image/* 会让部分机器的选择器把 gif 也放进来；
+                // 显式列 MIME 是为了让「选了动图却变成静图」这件事不发生
+                type = "image/*"
+                putExtra(
+                    Intent.EXTRA_MIME_TYPES,
+                    arrayOf("image/png", "image/jpeg", "image/webp", "image/gif"),
+                )
+            }
+            startActivityForResult(call, intent, "pickedSticker")
+        } catch (e: Exception) {
+            stickerCall = null
+            call.reject("这台机器没有图片选择器。", "MEDIA_UNAVAILABLE")
+        }
+    }
+
+    @ActivityCallback
+    private fun pickedSticker(call: PluginCall?, result: androidx.activity.result.ActivityResult) {
+        val target = stickerCall ?: call ?: return
+        stickerCall = null
+
+        val uri = result.data?.data
+        if (result.resultCode != Activity.RESULT_OK || uri == null) {
+            target.resolve(JSObject().put("picked", false))
+            return
+        }
+
+        val maxSide = intParam(target, "maxSide", STICKER_MAX_SIDE)
+            .coerceIn(MIN_MAX_SIDE, MAX_MAX_SIDE)
+        val maxBytes = longParam(target, "maxBytes", STICKER_MAX_BYTES)
+            .coerceIn(MIN_MAX_BYTES, MAX_MAX_BYTES)
+
+        Thread {
+            try {
+                resolveOnUi(target, processSticker(uri, maxSide, maxBytes))
+            } catch (e: StickerTooLarge) {
+                rejectOnUi(
+                    target,
+                    "这张图超过 ${maxBytes / 1024}KB 或 ${maxSide}px，动图没法无损缩小，换一张吧。",
+                    "MEDIA_TOO_LARGE",
+                )
+            } catch (e: Exception) {
+                rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}", "MEDIA_DECODE_FAILED")
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    /** 体积超上限。单独一个类型，好让上层给出「太大了」而不是「解码失败」这种误导性提示。 */
+    private class StickerTooLarge : Exception()
+
+    /**
+     * 分两条路：
+     *   · 动图（gif / ANIM 块的 webp）→ 原样复制字节，绝不重编码（重编码 = 掉帧 + 变静图）；
+     *   · 静图 → EXIF 校正 → 缩到 ≤maxSide → 压到 ≤maxBytes（有透明通道先试 PNG，塞不下退 JPEG）。
+     */
+    private fun processSticker(uri: Uri, maxSide: Int, maxBytes: Long): JSObject {
+        val mime = (context.contentResolver.getType(uri) ?: "").lowercase(Locale.US)
+        // 只有 gif / webp（以及个别机器不给 MIME 的情况）需要先拿原始字节判「是不是动画」。
+        // 静图不在这里读：一张 6 MB 的照片读完再丢掉，纯属白吃内存 —— 它走下面的采样解码。
+        val maybeAnimated = mime == "image/gif" || mime == "image/webp" || mime.isEmpty()
+        val raw = if (maybeAnimated) readBytesLimited(uri, MAX_STICKER_RAW) else null
+        val animated = raw != null && isAnimatedBytes(raw, mime)
+
+        if (animated) {
+            // 动图不能重编码（会掉帧、会变静图），所以只能在「原样放进去」和「拒绝」之间选。
+            // 超标的动图宁可明确拒绝，也不要偷偷压成静图骗用户「导入成功」。
+            if (raw == null) throw IllegalStateException("读不到这张图")
+            if (raw.size.toLong() > maxBytes) throw StickerTooLarge()
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("这不是有效的图片")
+            if (maxOf(bounds.outWidth, bounds.outHeight) > maxSide) throw StickerTooLarge()
+            val ext = if (mime == "image/gif" || looksLikeGif(raw)) "gif" else "webp"
+            val name = "u_${stamp()}.$ext"
+            writeAtomically(name, raw)
+            return stickerResult(
+                name = name,
+                mimeType = if (ext == "gif") "image/gif" else "image/webp",
+                bytes = raw.size,
+                width = bounds.outWidth,
+                height = bounds.outHeight,
+                animated = true,
+            )
+        }
+
+        // 静图：走和照片同一套采样/缩放的思路，只是目标尺寸小得多
+        val source = decodeScaled(uri, maxSide)
+            ?: throw IllegalStateException("解码失败")
+        val rotated = applyExifRotation(uri, source)
+        val scaled = scaleToMaxSide(rotated, maxSide)
+        val hasAlpha = scaled.hasAlpha()
+
+        var bytes = encodePng(scaled)
+        var ext = "png"
+        var outMime = "image/png"
+        // PNG 塞不进 300KB（照片类素材几乎必然）就退 JPEG：表情面板里一律 512 长边，
+        // 丢掉透明通道的代价远小于「存不进来」
+        if (!hasAlpha || bytes.size.toLong() > maxBytes) {
+            bytes = encodeJpeg(scaled, maxBytes)
+            ext = "jpg"
+            outMime = "image/jpeg"
+        }
+        if (bytes.size.toLong() > maxBytes) throw StickerTooLarge()
+
+        val name = "u_${stamp()}.$ext"
+        writeAtomically(name, bytes)
+        return stickerResult(
+            name = name,
+            mimeType = outMime,
+            bytes = bytes.size,
+            width = scaled.width,
+            height = scaled.height,
+            animated = false,
+        )
+    }
+
+    private fun stickerResult(
+        name: String,
+        mimeType: String,
+        bytes: Int,
+        width: Int,
+        height: Int,
+        animated: Boolean,
+    ): JSObject {
+        val out = JSObject()
+        out.put("picked", true)
+        out.put("name", name)
+        // id 只在 web 层拼（`u:` 前缀是它的约定）；原生给 name，别把命名规则藏两份
+        out.put("mimeType", mimeType)
+        out.put("bytes", bytes.toLong())
+        out.put("width", width)
+        out.put("height", height)
+        out.put("animated", animated)
+        return out
+    }
+
+    /** 读进内存但设硬上限：一张 30 MB 的原图不该把进程撑爆，超过就直接判「太大」。 */
+    private fun readBytesLimited(uri: Uri, limit: Long): ByteArray {
+        val resolver = context.contentResolver
+        val out = ByteArrayOutputStream()
+        resolver.openInputStream(uri)?.use { input ->
+            val buf = ByteArray(64 * 1024)
+            var total = 0L
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                total += n
+                if (total > limit) throw StickerTooLarge()
+                out.write(buf, 0, n)
+            }
+        } ?: throw IllegalStateException("读不到这张图")
+        return out.toByteArray()
+    }
+
+    /**
+     * 判动图。gif 不需要判；webp 看 RIFF 里有没有 `ANIM` 块 ——
+     * BitmapFactory 对动画 webp 只会给第一帧，靠它判断会一律判成静图。
+     * MIME 缺失时（个别文档提供方不给）再退回看文件魔数。
+     */
+    private fun isAnimatedBytes(bytes: ByteArray, mime: String): Boolean {
+        if (mime == "image/gif") return true
+        if (mime.isEmpty() && looksLikeGif(bytes)) return true
+        if (mime != "image/webp" && !mime.isEmpty()) return false
+        // ANIM 块在文件头附近（RIFF + VP8X 之后），查前 4KB 足够，也不至于误伤压缩数据
+        val end = minOf(bytes.size - 4, 4096)
+        var i = 0
+        while (i <= end) {
+            if (bytes[i] == 65.toByte() && bytes[i + 1] == 78.toByte() &&
+                bytes[i + 2] == 73.toByte() && bytes[i + 3] == 77.toByte()
+            ) {
+                return true
+            }
+            i++
+        }
+        return false
+    }
+
+    /** 文件头 GIF8 —— MIME 缺失时的兜底判断。 */
+    private fun looksLikeGif(bytes: ByteArray): Boolean {
+        if (bytes.size < 4) return false
+        return bytes[0] == 71.toByte() && bytes[1] == 73.toByte() &&
+            bytes[2] == 70.toByte() && bytes[3] == 56.toByte()
+    }
+
+    private fun decodeScaled(uri: Uri, maxSide: Int): Bitmap? {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= maxSide && bounds.outHeight / (sample * 2) >= maxSide) {
+            sample *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+
+    private fun encodePng(bitmap: Bitmap): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, buffer)
+        return buffer.toByteArray()
+    }
+
+    /** 先写 .part 再改名：中途被杀进程时 stickers/ 里不会留半张图（半张图在面板里就是个破图标）。 */
+    private fun writeAtomically(name: String, bytes: ByteArray) {
+        val file = File(stickersDir(), name)
+        val part = File(stickersDir(), "$name.part")
+        part.outputStream().use { it.write(bytes) }
+        if (file.exists()) file.delete()
+        if (!part.renameTo(file)) throw IllegalStateException("改名失败")
+    }
+
+    /**
+     * readSticker({name}) → {name, base64, bytes, mimeType}
+     *
+     * 为什么不复用 EllenDocuments.open：那个插件只认 attachments/ 那一套路径白名单，
+     * 表情在 stickers/ 里。要么放开它的白名单（越权改别人的插件），要么在这里给一个只认
+     * 文件名的方法 —— 后者的攻击面更小：safeFileName 过后拼到固定目录，不存在 ../ 的可能。
+     */
+    @PluginMethod
+    fun readSticker(call: PluginCall) {
+        val name = safeFileName(call.getString("name").orEmpty())
+        if (name.isEmpty()) {
+            call.reject("没有指定表情文件名。", "STICKER_INVALID_NAME")
+            return
+        }
+        val file = File(stickersDir(), name)
+        if (!file.isFile) {
+            call.reject("这张表情找不到了。", "STICKER_NOT_FOUND")
+            return
+        }
+        // 读回是有上限的：清单里的东西本该 ≤300KB，超过说明文件被外部换过，
+        // 这时宁可报错，也不要把几十 MB 的东西 base64 过桥
+        if (file.length() > MAX_STICKER_READ) {
+            call.reject("这张表情异常地大，已跳过。", "STICKER_TOO_LARGE")
+            return
+        }
+        Thread {
+            try {
+                val bytes = file.readBytes()
+                val out = JSObject()
+                out.put("name", name)
+                out.put("bytes", bytes.size.toLong())
+                out.put("mimeType", mimeOfName(name))
+                out.put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                resolveOnUi(call, out)
+            } catch (e: Exception) {
+                rejectOnUi(call, "读表情失败：${e.javaClass.simpleName}", "STICKER_READ_FAILED")
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    /**
+     * deleteSticker({name}) → {removed}
+     *
+     * 真删。表情是用户自己导入的文件，留在 filesDir 里没有「可恢复」的价值，
+     * 只有「越堆越大」的风险 —— 所以删就是删，不做回收站。
+     */
+    @PluginMethod
+    fun deleteSticker(call: PluginCall) {
+        val name = safeFileName(call.getString("name").orEmpty())
+        if (name.isEmpty()) {
+            call.reject("没有指定表情文件名。", "STICKER_INVALID_NAME")
+            return
+        }
+        val file = File(stickersDir(), name)
+        val removed = file.isFile && file.delete()
+        call.resolve(JSObject().put("removed", removed))
+    }
+
+    /**
+     * listStickers() → {files:[{name, bytes, mtime}]}
+     *
+     * 给 web 层做对账：meta 里的条目和磁盘上的文件对不上时（用户清了应用数据、
+     * 或某次写盘被杀），以磁盘为准修清单，别留一堆「点了没反应」的格子。
+     */
+    @PluginMethod
+    fun listStickers(call: PluginCall) {
+        Thread {
+            try {
+                val files = stickersDir().listFiles()
+                    ?.filter { it.isFile && !it.name.endsWith(".part") }
+                    ?.sortedByDescending { it.lastModified() }
+                    ?.take(MAX_STICKER_LIST)
+                    ?.map { f ->
+                        JSObject()
+                            .put("name", f.name)
+                            .put("bytes", f.length())
+                            .put("mtime", f.lastModified())
+                    }
+                    ?: emptyList()
+                val out = JSObject()
+                val arr = JSArray()
+                files.forEach { arr.put(it) }
+                out.put("files", arr)
+                resolveOnUi(call, out)
+            } catch (e: Exception) {
+                rejectOnUi(call, "列表情失败：${e.javaClass.simpleName}", "STICKER_LIST_FAILED")
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    private fun mimeOfName(name: String): String = when {
+        name.endsWith(".png") -> "image/png"
+        name.endsWith(".gif") -> "image/gif"
+        name.endsWith(".webp") -> "image/webp"
+        else -> "image/jpeg"
+    }
+
     private fun hasStoragePermission(): Boolean = try {
         ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
             PackageManager.PERMISSION_GRANTED
@@ -415,6 +768,7 @@ class EllenMediaPlugin : Plugin() {
     /** 页面关掉时把挂起的 Call 清掉：留着就是一个永远不落地的 Promise + 一份 Activity 引用。 */
     override fun handleOnDestroy() {
         pickCall = null
+        stickerCall = null
         super.handleOnDestroy()
     }
 
@@ -428,5 +782,18 @@ class EllenMediaPlugin : Plugin() {
         const val MIN_QUALITY = 10
         const val SHRINK_ROUNDS = 5
         const val MIN_DIMENSION = 64
+
+        /** 自定义表情：512 长边 / 300 KB（web 层 core/sticker-library.js 用同一组数复核）。 */
+        const val STICKER_MAX_SIDE = 512
+        const val STICKER_MAX_BYTES = 300L * 1024
+
+        /** 判动图时最多读进内存的量：够装下任何合理的表情，又不至于被一张巨图撑爆进程。 */
+        const val MAX_STICKER_RAW = 8L * 1024 * 1024
+
+        /** 读回上限：清单里本该 ≤300KB，给到 1MB 是留余量，不是留后门。 */
+        const val MAX_STICKER_READ = 1024L * 1024
+
+        /** 一次最多列 2000 个：目录异常变大时别把回包撑爆（正常上限是 200 张）。 */
+        const val MAX_STICKER_LIST = 2000
     }
 }

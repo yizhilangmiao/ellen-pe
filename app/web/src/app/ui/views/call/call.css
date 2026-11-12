@@ -1,0 +1,271 @@
+/* 语音通话页（全屏）。
+ * 单位规矩：1 设计像素 = var(--u)，除了 1px 细线一律 calc(N * var(--u))。
+ * 页面挂在 router 生成的 .el-page 里（position:absolute 由那边给），这里只补布局。 */
+
+.el-call-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(10 * var(--u)) calc(20 * var(--u)) calc(16 * var(--u));
+  /* --el-safe-bottom 已经在 base.css 里用 env(safe-area-inset-bottom, 0px) 兜过底，这里直接接上 */
+  padding-bottom: calc(16 * var(--u) + var(--el-safe-bottom));
+  background:
+    radial-gradient(circle at 50% 32%, rgba(228, 184, 205, 0.16), transparent 62%),
+    var(--el-bg);
+  background:
+    radial-gradient(
+      circle at 50% 32%,
+      color-mix(in srgb, var(--el-pink) 16%, transparent),
+      transparent 62%
+    ),
+    var(--el-bg);
+  color: var(--el-text);
+}
+
+/* 顶行只放返回与计时：通话页不摆标题，屏幕已经够空了。 */
+.el-call-top {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  width: 100%;
+  min-height: calc(40 * var(--u));
+}
+
+.el-call-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  border-radius: calc(20 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-call-back .el-icon svg {
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+}
+
+.el-call-back:active {
+  background: var(--el-line);
+}
+
+.el-call-timer {
+  margin-left: auto;
+  font-size: calc(13 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  /* 计时不能走品牌字体：站酷快乐体的「0」就是一个圆角方框，
+     13px 下 00:00 看着像四个「字形缺失」的空盒子（截图里就是这个）。
+     数字读数一律走系统等宽，顺带解决 00:07 → 00:08 的左右抖。 */
+  font-family: ui-monospace, "Roboto Mono", "Droid Sans Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 舞台占满中间：立绘 + 音量条竖排在正中，眼睛落在同一个位置。 */
+.el-call-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(22 * var(--u));
+  width: 100%;
+}
+
+.el-call-portrait {
+  width: calc(176 * var(--u));
+  height: calc(176 * var(--u));
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--el-raised);
+  box-shadow: 0 0 0 1px var(--el-line);
+  transition: box-shadow 240ms ease, transform 240ms ease;
+}
+
+.el-call-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 立绘不是正圆构图，往上提一点把脸放在圆心附近 */
+  object-position: 50% 22%;
+}
+
+/* 通话进行中给她一圈呼吸光：不闪、不转圈，只是「这通电话活着」。 */
+.el-call-page.is-live .el-call-portrait {
+  /* 实色 + rgba 两段：color-mix 在 Chrome 110 上无效会让整条 box-shadow 消失 */
+  box-shadow:
+    0 0 0 1px rgba(228, 184, 205, 0.55),
+    0 0 calc(28 * var(--u)) rgba(228, 184, 205, 0.28);
+}
+
+/* —— 音量条 ——
+ * 原生没给电平（EllenAudio.capabilities 只有 record/transcribe），
+ * 所以这里按状态给三种节奏：在听=轻呼吸，在想=单点跳，在说=整排起伏。 */
+.el-call-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(5 * var(--u));
+  height: calc(30 * var(--u));
+}
+
+.el-call-bar {
+  width: calc(4 * var(--u));
+  height: calc(7 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background: var(--el-pink);
+  opacity: 0.35;
+  transform-origin: center;
+  transition: opacity 200ms ease;
+}
+
+.el-call-page[data-state='listening'] .el-call-bar {
+  opacity: 0.6;
+  animation: el-call-breathe 1.6s ease-in-out infinite;
+}
+
+.el-call-page[data-state='speaking'] .el-call-bar {
+  opacity: 0.95;
+  animation: el-call-talk 620ms ease-in-out infinite alternate;
+}
+
+.el-call-page[data-state='thinking'] .el-call-bar {
+  opacity: 0.45;
+  animation: el-call-breathe 900ms ease-in-out infinite;
+}
+
+/* 交错延迟，五根条才不像一个方块在整体伸缩 */
+.el-call-bar[data-i='0'] { animation-delay: 0ms; }
+.el-call-bar[data-i='1'] { animation-delay: 90ms; }
+.el-call-bar[data-i='2'] { animation-delay: 180ms; }
+.el-call-bar[data-i='3'] { animation-delay: 270ms; }
+.el-call-bar[data-i='4'] { animation-delay: 360ms; }
+
+@keyframes el-call-breathe {
+  0%, 100% { transform: scaleY(0.9); }
+  50% { transform: scaleY(1.7); }
+}
+
+@keyframes el-call-talk {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(2.6); }
+}
+
+.el-call-status {
+  margin-top: calc(4 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-text);
+  opacity: 0.9;
+}
+
+/* 提示条：只占一行，出场 4 秒后自己收回去（逻辑在 call.js 的 setNote）。 */
+.el-call-note {
+  min-height: calc(18 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+  text-align: center;
+}
+
+.el-call-note[hidden] {
+  display: none;
+}
+
+.el-call-note.is-bad {
+  color: var(--el-pink);
+}
+
+/* 动作区：静音 / 免提 / 主按钮。三个等距，主按钮比两侧大一圈 —— 挂断要最好点。 */
+.el-call-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(30 * var(--u));
+  width: 100%;
+  padding: calc(10 * var(--u)) 0 calc(6 * var(--u));
+}
+
+.el-call-act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  width: calc(64 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-call-act .el-icon svg {
+  width: calc(23 * var(--u));
+  height: calc(23 * var(--u));
+}
+
+.el-call-act.is-on {
+  color: var(--el-pink);
+}
+
+.el-call-act:active {
+  opacity: 0.7;
+}
+
+.el-call-act-label {
+  font-size: calc(11 * var(--u));
+  line-height: calc(15 * var(--u));
+}
+
+/* 主按钮：未开始是「打给她」，进行中是「挂断」。
+ * 两态共用同一个位置 —— 通话中临时找挂断键是这类界面最典型的误操作来源。 */
+.el-call-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(3 * var(--u));
+  width: calc(76 * var(--u));
+  height: calc(76 * var(--u));
+  border-radius: 50%;
+  background: var(--el-raised);
+  color: var(--el-text);
+  box-shadow: 0 0 0 1px var(--el-line);
+  transition: background 200ms ease, color 200ms ease, transform 160ms ease;
+}
+
+.el-call-main .el-icon svg {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+}
+
+.el-call-main.is-live {
+  /* 挂断要一眼认出来：从令牌里的粉往红的方向压一点，不引入新色板 */
+  /* 原值 color-mix(pink 55%, #b8404b)：亲测在 Chrome 110 上整条失效、按钮变透明，
+     这里直接写成算好的实色（粉压红），任何 WebView 都认 */
+  background: #d0778f;
+  color: var(--el-primary-ink);
+  box-shadow: 0 0 0 1px rgba(184, 64, 75, 0.45);
+}
+
+.el-call-main:active {
+  transform: scale(0.96);
+}
+
+/* 横屏：立绘缩一圈，动作区贴到右下，别把舞台挤成一条缝。 */
+@media (orientation: landscape) {
+  .el-call-page {
+    padding-left: calc(40 * var(--u));
+    padding-right: calc(40 * var(--u));
+  }
+
+  .el-call-portrait {
+    width: calc(132 * var(--u));
+    height: calc(132 * var(--u));
+  }
+
+  .el-call-stage {
+    gap: calc(14 * var(--u));
+  }
+}

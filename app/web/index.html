@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <title>艾莲</title>
+    <!-- 底色写在 html/body 上：Capacitor 的 android.backgroundColor 没配时 WebView 停在默认白画布，
+         闪屏退场到首帧之间会闪一下白。这里先铺主题深色，样式表加载完再被 tokens.css 接管。 -->
+    <style>
+      /* 跟 values/colors.xml 的 ellen_bg 与 splash_bg 深色底对齐：闪屏深色 → WebView 深色 → 应用，中间不跳色 */
+      html,
+      body {
+        margin: 0;
+        background: #17191f;
+      }
+    </style>
   </head>
   <body>
     <main id="app" class="ellen-app ellen-ui-root" data-theme="dark"></main>

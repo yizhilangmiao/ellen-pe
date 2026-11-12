@@ -7,6 +7,7 @@
 // 用 vault 反而要多一次原生往返，且导入导出时会被当成敏感数据。
 import { s } from '../strings.zh.js';
 import { RELATIONSHIPS } from './companion.js';
+import { buildLoreBlock } from './lore.js';
 
 const KEY = 'ellen.persona.v1';
 
@@ -79,7 +80,7 @@ const LENGTH_LINES = {
  *   - 不用列表和小标题：手机上气泡里出现 `- ` 和 `##` 很出戏。
  *   - 强调用 **粗体**：richtext.js 渲染粗体为粉色（不是字重，字形只有 400）。
  */
-export function buildSystemPrompt({ persona, relationship, now = Date.now() } = {}) {
+export function buildSystemPrompt({ persona, relationship, lore, mood, bond, now = Date.now() } = {}) {
   const p = { ...DEFAULT_PERSONA, ...(persona || {}) };
   const relId = (relationship && relationship.id) || 'lover';
   const rel = RELATIONSHIPS.find((r) => r.id === relId) || RELATIONSHIPS[0];
@@ -94,6 +95,28 @@ export function buildSystemPrompt({ persona, relationship, now = Date.now() } = 
     '需要强调时只用 **粗体**，不要用列表、标题、分割线。',
     '偶尔主动关心他一句（吃饭、睡觉、累不累），但不要每句都问。',
   ];
+
+  // lore 段（角色卡事实）：可选。不传就整段跳过，输出与加这个功能之前逐字节一致。
+  // 为什么插在第 1 行之后、语气规则之前：先给「你是谁、这些是事实」，后面的
+  // 「简短 / 不要列表」才落在具体这个人身上；事实在前也更不容易被当成设定说明书。
+  // lore 可以直接传拼好的字符串（热路径最省），也可以传 { query } 让它现场按这句话题命中世界书。
+  let loreBlock = '';
+  if (typeof lore === 'string') loreBlock = lore.trim();
+  else if (lore && typeof lore === 'object') {
+    loreBlock = buildLoreBlock({
+      persona: p,
+      relationship: rel,
+      query: lore.query || '',
+      cardId: lore.cardId,
+      rand: lore.rand || Math.random,
+      now,
+    });
+  }
+  if (loreBlock) lines.splice(1, 0, loreBlock);
+
+  // mood / bond 只在签名上占位：心情措辞归 mood 产出方、亲密度措辞归 bond.js，
+  // 这个函数只加事实不加语气，两边同时拼会把同一句「累不累」写出两个版本。
+  void mood; void bond;
 
   if (callMe) lines.push(`叫他的时候用「${callMe}」。`);
   const note = String(p.note || '').trim();

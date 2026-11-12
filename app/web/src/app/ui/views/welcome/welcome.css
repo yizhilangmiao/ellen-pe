@@ -1,0 +1,333 @@
+/* 首次打开引导（welcome）。
+ *
+ * 版式：顶部进度点 + 跳过；中间一屏一句话；底部一个主按钮（上一步在左边）。
+ * 单位全走 --u（clamp 标尺），只有 1px 细线写 px —— 见 UI规范-相对单位.md。
+ * 颜色只取令牌：交互色 --el-primary / 文字 --el-text / 辅助 --el-muted，
+ * 深浅主题各取各的值，这里不写死颜色。
+ */
+
+.el-welcome-page {
+  display: flex;
+  flex-direction: column;
+  padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* 一层很淡的粉晕，是从聊天页的壁纸过渡过来时不要「啪」地换底色。
+     两行写：第一行给不支持 color-mix 的 WebView（MuMu 内置 Chrome 110 就没有），
+     第二行给支持的；同一属性后写的胜出，算是一种零成本的渐进增强。 */
+  background-image: radial-gradient(
+    120% 60% at 50% 0%,
+    rgba(228, 184, 205, 0.1),
+    transparent 70%
+  );
+  background-image: radial-gradient(
+    120% 60% at 50% 0%,
+    color-mix(in srgb, var(--el-pink) 10%, transparent),
+    transparent 70%
+  );
+}
+
+/* —— 顶部：进度点 + 跳过 —— */
+.el-welcome-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  min-height: calc(24 * var(--u));
+}
+
+.el-welcome-dots {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+}
+
+.el-welcome-dot {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  width: calc(8 * var(--u));
+  height: calc(8 * var(--u));
+  border-radius: 999px;
+  /* 用「实色 + opacity」而不是 color-mix：宿主 WebView 是 Chrome 110，
+     color-mix 要 111+，写进去整条属性失效 → 点直接看不见（首屏只剩一个亮条）。
+     34% 是既读得出「还有几步」、又不跟当前那根绿条抢注意力的位置。 */
+  background: var(--el-text);
+  opacity: 0.34;
+  transition: width 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
+  /* 只是回头看，不是给手指按的 —— 命中区由父级 gap 撑着，别做成大按钮 */
+  cursor: default;
+}
+
+.el-welcome-dot.is-done {
+  background: var(--el-primary);
+  opacity: 0.62;
+  cursor: pointer;
+}
+
+.el-welcome-dot.is-active {
+  width: calc(22 * var(--u));
+  background: var(--el-primary);
+  opacity: 1;
+}
+
+.el-welcome-skip {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+  padding: calc(6 * var(--u)) calc(4 * var(--u));
+  cursor: pointer;
+}
+
+.el-welcome-skip:disabled {
+  opacity: 0.4;
+}
+
+/* —— 中间一屏 —— */
+.el-welcome-stage {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(12 * var(--u)) 0;
+}
+
+.el-welcome-card {
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+}
+
+.el-welcome-eyebrow {
+  margin: 0;
+  font-size: calc(10 * var(--u));
+  letter-spacing: calc(2.4 * var(--u));
+  color: var(--el-muted);
+  opacity: 0.8;
+}
+
+.el-welcome-title {
+  margin: 0;
+  font-weight: 400;
+  font-size: calc(26 * var(--u));
+  line-height: calc(36 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-text);
+}
+
+.el-welcome-text {
+  margin: 0;
+  font-size: calc(13 * var(--u));
+  line-height: calc(22 * var(--u));
+  color: var(--el-text);
+  opacity: 0.92;
+}
+
+.el-welcome-note {
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-welcome-portrait {
+  margin-top: calc(4 * var(--u));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--el-line);
+  border-radius: calc(20 * var(--u));
+  background: color-mix(in srgb, var(--el-surface) 80%, transparent);
+  aspect-ratio: 1 / 0.92;
+}
+
+.el-welcome-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.el-welcome-body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(9 * var(--u));
+}
+
+/* —— 步骤内的小件 —— */
+.el-welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(8 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+
+.el-welcome-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  border: 1px solid var(--el-line);
+  border-radius: calc(14 * var(--u));
+  background: var(--el-surface);
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  cursor: pointer;
+}
+
+.el-welcome-btn .el-icon {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+
+.el-welcome-btn:disabled {
+  opacity: 0.55;
+}
+
+.el-welcome-hint {
+  margin: 0;
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-pink);
+}
+
+.el-welcome-chips {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: calc(8 * var(--u));
+}
+
+.el-welcome-chip {
+  appearance: none;
+  border: 1px solid var(--el-line);
+  border-radius: calc(14 * var(--u));
+  background: transparent;
+  color: var(--el-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+  padding: calc(11 * var(--u)) calc(8 * var(--u));
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.el-welcome-chip.is-active {
+  border-color: transparent;
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+}
+
+.el-welcome-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  border: 1px solid var(--el-line);
+  border-radius: calc(14 * var(--u));
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  background: color-mix(in srgb, var(--el-surface) 70%, transparent);
+}
+
+.el-welcome-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-text);
+}
+
+.el-welcome-item-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.el-welcome-item-meta {
+  flex: 0 0 auto;
+  color: var(--el-muted);
+}
+
+.el-welcome-item-more {
+  font-size: calc(11 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-muted);
+}
+
+/* —— 底部 —— */
+.el-welcome-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+}
+
+.el-welcome-feedback {
+  margin: 0;
+  min-height: calc(16 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-muted);
+}
+
+.el-welcome-feedback[hidden] {
+  display: none;
+}
+
+.el-welcome-foot-row {
+  display: flex;
+  align-items: stretch;
+  gap: calc(8 * var(--u));
+}
+
+.el-welcome-back {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid var(--el-line);
+  border-radius: calc(16 * var(--u));
+  background: transparent;
+  color: var(--el-muted);
+  font-family: inherit;
+  font-size: calc(12 * var(--u));
+  line-height: 1.4;
+  padding: 0 calc(14 * var(--u));
+  cursor: pointer;
+}
+
+.el-welcome-back[hidden] {
+  display: none;
+}
+
+.el-welcome-primary {
+  flex: 1 1 auto;
+  appearance: none;
+  border: 0;
+  border-radius: calc(16 * var(--u));
+  background: var(--el-primary);
+  color: var(--el-primary-ink);
+  font-family: inherit;
+  font-size: calc(14 * var(--u));
+  line-height: 1.4;
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  cursor: pointer;
+}
+
+.el-welcome-primary:disabled {
+  opacity: 0.5;
+}
+
+.el-welcome-loading {
+  margin: auto;
+  font-size: calc(12 * var(--u));
+  color: var(--el-muted);
+  text-align: center;
+}

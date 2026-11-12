@@ -28,6 +28,8 @@ import { installAndroidBack, minimizeApp, registerBack, requestBack, backChain }
 import { initMotionGuard } from './ui/motion-guard.js';
 import { createChatView } from './ui/views/chat/chat.js';
 import { createPlaceholderView } from './ui/views/placeholder.js';
+import { createWelcomeView } from './ui/views/welcome/welcome.js';
+import { shouldOnboard } from './core/onboarding.js';
 import { createMemoryView } from './ui/views/memory/memory.js';
 import { createHistoryView } from './ui/views/history/history.js';
 import { createJournalView } from './ui/views/journal/journal.js';
@@ -84,8 +86,15 @@ import {
 } from './core/achievements.js';
 import { due as ritualDue, markAsk, markGoodnight, morningQuestion, nightRitual } from './core/ritual.js';
 import { buildStarmap, dayEvents } from './core/starmap.js';
-import { extractTone, toneEnabled, toneToRate } from './core/tone.js';
+import { extractTone, toneEnabled, toneToRate, toneLineOf, styleOf } from './core/tone.js';
 import { pickStickerReply, replyDelay, slotOf } from './core/sticker-reply.js';
+// E4：情绪接线。数值层（affect）→ 事件层（affect-events）→ 提示词/语气/表情
+import { loadAffect, saveAffect, effectiveDesire, derivedMood } from './core/affect.js';
+import { applyNeglect, applyUtterance, attachToPrompt } from './core/affect-events.js';
+import { createAffectPage } from './ui/views/settings/page-affect.js';
+import { createLorePage } from './ui/views/settings/page-lore.js';
+import { createCallView } from './ui/views/call/call.js';
+import { createCallSettingsPage } from './ui/views/settings/page-call.js';
 import { pickImage as pickMediaImage, saveToAlbum as saveMediaToAlbum } from './core/media.js';
 
 const THEME_KEY = 'ellen-ui-theme';
@@ -259,10 +268,94 @@ async function main() {
   }
   applyTheme(root, theme);
 
-  // 人设每轮现取：设置页改完立刻生效，不用重开会话
-  async function currentSystemPrompt() {
+  // 情绪状态缓存：一条消息里要读两次（拼 prompt + 记事件），5 秒内复用同一份，
+  // 免得同一句话 settle 两遍、也免得两次落盘互相覆盖。
+  let affectCache = null; // {state, at}
+  async function takeAffect({ fresh = false } = {}) {
+    const now = Date.now();
+    if (!fresh && affectCache && now - affectCache.at < 5000) return affectCache.state;
+    try {
+      const state = await loadAffect({ now, persist: false });
+      affectCache = { state, at: now };
+      return state;
+    } catch (err) {
+      console.warn('[main] 情绪状态没读出来，这轮不加注入块', err);
+      return null;
+    }
+  }
+
+  /**
+   * 七维派生的心情词 → 表情 slot。
+   *
+   * 为什么要翻一层：derivedMood() 吐的是「想要你 / 在忍着 / 盯着你」这种处境词，
+   * 表情库的 slot 是「比心 / 生气 / 问号」。不翻，shouldAutoKeep 里 mood===slot 那半条
+   * （+0.5）永远不成立，自动收藏等于只有 0.15 的底分。
+   * 翻不出来就留空 —— 宁可不自动收藏，也不要按错的心情乱收。
+   */
+  const MOOD_SLOT = {
+    想要你: '比心',
+    耐不住了: '比心',
+    心痒着: '比心',
+    想被抱: '比心',
+    在忍着: '生气',
+    盯着你: '问号',
+  };
+  // 聊天页 props.mood 读的是这个（getter），每次长按她那张表情时才取当前值
+  let moodSlotNow = '';
+  function updateMoodSlot(state) {
+    try {
+      const d = derivedMood(state);
+      moodSlotNow = (d && MOOD_SLOT[d.mood]) || '';
+    } catch (err) {
+      moodSlotNow = '';
+    }
+  }
+
+  /**
+   * 一句话进模型之前先记账：读状态 → 补算「被晾着」 → 归类这句话 → 落盘。
+   *
+   * 为什么必须在这条路上同步做完：prompt 里要用的是「这句话之后」的状态
+   * （他说了想要，那她这一刻就该是想要的，不能等回复回来才生效）；
+   * 而且安卓没有常驻进程，读时结算的结果不落盘，关掉 App 这段就白算了。
+   * 分类走本地关键词表（affect-events.classify），**不为每条消息多花一次请求**。
+   */
+  async function touchAffect(text) {
+    const now = Date.now();
+    try {
+      const state = await loadAffect({ now, persist: false });
+      applyNeglect(state, { now });
+      const hit = applyUtterance(state, text, { now });
+      if (hit && (hit.type || hit.safeWord)) {
+        console.info('[affect]', hit.safeWord ? '安全词' : hit.type, hit.hit || '', hit.deltas || {});
+      }
+      await saveAffect({ state });
+      affectCache = { state, at: now };
+      return state;
+    } catch (err) {
+      console.warn('[main] 情绪没记上，这次照常回', err);
+      return null;
+    }
+  }
+
+  // 人设每轮现取：设置页改完立刻生效，不用重开会话。
+  // E4：人格提示后面再拼两段 ——「此刻」的处境（注入块）与语气/长度约束。
+  // 注入块读不出来只降级成旧行为（只发人格提示），绝不给模型一段空串。
+  async function currentSystemPrompt(opts) {
     const [persona, relation] = await Promise.all([readPersona(), relationship()]);
-    return buildSystemPrompt({ persona, relationship: relation });
+    // query 只用来命中世界书：把用户这句话当检索词，命中不到就只剩常驻卡（不报错、不空转）
+    const query = (opts && opts.query) || '';
+    const base = buildSystemPrompt({ persona, relationship: relation, lore: query ? { query } : undefined });
+    const st = await takeAffect();
+    if (!st) return base;
+    // 顺手把「此刻心情」翻成表情 slot，给聊天页的自动收藏用（见 MOOD_SLOT）
+    updateMoodSlot(st);
+    let styleLine = '';
+    try {
+      styleLine = [toneLineOf(st.dims), styleOf(st.dims).line].filter(Boolean).join('\n');
+    } catch (err) {
+      console.warn('[main] 语气/长度没算出来，这次只带注入块', err);
+    }
+    return attachToPrompt(base, st, { styleLine });
   }
 
   const session = createChatSession({ state: appState, getSystemPrompt: currentSystemPrompt });
@@ -356,7 +449,8 @@ function sendMessage(text, extra = null) {
   // 引用：聊天页记着「正在回哪一条」，键盘回车路径不会带 extra，这里补上
   const payload = extra || (quotedOf ? { quoteOf: quotedOf } : null);
   quotedOf = null;
-  return session.send(clean, payload).then(() => {
+  // 先记情绪再发：prompt 里要的是「这句话之后」的状态。记不上也照常发（她不能因此不说话）
+  return touchAffect(clean).then(() => session.send(clean, payload)).then(() => {
     // 亲密度计点：每条 +1、每天首条 +3，凑够阈值她会升一档并发一封信
     bondTouch({ at: Date.now() })
       .then((res) => {
@@ -589,7 +683,12 @@ function sendMessage(text, extra = null) {
     appState.addMessage({ role: 'user', type: 'expression', text: '', stickerId: sticker.id });
     // 你甩一张过来，她有一半多一点的概率也回一张 —— 不是每次都回，那样太吵。
     // 走本地规则挑图（收藏的 12 张里选），不为挑一张图多发一次请求。
-    const back = pickStickerReply({ incomingSlot: slotOf(sticker.id) });
+    // E4：好感决定挑哪一组 —— 高走 SAFE（比心/晚安），低走 ECHO（委屈/无语）。
+    // 没有缓存就不传，退回旧行为（谁在场挑谁），不为了挑图去读一次库。
+    const aff = affectCache && affectCache.state ? affectCache.state.dims.affection : undefined;
+    const back = pickStickerReply({ incomingSlot: slotOf(sticker.id), affection: aff });
+    // 甩个表情也算在场：推一下 lastEventAt，别让她把「发表情」当成没理她
+    touchAffect('');
     if (replyTimer) {
       clearTimeout(replyTimer);
       replyTimer = null;
@@ -627,6 +726,10 @@ function sendMessage(text, extra = null) {
         const handle = view.mount(el, {
           messages: appState.getMessages(),
           model: appState.getModelName(),
+          // 心情 → 表情 slot，给「她发的表情值不值得自动收藏」用；getter 保证取的是当下而不是挂载时
+          get mood() {
+            return moodSlotNow;
+          },
           onSend: (text, extra) => sendMessage(text, extra),
           onStop: () => session.stop(),
           // —— 长按菜单的五个出口（缺哪个，聊天页就不显示哪一项）——
@@ -762,6 +865,31 @@ function sendMessage(text, extra = null) {
   defineView('settings-backup', () => createBackupPage({ state: appState, onChange: () => session.refresh() }));
   defineView('settings-companion', () => createCompanionPage({ state: appState }));
   defineView('settings-about', () => createAboutPage({ state: appState }));
+  // 情绪只读调试页（七维 / 档位 / 注入块原文）：排期 E4，注册在 settings 抽屉里
+  defineView('settings-affect', () => createAffectPage({ state: appState }));
+  // 角色卡：换卡 / 写自己的补充设定（排期 4，三层加载由 core/lore.js 管）
+  defineView('settings-lore', () => createLorePage({ state: appState, onChange: () => session.refresh() }));
+  // 首次打开引导（排期 5）：走完自己写 markDone，这里只负责切回聊天
+  defineView('welcome', () => createWelcomeView({ state: appState, onFinished: () => goChat() }));
+  // 语音通话（排期 6）：turn 只负责「说一句、拿回她的回复」，状态机全在 core/call.js
+  defineView('call', () =>
+    createCallView({
+      turn: async (text) => {
+        await sendMessage(text);
+        // 回复落库后取最后一条她说的：通话页只念这一条，历史由聊天页管
+        const list = appState.getMessages();
+        for (let i = list.length - 1; i >= 0; i -= 1) {
+          const m = list[i];
+          if (m && m.role === 'assistant' && !m.pending && !m.recalled && String(m.text || '').trim()) {
+            return String(m.text);
+          }
+        }
+        return '';
+      },
+      onEnd: () => pop(),
+    })
+  );
+  defineView('settings-call', () => createCallSettingsPage({ state: appState, onChange: () => session.refresh() }));
 
   defineView('notices', () =>
     createPlaceholderView({
@@ -855,6 +983,10 @@ function sendMessage(text, extra = null) {
     'settings-backup': 'settings',
     'settings-companion': 'settings',
     'settings-about': 'settings',
+    'settings-affect': 'settings',
+    'settings-lore': 'settings',
+    'settings-call': 'settings',
+    welcome: 'chat',
     notices: 'settings',
     background: 'settings',
     feedback: 'settings',
@@ -985,9 +1117,9 @@ function sendMessage(text, extra = null) {
     chatHandle.setModel(appState.getModelName());
   });
 
-  show('chat');
+  // 首次打开：先过引导（排期 5）。判断走 localStorage 同步读，不等 IDB，避免先闪一下聊天页。
+  show(shouldOnboard() ? 'welcome' : 'chat');
   syncTabs('chat');
-
   // 读加密配置（异步），读到后刷新聊天页标题上的模型名
   // 先把老消息补成新形状（type/recalled/quoteOf…）：界面按新字段分支渲染，
   // 缺字段会走进奇怪的分支，所以迁移必须在第一次读消息之前。
@@ -1027,11 +1159,31 @@ async function reconcileVoiceFiles() {
   }
 }
 
+  // E4：主动消息的门槛（文档 5章2表「主动消息」行）。
+  // 为什么宁可不发：主动消息的分量全在「她真的想找你」，凑数的一句「在干嘛」
+  // 会把这个分量用光；eff 低的时候安静，比硬找一个话题更对。
+  //
+  // 门槛为什么是 20 而不是 45：日常值（lust30/resist50/affection40）算出来 eff≈3.8，
+  // 45 这条线等于「她永远不主动找你」；eff 自己已经做过「心思量 − 抵抗 × 0.5」的折扣，
+  // 20 相当于「有点想要、也不太抗拒」才开口。lust 真上来时（80/ resist30 → eff≈65）照样能过。
+  // 【待老大复核】这个数字文档没给，20 是我按默认值反推的。
+  const INITIATE_THRESHOLD = 20;
+
 async function syncProactive() {
     if (!isNative()) return;
     try {
       const st = await readProactiveState();
       if (!st || !st.available || !st.enabled) return;
+      // 先看情绪：低于门槛就不推新素材，native 那边没有素材自然发不出消息。
+      // 读失败（null）按「不知道」处理 —— 照旧推，别因为读不到情绪就彻底不吭声。
+      const aff = await takeAffect();
+      if (aff) {
+        const eff = effectiveDesire(aff.dims);
+        if (eff < INITIATE_THRESHOLD) {
+          console.info('[affect] eff', eff.toFixed(2), '<', INITIATE_THRESHOLD, '这次不主动开口');
+          return;
+        }
+      }
       await pushMaterial({
         config: appState.getConfig(),
         messages: appState.getMessages(),

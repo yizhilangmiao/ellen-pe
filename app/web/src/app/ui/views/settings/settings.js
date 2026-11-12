@@ -8,6 +8,8 @@ import { platformOf, isUsable } from '../../../core/config.js';
 import { readPrefs as readVoicePrefs } from '../../../core/speech.js';
 import { state as backupState } from '../../../core/backup.js';
 import { push } from '../../router.js';
+// 角色卡摘要：卡名是数据不是文案，直接读当前选中的卡
+import { describeCard, readLoreSelection } from '../../../core/lore.js';
 import './settings.css';
 
 export function createSettingsView({ state } = {}) {
@@ -115,7 +117,21 @@ export function createSettingsView({ state } = {}) {
       // —— 陪伴 ——
       el.append(group('settings.groupCharacter'));
       const compEntry = entry({ view: 'settings-companion', titleKey: 'settings.entryCompanion', summary: s('settings.entryCompanionSum') });
-      el.append(compEntry.row);
+      // 角色卡：摘要写卡名，读失败就留空（不阻断首页）
+      const loreSummary = (() => {
+        try {
+          const card = describeCard((readLoreSelection() || {}).cardId);
+          return card && card.label ? card.label : '';
+        } catch (_) {
+          return '';
+        }
+      })();
+      const loreEntry = entry({ view: 'settings-lore', titleKey: 'settings.entryLore', summary: loreSummary || s('settings.entryLoreSum') });
+      // 心情：只读调试页，摘要不预读状态（读盘留给页面自己，别堵首页）
+      const affectEntry = entry({ view: 'settings-affect', titleKey: 'settings.entryAffect', summary: s('settings.entryAffectSum') });
+      // 语音通话：连续对话 / 免提 / 语速回显（语速本体仍在 voice 页）
+      const callEntry = entry({ view: 'settings-call', titleKey: 'settings.entryCall', summary: s('settings.entryCallDesc') });
+      el.append(compEntry.row, loreEntry.row, affectEntry.row, callEntry.row);
 
       // —— 其他 ——
       el.append(group('settings.groupOther'));
