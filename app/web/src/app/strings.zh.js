@@ -552,6 +552,9 @@ export const strings = {
     backfillStart: '她从最早那封开始补，共 {n} 封。',
     backfillDone: '补好了 {n} 封，没写成 {fail} 封。',
     backfillNone: '该有的信都在了，没有欠的。',
+    backfillPointsText: '聊天记录还在，但点数、档位没跟着搬过来。按历史重算一遍？',
+    backfillPointsBtn: '按聊天记录补回来',
+    backfillPointsDone: '点数和档位按聊天记录补上了。',
     backfillNoModel: '还没配聊天模型，补不了信。',
   },
   // —— 亲密度 / 等级 ——

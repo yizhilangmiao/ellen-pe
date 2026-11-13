@@ -422,3 +422,169 @@
 .ellen-app[data-skin='zzz'] .el-letter-backfill-btn:disabled {
   opacity: 0.6;
 }
+
+/* ── 全屏读信：米白信纸 + 蝴蝶结 + 蜡封（老大 2026-11-13）────────
+   原来读信挤在页面里的一小块卡片，长信怎么看都别扭。
+   现在信纸整个盖住界面：深色桌面托一张米白信纸，纸面带横线，
+   页头（回列表 / 日期）与翻页条浮在桌面上下两端。
+   信纸层挂在 body 上，所以页头和底部 tab 也被盖住。 */
+.el-letter-read.is-full {
+  --rhythm: calc(31 * var(--u));
+  --paper-pad-top: calc(22 * var(--u));
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+  padding: calc(10 * var(--u)) calc(10 * var(--u))
+    calc(10 * var(--u) + env(safe-area-inset-bottom, 0px));
+  background: #221f1c;
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    rgba(255, 236, 200, 0.13),
+    rgba(0, 0, 0, 0) 62%
+  );
+}
+
+.el-letter-read.is-full .el-letter-read-top {
+  flex: 0 0 auto;
+  padding: 0 calc(6 * var(--u));
+}
+
+.el-letter-read.is-full .el-letter-back {
+  padding: calc(7 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: rgba(255, 255, 255, 0.1);
+  color: #f3e7d2;
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+}
+
+.el-letter-read.is-full .el-letter-when {
+  color: rgba(243, 231, 210, 0.66);
+}
+
+.el-letter-read.is-full .el-letter-stage {
+  flex: 0 0 auto;
+  padding: 0 calc(8 * var(--u));
+  color: #e6c08a;
+}
+
+.el-letter-read.is-full .el-letter-short {
+  flex: 0 0 auto;
+}
+
+/* 信纸本体：米白、暖墨、横线对齐行距，首行缩进两个字 */
+.el-letter-read.is-full .el-letter-paper {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--paper-pad-top) calc(22 * var(--u)) calc(30 * var(--u));
+  border-radius: calc(4 * var(--u));
+  background-color: #f8f2e4;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) calc(var(--rhythm) - 1px),
+    rgba(150, 118, 80, 0.16) calc(var(--rhythm) - 1px),
+    rgba(150, 118, 80, 0.16) var(--rhythm)
+  );
+  background-repeat: repeat;
+  background-attachment: local;
+  background-position: 0 calc(var(--paper-pad-top) + var(--rhythm));
+  color: #3a3126;
+  box-shadow: 0 calc(8 * var(--u)) calc(26 * var(--u)) rgba(0, 0, 0, 0.5);
+}
+
+/* 蝴蝶结：信纸顶上，像把信绑起来 */
+.el-letter-read.is-full .el-letter-bow {
+  width: calc(72 * var(--u));
+  margin: calc(-8 * var(--u)) auto calc(4 * var(--u));
+  filter: drop-shadow(0 calc(2 * var(--u)) calc(3 * var(--u)) rgba(120, 60, 80, 0.28));
+}
+
+.el-letter-read.is-full .el-letter-bow svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.el-letter-read.is-full .el-letter-para {
+  margin: 0 0 var(--rhythm);
+  font-size: calc(15.5 * var(--u));
+  line-height: var(--rhythm);
+  color: #3a3126;
+  text-indent: var(--rhythm);
+}
+
+.el-letter-read.is-full .el-letter-para.is-empty {
+  color: #9a8f7c;
+  text-indent: 0;
+}
+
+.el-letter-read.is-full .el-letter-sign {
+  margin: calc(2 * var(--u)) 0 0;
+  font-size: calc(14 * var(--u));
+  line-height: var(--rhythm);
+  color: #7b5a42;
+}
+
+.el-letter-read.is-full .el-letter-foot {
+  margin: calc(6 * var(--u)) 0 0;
+  color: #a1937c;
+}
+
+/* 蜡封：落款下面一枚，稍微歪一点，像盖上去的 */
+.el-letter-read.is-full .el-letter-seal {
+  display: grid;
+  place-items: center;
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  margin: calc(10 * var(--u)) calc(2 * var(--u)) 0 auto;
+  border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
+  background: radial-gradient(circle at 34% 28%, #d8495f, #a3243a 58%, #7d1728);
+  box-shadow: inset 0 0 calc(7 * var(--u)) rgba(0, 0, 0, 0.35),
+    0 calc(2 * var(--u)) calc(6 * var(--u)) rgba(0, 0, 0, 0.32);
+  transform: rotate(-7deg);
+}
+
+.el-letter-read.is-full .el-letter-seal-mark {
+  font-size: calc(21 * var(--u));
+  line-height: 1;
+  color: rgba(255, 238, 232, 0.94);
+  text-shadow: 0 calc(-1 * var(--u)) calc(1 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+
+.el-letter-read.is-full .el-letter-nav {
+  flex: 0 0 auto;
+  padding: calc(2 * var(--u)) 0 calc(2 * var(--u));
+}
+
+.el-letter-read.is-full .el-letter-nav-btn {
+  border: calc(1 * var(--u)) solid rgba(243, 231, 210, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3e7d2;
+}
+
+.el-letter-read.is-full .el-letter-nav-page {
+  color: rgba(243, 231, 210, 0.7);
+}
+
+/* 绝区零皮肤下也照样是米白信纸（信纸不该跟着界面变黑） */
+.ellen-app[data-skin='zzz'] .el-letter-read.is-full .el-letter-paper {
+  border: 0;
+  border-radius: calc(4 * var(--u));
+  color: #3a3126;
+  box-shadow: 0 calc(8 * var(--u)) calc(26 * var(--u)) rgba(0, 0, 0, 0.5);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-read.is-full .el-letter-para {
+  color: #3a3126;
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-read.is-full .el-letter-sign {
+  color: #7b5a42;
+}

@@ -839,19 +839,39 @@ function sendMessage(text, extra = null, opts = null) {
     try {
       const bf = await import('./core/backfill.js');
       const found = await bf.planFromHistory();
-      if (!found || !found.gaps || !found.gaps.length) {
+      const gaps = (found && found.gaps) || [];
+      const needsPoints = !!(found && found.needsPoints);
+      const needsCheckin = !!(found && found.checkin && found.checkin.needs);
+      if (!gaps.length && !needsPoints && !needsCheckin) {
         flash(s('letter.backfillNone'));
         return { written: [], skipped: [], failed: [] };
       }
-      if (found.needsPoints) {
+      // 先把点数/档位/签到天数按历史补回来（只升不降），再考虑写信
+      if (needsCheckin) {
+        try {
+          await bf.applyCheckin(found.checkin.plan);
+        } catch (err) {
+          console.warn('[main] 历史签到天数没补上', err);
+        }
+      }
+      if (needsPoints) {
         try {
           await bf.applyPlan(found.plan);
         } catch (err) {
           console.warn('[main] 历史点数没补上', err);
         }
       }
-      letterWriting = { chars: 0, target: 1500, at: Date.now(), stage: found.gaps[0].label };
-      flash(s('letter.backfillStart').replace('{n}', String(found.gaps.length)));
+      if (!gaps.length) {
+        flash(s('letter.backfillPointsDone'));
+        try {
+          await bondSnapshot();
+        } catch (err) {
+          console.warn('[main] 补完点数没刷新亲密度', err);
+        }
+        return { written: [], skipped: [], failed: [] };
+      }
+      letterWriting = { chars: 0, target: 1500, at: Date.now(), stage: gaps[0].label };
+      flash(s('letter.backfillStart').replace('{n}', String(gaps.length)));
       const res = await bf.writeGaps({
         config,
         persona: await readPersona(),

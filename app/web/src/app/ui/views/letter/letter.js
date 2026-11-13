@@ -103,12 +103,15 @@ export function createLetterView({ state } = {}) {
   let cards = [];
   let mode = 'list'; // list | read | writing
   let opened = null; // 正在读的那封
+  let readLayer = null; // 全屏信纸（挂 body，盖住页头和底栏）
   let pages = [];
   let page = 0;
   let busy = false;
   let backfillPending = false;
   // 「已经走过但还没写信」的档位。列表顶部因此会长出一条补写入口（老大 2026-11-13 要的）。
   let gapStages = [];
+  let backfillNeedsPoints = false;
+  let backfillError = '';
   let writingChars = 0;
   let rewritePending = false;
   let disposed = false;
@@ -173,6 +176,7 @@ export function createLetterView({ state } = {}) {
   // ── 列表 ──────────────────────────────────────────────────────────
   function paintList() {
     mode = 'list';
+    dropReadLayer();
     if (!root || !root._body) return;
     const body = root._body;
     clear(body);
@@ -193,6 +197,8 @@ export function createLetterView({ state } = {}) {
 
       empty.append(text, toChat);
       body.append(empty);
+      // 一封都没有的时候，补写入口更得在（否则历史阶段欠的信永远没人知道）
+      if (gapStages.length || backfillNeedsPoints || backfillError) body.append(backfillCard());
       return;
     }
 
@@ -208,7 +214,7 @@ export function createLetterView({ state } = {}) {
         : s('letter.readAll');
     list.append(summary);
 
-    if (gapStages.length) list.append(backfillCard());
+    if (gapStages.length || backfillNeedsPoints || backfillError) list.append(backfillCard());
 
     cards.forEach((card) => {
       const item = document.createElement('button');
@@ -258,12 +264,21 @@ export function createLetterView({ state } = {}) {
     const text = document.createElement('p');
     text.className = 'el-letter-backfill-text';
     const labels = gapStages.map((g) => (g.label ? g.label : stageLabel(g.id))).join(' · ');
-    text.textContent = s('letter.backfillText').replace('{stages}', labels);
+    if (backfillError) {
+      text.textContent = `补算没算出来（${backfillError}）。`;
+    } else if (gapStages.length) {
+      text.textContent = s('letter.backfillText').replace('{stages}', labels);
+    } else {
+      // 只差点数、不缺信：也要让人能点一下把档位按历史补回来
+      text.textContent = s('letter.backfillPointsText');
+    }
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'el-secondary el-letter-backfill-btn';
-    btn.textContent = s('letter.backfillBtn').replace('{n}', String(gapStages.length));
+    btn.textContent = gapStages.length
+      ? s('letter.backfillBtn').replace('{n}', String(gapStages.length))
+      : s('letter.backfillPointsBtn');
     btn.addEventListener('click', async () => {
       if (backfillPending) return;
       if (typeof props.onBackfill !== 'function') {
@@ -292,9 +307,14 @@ export function createLetterView({ state } = {}) {
       const mod = await import('../../../core/backfill.js');
       const plan = await mod.planFromHistory();
       gapStages = Array.isArray(plan && plan.gaps) ? plan.gaps : [];
+      backfillNeedsPoints = !!(plan && (plan.needsPoints || (plan.checkin && plan.checkin.needs)));
+      backfillError = '';
     } catch (err) {
       console.warn('[letter] 算不出缺哪几封信', err);
       gapStages = [];
+      backfillNeedsPoints = false;
+      // 出错也把原因摆出来：不然页面上只是「没有欠的信」，看着像一切正常
+      backfillError = (err && (err.message || err.code)) || 'UNKNOWN';
     }
   }
 
@@ -306,7 +326,8 @@ export function createLetterView({ state } = {}) {
     clear(body);
 
     const box = document.createElement('section');
-    box.className = 'el-letter-read';
+    // 读信整页盖住界面（老大 2026-11-13：小窗口不舒服，要全屏米白信纸）
+    box.className = 'el-letter-read is-full';
 
     const top = document.createElement('div');
     top.className = 'el-letter-read-top';
@@ -358,6 +379,22 @@ export function createLetterView({ state } = {}) {
 
     const paper = document.createElement('div');
     paper.className = 'el-letter-paper';
+
+    // 信纸装饰（老大 2026-11-13）：顶部一只蝴蝶结，落款旁一枚蜡封，纸面带横线
+    const bow = document.createElement('div');
+    bow.className = 'el-letter-bow';
+    bow.setAttribute('aria-hidden', 'true');
+    bow.innerHTML =
+      '<svg viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">' +
+      '<g fill="#e79ab0" stroke="#c4768e" stroke-width="1.6" stroke-linejoin="round">' +
+      '<path d="M60 24C47 8 23 5 19 17c-4 12 19 16 41 12Z"/>' +
+      '<path d="M60 24c13-16 37-19 41-7 4 12-19 16-41 12Z"/>' +
+      '<path d="M53 34 42 55l12-4 6-15Z"/>' +
+      '<path d="M67 34l11 21-12-4-6-15Z"/>' +
+      '</g>' +
+      '<ellipse cx="60" cy="27" rx="9.5" ry="8.5" fill="#d97e99" stroke="#c4768e" stroke-width="1.6"/>' +
+      '</svg>';
+    paper.append(bow);
 
     const pageParas = pages[page] || [];
     pageParas.forEach((text) => {
@@ -419,22 +456,53 @@ export function createLetterView({ state } = {}) {
       const p = document.createElement('p');
       p.className = 'el-letter-sign';
       p.textContent = sign;
-      box.append(p);
+      paper.append(p);
     }
 
     const foot = document.createElement('p');
     foot.className = 'el-letter-foot';
     foot.textContent = s('letter.chars').replace('{n}', String(Number(opened.chars) || 0));
-    box.append(foot);
+    paper.append(foot);
 
-    body.append(box);
+    const seal = document.createElement('div');
+    seal.className = 'el-letter-seal';
+    seal.setAttribute('aria-hidden', 'true');
+    const sealMark = document.createElement('span');
+    sealMark.className = 'el-letter-seal-mark';
+    sealMark.textContent = '艾';
+    seal.append(sealMark);
+    paper.append(seal);
+
+    dropReadLayer();
+    readLayer = box;
+    document.body.append(box);
+  }
+
+  /** 关掉全屏信纸。任何离开读信态的路径都要先调它，否则会留一层盖住界面。 */
+  function dropReadLayer() {
+    if (!readLayer) return;
+    try {
+      readLayer.remove();
+    } catch (err) {
+      /* 已经不在文档里就算了 */
+    }
+    readLayer = null;
   }
 
   /** 翻页后把视口拉回信纸顶部（长信翻页停在页脚会很难受）。 */
   function scrollReadTop() {
     if (!root) return;
-    const paper = root._body && root._body.querySelector('.el-letter-read');
-    if (paper && typeof paper.scrollIntoView === 'function') {
+    const paper = root._body && root._body.querySelector('.el-letter-read .el-letter-paper');
+    if (!paper) return;
+    if (typeof paper.scrollTo === 'function') {
+      try {
+        paper.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } catch (err) {
+        /* 老内核不支持 smooth，往下走 */
+      }
+    }
+    if (typeof paper.scrollIntoView === 'function') {
       try {
         paper.scrollIntoView({ block: 'start', behavior: 'smooth' });
       } catch (err) {
@@ -533,7 +601,11 @@ export function createLetterView({ state } = {}) {
     cards = list;
     await loadGaps();
     if (disposed) return;
-    if (mode !== 'read' && mode !== 'writing') paintList();
+    // 读信时被别处刷新（setLetters / resume）不能把画面留在「读过的信」上：
+    // 安卓返回键回到信页时，读信 DOM 已经没了，只有把模式退回 list 再重画才不会一片空白。
+    if (mode === 'writing') return;
+    if (mode === 'read') mode = 'list';
+    paintList();
   }
 
   async function refresh() {
@@ -614,6 +686,7 @@ export function createLetterView({ state } = {}) {
         },
         destroy() {
           disposed = true;
+          dropReadLayer();
           cards = [];
           pages = [];
           opened = null;

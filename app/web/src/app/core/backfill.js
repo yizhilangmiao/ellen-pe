@@ -22,6 +22,8 @@ import {
   seedFromHistory,
 } from './bond.js';
 import { listLatest } from './store/library.js';
+import { putMeta } from './store/records.js';
+import { readCheckin, META_KEY as CHECKIN_KEY, normalizeState as normalizeCheckin } from './checkin.js';
 import { loadAffect, saveAffect, snapshot as affectSnapshot } from './affect.js';
 import { composeLetter } from './letter.js';
 
@@ -118,6 +120,52 @@ export function letterGaps(bond, upto = null) {
  * 纯读，不写库（除了 bond/affect 的读取本身）。
  * @returns {Promise<{history:{messages:number,days:number,from:number,to:number}, plan:object, current:object, pointsNow:number, gaps:Array, affectionNow:number, affectionFloor:number, needsPoints:boolean}>}
  */
+/**
+ * 纯函数：把「哪天说过话」折成签到统计。
+ * 为什么拿聊天日回填签到：迁移过来的老数据只有消息，签到表是空的，
+ * 相处页就永远显示「连续 0 天」。只补统计（天数 / 连击 / 最长），不动 lastDay 以外的任何东西，
+ * 也不会替用户「签今天」——今天要不要来，还是他自己点。
+ * @param {string[]} days 形如 `2026-11-12`，可以重复、可以不排序
+ */
+export function checkinPlan(days = []) {
+  const uniq = [...new Set((days || []).filter((d) => typeof d === 'string' && d))].sort();
+  if (!uniq.length) return { days: 0, streak: 0, best: 0, lastDay: '' };
+  const toNum = (k) => {
+    const [y, m, d] = k.split('-').map((n) => Number(n));
+    return Date.UTC(y, (m || 1) - 1, d || 1) / 86400000;
+  };
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < uniq.length; i += 1) {
+    if (toNum(uniq[i]) - toNum(uniq[i - 1]) === 1) run += 1;
+    else run = 1;
+    if (run > best) best = run;
+  }
+  // 结尾那串 = 连击（不管结尾是不是今天：断了就是 0，这里只报「到最后一个说话日为止」）
+  let streak = 1;
+  for (let i = uniq.length - 1; i > 0; i -= 1) {
+    if (toNum(uniq[i]) - toNum(uniq[i - 1]) === 1) streak += 1;
+    else break;
+  }
+  return { days: uniq.length, streak, best: Math.max(best, streak), lastDay: uniq[uniq.length - 1] };
+}
+
+/** 落盘签到统计：只升不降，且不替用户签到（lastDay 只往前挪）。 */
+export async function applyCheckin(plan, { at = Date.now() } = {}) {
+  if (!plan || !plan.days) return { applied: false };
+  const before = normalizeCheckin(await readCheckin());
+  const next = {
+    ...before,
+    days: Math.max(before.days, plan.days),
+    streak: Math.max(before.streak, plan.streak),
+    best: Math.max(before.best, plan.best),
+    lastDay: before.lastDay && before.lastDay > plan.lastDay ? before.lastDay : plan.lastDay,
+    updatedAt: at,
+  };
+  await putMeta(CHECKIN_KEY, next);
+  return { applied: true, state: next };
+}
+
 export async function planFromHistory() {
   const history = await readHistory();
   const plan = replay(history);
@@ -127,6 +175,8 @@ export async function planFromHistory() {
   const affectionNow = Number(dims.affection) || 0;
   const affectionFloor = AFFECTION_FLOOR[plan.stage] || 0;
   const gaps = letterGaps({ ...bond, stage: plan.stage }, plan.stageIndex);
+  const checkinPlanned = checkinPlan(history.map((m) => dayKey(m.at)));
+  const checkinNow = normalizeCheckin(await readCheckin());
 
   return {
     history: { messages: plan.messages, days: plan.days, from: plan.from, to: plan.to },
@@ -137,6 +187,7 @@ export async function planFromHistory() {
     affectionNow,
     affectionFloor,
     needsPoints: plan.points > (Number(bond.points) || 0),
+    checkin: { plan: checkinPlanned, now: checkinNow, needs: checkinPlanned.days > checkinNow.days },
   };
 }
 
