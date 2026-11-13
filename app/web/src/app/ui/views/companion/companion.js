@@ -407,6 +407,12 @@ export function createCompanionView({ state }) {
 
       if (next == null || !nextStage) {
         nextEl.textContent = s('bond.top');
+      } else if (info && info.blockedByMessages) {
+        // 点数已经够、卡在条数上：说清楚还差什么，别显示「再 0 点」
+        const need = Math.max(1, Number(info.needMessages) || 0);
+        nextEl.textContent = s('bond.needMessages')
+          .replace('{n}', String(Math.max(0, need - (Number(stageMessages) || 0))))
+          .replace('{next}', stageText(nextStage));
       } else {
         const remain = Number.isFinite(Number(info && info.remaining)) ? Number(info.remaining) : Math.max(0, next - pts);
         nextEl.textContent = s('bond.toNext')
@@ -723,6 +729,9 @@ export function createCompanionView({ state }) {
       nextAt,
       ratio: prog && prog.ratio,
       remaining: prog && prog.remaining,
+      // 点够了但这一档说得还不够多：文案要走「再聊几句」而不是「再 0 点」
+      blockedByMessages: !!(prog && prog.blockedByMessages),
+      needMessages: prog && prog.needMessages,
     });
   }
 

@@ -562,6 +562,7 @@ export const strings = {
     label: '我们之间',
     points: '{n} 点',
     toNext: '再 {n} 点到「{next}」',
+    needMessages: '再聊 {n} 句就到「{next}」了',
     top: '已经走到最后一档了',
     stageAcquainted: '相识',
     stageFamiliar: '熟悉',

@@ -26,8 +26,8 @@ android {
         applicationId = "cn.ellen.companion2"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.4.7"
+        versionCode = 19
+        versionName = "0.4.8"
         if (!abiSplit) {
             ndk {
                 abiFilters += listOf("arm64-v8a", "x86_64")
