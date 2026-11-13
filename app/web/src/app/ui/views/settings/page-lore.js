@@ -4,26 +4,12 @@
 // 再挂一套角色卡会变成十几行控件，手机上要滚三屏才看得完。这里只做两件事——选卡、写设定。
 //
 // 为什么文案写在这个文件里：strings.zh.js 现在有别人在改，先落本地常量表，由 Lead 统一收。
+import { pages } from '../../../strings.zh.js';
 import { readPersona, writePersona } from '../../../core/persona.js';
 import { applyLoreSelection, describeCard, listCards, readLoreSelection } from '../../../core/lore.js';
 import './settings.css';
 
-const TXT = {
-  title: '角色卡',
-  subtitle: '她是谁，用哪套设定说话。换卡立刻生效，下一句就用新的。',
-  cardTitle: '当前角色卡',
-  cardHint: '同一个艾莲，区别在关系走到哪、知道多少。切换只换设定，不动聊天记录。',
-  mineTitle: '我自己的补充设定',
-  mineHint: '写给她的事实（你的作息、你在做的事、你在意的东西）。这里只写事实，别写「要温柔一点」——语气在上面那栏调。',
-  minePlaceholder: '比如：我在做一款手机应用，经常熬到一两点；我不吃香菜；我怕黑。',
-  save: '保存',
-  clear: '清空',
-  saved: '已保存，下一句就用新的。',
-  cleared: '已清空。',
-  switched: '已换成',
-  failPrefix: '没存上：',
-  chars: (n) => `${n} 字`,
-};
+const TXT = pages.lore;
 
 export function createLorePage({ state, onChange } = {}) {
   void state; // 这一页不读全局状态：角色卡与 persona 都在 localStorage 里，读一次就够

@@ -3,29 +3,14 @@
 // 只放三个真会影响通话手感的东西：免提、连续通话、以及「语速在哪改」的指路。
 // 为什么语速不在这里放滑杆：声音页已经有一份语速，两处都能改就会互相覆盖，
 // 而且用户改完语速回到通话页不知道以哪个为准。这里只显示当前值 + 一个跳转。
+import { pages } from '../../../strings.zh.js';
 import { push } from '../../router.js';
 import { readCallPrefs, writeCallPrefs, resetCallPrefs } from '../../../core/call.js';
 import { readPrefs as readVoicePrefs } from '../../../core/speech.js';
 import './settings.css';
 
 // 文案先放本地常量：strings.zh.js 这一轮不归我写。搬过去时按 `settings.call*` 命名。
-const T = {
-  title: '语音通话',
-  subtitle: '她直接说话，你直接开口。这里只留会改变通话手感的三项。',
-  cardTitle: '通话偏好',
-  handsFreeTitle: '默认免提',
-  handsFreeDesc: '进通话页就用扬声器。关掉是听筒模式（本机走系统播报，仅作偏好记录）。',
-  continuousTitle: '连续通话',
-  continuousDesc: '她说完自动继续听。关掉的话，她说完这一句就挂断 —— 一次一问一答。',
-  rateTitle: '说话语速',
-  rateDesc: '语速和音色与「声音」页共用一份设置，改那里即可。',
-  rateUnit: '倍速',
-  rateLink: '去声音页改',
-  reset: '恢复默认',
-  resetDone: '已恢复默认。',
-  on: '开',
-  off: '关',
-};
+const T = pages.call;
 
 export function createCallSettingsPage({ state, onChange } = {}) {
   return {

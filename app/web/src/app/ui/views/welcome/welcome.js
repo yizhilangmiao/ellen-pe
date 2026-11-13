@@ -6,6 +6,7 @@
 //   * 主动消息开关 ← core/autonomy-prefs.js + core/proactive.js（跟设置页写同一份存储）
 //
 // 本文件里所有句子都在下面这张 TXT 表里：strings.zh.js 由 Lead 统一收口，我不去改它。
+import { pages } from '../../../strings.zh.js';
 import portraitUrl from '../../../assets/ellen-portrait.webp';
 import {
   buildSteps,
@@ -30,69 +31,7 @@ import { iconEl } from '../../icons.js';
 import './welcome.css';
 
 // 文案常量表：Lead 统一并进 strings.zh.js 时按这里的 key 搬。
-const TXT = {
-  loading: '正在看看有没有旧版资料…',
-  skip: '跳过',
-  next: '继续',
-  start: '开始',
-  back: '上一步',
-  steps: {
-    [STEP_WHO]: {
-      eyebrow: '第一件',
-      title: '她叫艾莲',
-      text: '维多利亚家政的员工，也是新艾利都的学生。白天上课、偶尔下空洞，晚上才有空跟你说话。',
-      note: '她不是客服，不会一直顺着你。',
-    },
-    [STEP_TALK]: {
-      eyebrow: '第二件',
-      title: '怎么跟她说话',
-      text: '打字、发语音都行。语音会先转成字再发出去 —— 她看到的是字，不是声音。',
-      note: '麦克风权限只在你点下面这个按钮时问一次；不给也能一直用打字。',
-      mic: '试试语音',
-      micAsking: '等系统弹权限…',
-      micOk: '能录了。以后聊天页按住麦克风就能说话。',
-      micDenied: '没给权限。想开的话去系统设置里放开录音，这里不影响打字。',
-      micUnsupported: '这个环境没有录音能力（模拟器/网页预览下常见），用打字就好。',
-      micFail: '没开起来。可能是别的应用占着麦克风，等会儿再试。',
-    },
-    [STEP_MEMORY]: {
-      eyebrow: '第三件',
-      title: '她记得你',
-      text: '聊过的事存在这台手机里。记忆页能翻、能改，也能让她「别再提」。',
-      note: '想留个底就开自动备份，包会存进你选的文件夹，不经过任何服务器。',
-      backup: '去看备份设置',
-    },
-    [STEP_LEGACY]: {
-      eyebrow: '顺手',
-      title: '从旧版搬过来',
-      text: (n) => `找到 ${n} 份旧版的资料包。搬进来之后，原来的聊天、记忆都还在。`,
-      note: '只读你手机上已有的 .ellenpack，不联网。',
-      import: (n) => `搬过来（${n} 份）`,
-      importing: (i, total) => `搬第 ${i}/${total} 份…`,
-      imported: (ok, heads) => `搬好了：${ok} 份，共 ${heads} 条记录。`,
-      partial: (bad) => `有 ${bad} 份没搬动（包坏了或者读到一半断了），其余的已经进来。`,
-      more: (n) => `还有 ${n} 份没列出来，会一起搬。`,
-    },
-    [STEP_PING]: {
-      eyebrow: '最后一件事',
-      title: '让她主动找你？',
-      text: '开着的话，她会在你没开 App 的时候自己发来一句，走系统通知。',
-      note: '随时能在设置里改，包括免打扰时段。',
-      options: [
-        { id: 'often', intervalH: 2, label: '常来找我' },
-        { id: 'normal', intervalH: 4, label: '自然一些' },
-        { id: 'rare', intervalH: 8, label: '别太频繁' },
-        { id: 'off', intervalH: 4, label: '先不用' },
-      ],
-    },
-    [STEP_DONE]: {
-      eyebrow: '',
-      title: '可以开始了',
-      text: '她在聊天页等你。想改什么，右上角进设置。',
-      note: '',
-    },
-  },
-};
+const TXT = pages.welcome;
 
 function h(tag, cls, text) {
   const el = document.createElement(tag);

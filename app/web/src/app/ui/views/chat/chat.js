@@ -290,24 +290,9 @@ export function createChatView() {
 
       el.append(stream, systemStrip, composer, hud);
 
-      // 顶栏通话入口：聊天页右上角一颗浮钮，点它 push 全屏通话页。
-      // 为什么不放进 composer：通话不是「输入方式」，混在输入区会被当成第四个动作；
-      // 也不塞进 app 顶栏（那是 main.js 的地盘，多人在改），所以就地浮在这里。
-      const callBtn = document.createElement('button');
-      callBtn.type = 'button';
-      callBtn.className = 'el-chat-call-btn';
-      callBtn.setAttribute('aria-label', sOr('chat.callEntry', '语音通话'));
-      callBtn.innerHTML =
-        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ' +
-        'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M6.5 3.5h3l1.5 4-2 1.4a11.5 11.5 0 0 0 6.1 6.1l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"></path>' +
-        '</svg>';
-      callBtn.addEventListener('click', () => {
-        // 进通话页先把输入区收回键盘态：面板/语音态留在下面，回来时不会半开着。
-        setMode('text', false, false);
-        props.onOpenCall ? props.onOpenCall() : push('call');
-      });
-      el.append(callBtn);
+      // 通话入口在「+」面板里（老大 2026-11-13 定：从顶栏浮钮挪进输入区）。
+      // 为什么不再浮一颗按钮：右上角那块地方本来就靠「在线 / …」，多一颗图标既挤又抢眼；
+      // 通话属于「换一种跟她说」的动作，和相册/表情/音量是同一层的事。
 
       let dismissedAt = -1;
 
@@ -1411,6 +1396,28 @@ export function createChatView() {
         });
       }
 
+      /** 通话：和相册/表情/音量同一层，点进去是全屏通话页（不是开关，所以 keepOpen 不设）。 */
+      function callTile() {
+        const phone = document.createElement('span');
+        phone.className = 'el-icon';
+        phone.setAttribute('aria-hidden', 'true');
+        phone.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M6.5 3.5h3l1.5 4-2 1.4a11.5 11.5 0 0 0 6.1 6.1l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z"></path>' +
+          '</svg>';
+        return panelTile({
+          key: 'call',
+          icon: phone,
+          label: sOr('chat.panelCall', '语音通话'),
+          run: () => {
+            // 进通话页前把输入区收回键盘态：面板/语音态留在下面，回来时不会半开着
+            setMode('text', false, false);
+            props.onOpenCall ? props.onOpenCall() : push('call');
+          },
+        });
+      }
+
       function mineTile() {
         return panelTile({
           key: 'mine',
@@ -1479,6 +1486,7 @@ export function createChatView() {
         if (typeof props.onPickImage === 'function' && mediaSupported()) tiles.push(albumTile());
         if (cameraSupported()) tiles.push(cameraTile());
         tiles.push(mineTile());
+        tiles.push(callTile());
         if (volumeSupported()) {
           volumeTile = volumeTileEl();
           tiles.push(volumeTile);

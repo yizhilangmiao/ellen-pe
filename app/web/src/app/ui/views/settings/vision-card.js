@@ -9,6 +9,7 @@
 // 3) 名字认不出来时给一个「强制按视觉模型用」的开关，而不是硬判死。
 //
 // 文案先放本文件的 TXT 表：strings.zh.js 这一轮不归我改（lead 统一收）。
+import { pages } from '../../../strings.zh.js';
 import { pickImage, mediaSupported } from '../../../core/media.js';
 import { readDocument } from '../../../core/documents.js';
 import {
@@ -21,31 +22,7 @@ import {
 } from '../../../core/vision.js';
 import { DEFAULT_CONFIG } from '../../../core/config.js';
 
-const TXT = {
-  title: '视觉模型',
-  cardHint: '开了以后，她能在通话里看见你；没开就一个字都不发。',
-  off: '关着',
-  on: '开着',
-  toggleOn: '打开',
-  toggleOff: '关掉',
-  modelLabel: '视觉模型名',
-  modelPlaceholder: '留空 = 用聊天模型（例如 gpt-4o / qwen-vl-max）',
-  modelHint: '只有能看图的模型才有用。不填就跟着上面聊天模型走。',
-  baseLabel: '视觉模型地址',
-  basePlaceholder: '留空 = 跟聊天模型用同一个地址',
-  keyLabel: '视觉模型钥匙',
-  keyPlaceholder: '留空 = 跟聊天模型用同一个钥匙',
-  force: '强制按视觉模型用',
-  forced: '已强制（点一下取消）',
-  forceHint: '名字认不出来时打开它（自建服务、私有名字常见）。',
-  tryLabel: '用相册试一张',
-  trying: '让她看看…',
-  tryOk: '她看到了：',
-  tryNoMedia: '这台设备没有相册能力（浏览器预览/模拟器），到手机上才能试。',
-  tryCancel: '没选图，那就先不试。',
-  tryNoModel: '还不能看图：先把视觉打开，或者换一个能吃图的模型。',
-  tryFail: '没看成：',
-};
+const TXT = pages.vision;
 
 function el(tag, cls, text) {
   const node = document.createElement(tag);

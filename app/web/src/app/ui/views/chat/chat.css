@@ -1381,31 +1381,7 @@
   opacity: 0.3;
 }
 
-/* 顶栏通话入口：右上角一颗浮钮（task-10）。
- * 为什么浮着而不占一行：聊天页的竖向空间全给了消息流，为一个大按钮再切一条横带不值。
- * 位置压在 stream 的上内边距里（10u），不盖住第一条气泡的正文。 */
-.el-chat-call-btn {
-  position: absolute;
-  top: calc(2 * var(--u));
-  right: calc(10 * var(--u));
-  z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(36 * var(--u));
-  height: calc(36 * var(--u));
-  border-radius: 50%;
-  color: var(--el-muted);
-  background: color-mix(in srgb, var(--el-surface) 72%, transparent);
-  box-shadow: 0 0 0 1px var(--el-line);
-  backdrop-filter: blur(calc(6 * var(--u)));
-}
-
-.el-chat-call-btn svg {
-  width: calc(18 * var(--u));
-  height: calc(18 * var(--u));
-}
-
-.el-chat-call-btn:active {
-  color: var(--el-pink);
-}
+/* 通话入口已从顶栏浮钮挪进「+」面板（老大 2026-11-13 定），
+ * 磁贴样式沿用 .el-chat-panel-tile，这里不再需要专属规则。
+ * 留一句说明是为了下次有人搜 .el-chat-call-btn 时知道它去哪了。
+ */
