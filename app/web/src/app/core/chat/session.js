@@ -187,7 +187,9 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
    */
   async function send(text, extra, opts = {}) {
     const trimmed = String(text || '').trim();
-    if (!trimmed) return;
+    // imageTurn：「这一轮就等于发了一张图」，正文可以是空的 —— 图由下面的视觉块补进最后一条 user。
+    // 别的地方照旧：空文本一律不发，免得点两下发送就多出一条空消息。
+    if (!trimmed && !opts.imageTurn) return;
 
     const cfg = state.getConfig();
     // 重新生成时不重复落一条「我说的」：那句话已经在库里了
@@ -244,7 +246,7 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
 
       // 记忆召回：把「她记得的事」拼进 system 段（不进聊天记录，界面看不到）
       let recalled = [];
-      if (prefs.recall) {
+      if (prefs.recall && trimmed) {
         try {
           // scorer:'semantic' = 字面分 + 概念分取大（同义句才召得回来）；scorer 内部抛错会自己退回字面
           recalled = await recall(trimmed, { limit: prefs.recallLimit, scorer: 'semantic' });

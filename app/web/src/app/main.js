@@ -443,14 +443,18 @@ async function maybeWriteLetter(stage = null, opts = {}) {
 }
 
 // 发一句话（键盘回车和语音转写共用这一条路，别再复制一遍）
-function sendMessage(text, extra = null) {
+function sendMessage(text, extra = null, opts = null) {
   const clean = (text || '').trim();
-  if (!clean) return Promise.resolve();
+  // imageTurn：这一轮就是「发了一张图」，没有正文。图已经在消息库里，视觉块会自己去取。
+  const imageTurn = !!(opts && opts.imageTurn);
+  if (!clean && !imageTurn) return Promise.resolve();
   // 引用：聊天页记着「正在回哪一条」，键盘回车路径不会带 extra，这里补上
   const payload = extra || (quotedOf ? { quoteOf: quotedOf } : null);
   quotedOf = null;
+  const sendOpts = imageTurn ? { imageTurn: true, appendUser: false } : {};
   // 先记情绪再发：prompt 里要的是「这句话之后」的状态。记不上也照常发（她不能因此不说话）
-  return touchAffect(clean).then(() => session.send(clean, payload)).then(() => {
+  const touched = clean ? touchAffect(clean) : Promise.resolve();
+  return touched.then(() => session.send(clean, payload, sendOpts)).then(() => {
     // 亲密度计点：每条 +1、每天首条 +3，凑够阈值她会升一档并发一封信
     bondTouch({ at: Date.now() })
       .then((res) => {
@@ -672,6 +676,9 @@ function sendMessage(text, extra = null) {
         mime: res.mimeType || res.mime || '',
       },
     });
+    // 选完就发：老大要的是「点相册 → 选一张 → 她马上看见」，不该再多一步点发送。
+    // 这里不带正文（imageTurn），图已经在上面那条消息里，session 的视觉块会把它送出去。
+    sendMessage('', null, { imageTurn: true }).catch((err) => console.warn('[main] 图片没发出去', err));
   }
 
   /**

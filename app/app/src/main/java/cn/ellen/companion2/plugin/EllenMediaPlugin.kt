@@ -91,10 +91,7 @@ class EllenMediaPlugin : Plugin() {
         }
         pickCall = call
         try {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "image/*"
-            }
+            val intent = imagePickerIntent(gif = false)
             startActivityForResult(call, intent, "pickedImage")
         } catch (e: Exception) {
             pickCall = null
@@ -124,6 +121,50 @@ class EllenMediaPlugin : Plugin() {
                 rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}", "MEDIA_DECODE_FAILED")
             }
         }.apply { isDaemon = true }.start()
+    }
+
+    /**
+     * 选图入口：**相册优先**，文件管理器只当兜底。
+     *
+     * 老大 2026-11-13 的原话：「点击相册打开的是文件管理器，应该打开相册然后直接选图片发送」。
+     * 之前统一用 ACTION_OPEN_DOCUMENT，在国产 ROM 上落到的就是「文件」那个界面 —— 看得到
+     * DCIM、Download，但要一层层点文件夹，选一张图三步起步，完全不是聊天该有的手感。
+     *
+     * 三级阶梯：
+     *   1. Android 13+ 的系统照片选择器（MediaStore.ACTION_PICK_IMAGES）：整屏相册网格，
+     *      免读权限，选中即回，还能带 gif；
+     *   2. 图库 App 的「选一张」（ACTION_PICK + MediaStore.Images）：Android 12 及以下主流路径；
+     *   3. 都没有才退回文件管理器（ACTION_OPEN_DOCUMENT）。
+     *
+     * 每一级都先问 resolveActivity：有些 ROM 声明了但没实现，直接 start 会崩。
+     */
+    private fun imagePickerIntent(gif: Boolean): Intent {
+        val pm = context.packageManager
+        val types = if (gif) {
+            arrayOf("image/png", "image/jpeg", "image/webp", "image/gif")
+        } else {
+            arrayOf("image/png", "image/jpeg", "image/webp")
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            val photoPicker = Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                type = "image/*"
+                if (gif) putExtra(MediaStore.EXTRA_PICK_IMAGES_ACCENT_COLOR, 0xFFE4B8CD.toInt())
+            }
+            if (photoPicker.resolveActivity(pm) != null) return photoPicker
+        }
+
+        val gallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+            type = "image/*"
+        }
+        if (gallery.resolveActivity(pm) != null) return gallery
+
+        return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            // 显式列 MIME 是为了让「选了动图却变成静图」这件事不发生
+            putExtra(Intent.EXTRA_MIME_TYPES, types)
+        }
     }
 
     /** 读图 → 校正 EXIF 方向 → 缩到长边上限 → 压到体积上限 → 原子落盘。 */
@@ -400,16 +441,7 @@ class EllenMediaPlugin : Plugin() {
         }
         stickerCall = call
         try {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                // 只给 image/* 会让部分机器的选择器把 gif 也放进来；
-                // 显式列 MIME 是为了让「选了动图却变成静图」这件事不发生
-                type = "image/*"
-                putExtra(
-                    Intent.EXTRA_MIME_TYPES,
-                    arrayOf("image/png", "image/jpeg", "image/webp", "image/gif"),
-                )
-            }
+            val intent = imagePickerIntent(gif = true)
             startActivityForResult(call, intent, "pickedSticker")
         } catch (e: Exception) {
             stickerCall = null
