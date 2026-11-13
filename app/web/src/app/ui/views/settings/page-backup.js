@@ -265,6 +265,13 @@ export function createBackupPage({ state, onChange } = {}) {
     legacyScan.className = 'el-settings-btn';
     legacyScan.textContent = s('settings.legacyScan');
     legacyRow.append(legacyScan);
+    // 诊断：只在排查「数据在库里但界面看不到」时才用。屏幕上看一眼就能定性，
+    // 不用连 devtools（2026-11-13 真机换签名包后聊天页空白就是靠它定的性）。
+    const diagBtn = document.createElement('button');
+    diagBtn.type = 'button';
+    diagBtn.className = 'el-settings-btn is-ghost';
+    diagBtn.textContent = '诊断';
+    legacyRow.append(diagBtn);
     const legacyList = document.createElement('div');
     legacyList.className = 'el-legacy-list';
     const legacyNote = document.createElement('div');
@@ -276,6 +283,61 @@ export function createBackupPage({ state, onChange } = {}) {
       legacyNote.className = isError ? 'el-settings-note is-error' : 'el-settings-note';
       legacyNote.textContent = text;
     }
+
+    /** 诊断：把 profile / 当前线程 / 消息分布摊在屏幕上。 */
+    async function showDiagnostics() {
+      const box = document.createElement('pre');
+      box.className = 'el-legacy-result-line';
+      box.style.whiteSpace = 'pre-wrap';
+      try {
+        const db = await import('../../../core/store/db.js');
+        const handle = await db.openDb();
+        const all = (store) => new Promise((resolve) => {
+          try {
+            const t = handle.transaction(store, 'readonly');
+            const r = t.objectStore(store).getAll();
+            r.onsuccess = () => resolve(r.result || []);
+            r.onerror = () => resolve([]);
+          } catch (err) {
+            resolve([]);
+          }
+        });
+        const profiles = await all('data-profiles');
+        const heads = await all('data-heads');
+        const { ensureProfile, currentThreadId, getMeta } = await import('../../../core/store/records.js');
+        const mine = await ensureProfile();
+        const metaThread = await getMeta('current-thread');
+        const tid = await currentThreadId();
+        const byThread = new Map();
+        const byProfile = new Map();
+        for (const h of heads) {
+          if (h.kind !== 'message') continue;
+          const k = `${h.profileId || '?'} | ${h.threadId || '?'}`;
+          byThread.set(k, (byThread.get(k) || 0) + 1);
+          byProfile.set(h.profileId || '?', (byProfile.get(h.profileId || '?') || 0) + 1);
+        }
+        const lines = [
+          `heads 总数：${heads.length}`,
+          `profiles(${profiles.length})：${profiles.map((p) => p.id).join(', ')}`,
+          `ensureProfile：${mine.id}`,
+          `meta current-thread：${metaThread || '(空)'}`,
+          `currentThreadId：${tid}`,
+          `消息按 profile 分：${[...byProfile].map(([k, v]) => `${k}=${v}`).join(' / ') || '(无)'}`,
+          `消息按 线程 分：`,
+          ...[...byThread].map(([k, v]) => `  ${k} → ${v}`),
+        ];
+        box.textContent = lines.join('\n');
+      } catch (err) {
+        box.textContent = `诊断失败：${(err && err.message) || err}`;
+      }
+      legacyList.append(box);
+    }
+
+    diagBtn.addEventListener('click', () => {
+      const old = legacyList.querySelector('pre');
+      if (old) old.remove();
+      showDiagnostics();
+    });
 
     function sizeText(bytes) {
       const n = Number(bytes || 0);

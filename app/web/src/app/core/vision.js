@@ -176,8 +176,10 @@ export function visionPlan({ vision, chat } = {}) {
   if (!v.model) {
     // 回落聊天模型：这时 key/地址都跟着聊天配置走
     if (!c.apiKey || !c.endpoint) return { ...base, reason: 'no-chat', hint: '聊天模型还没配好，视觉没处回落。' };
-    if (!supportsVision({ model })) {
-      return { ...base, reason: 'not-vision', hint: `当前模型不吃图（${model}）。填一个能看图的模型。` };
+    // 老大的模型（deepseek v4.1 flash 这类）名字里没有 vl/vision 特征词，但确实收图：
+    // 回落聊天模型时也认「强制按视觉模型用」，打开就当它能吃图，别拦着。
+    if (!supportsVision({ model, forceVision: v.forceVision })) {
+      return { ...base, reason: 'not-vision', hint: `当前模型不吃图（${model}）。确认它能吃图就打开「强制按视觉模型用」，或另填一个视觉模型。` };
     }
     return { ...base, usable: true, hint: `用聊天模型看图（${model}）。` };
   }

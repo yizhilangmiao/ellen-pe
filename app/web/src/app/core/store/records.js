@@ -75,8 +75,35 @@ export async function ensureProfile() {
     r.onsuccess = () => resolve(r.result || []);
     r.onerror = () => reject(r.error);
   });
-  if (existing.length) {
+  if (existing.length === 1) {
     profileCache = existing[0];
+    return profileCache;
+  }
+  if (existing.length > 1) {
+    // 有多个 profile（换签名包重装后导入旧包 = 新 profile + 旧 profile 并存）：
+    // 取「消息最多的那个」，否则会随机挑到新装时自动建的空 profile，
+    // 数据明明在库里、界面却是一片空白（2026-11-13 真机踩到）。
+    const counts = await new Promise((resolve, reject) => {
+      const t = db.transaction(STORE_HEADS, 'readonly');
+      const r = t.objectStore(STORE_HEADS).getAll();
+      r.onsuccess = () => resolve(r.result || []);
+      r.onerror = () => reject(r.error);
+    });
+    const tally = new Map();
+    for (const h of counts) {
+      if (h.kind !== 'message' || !h.profileId) continue;
+      tally.set(h.profileId, (tally.get(h.profileId) || 0) + 1);
+    }
+    let best = existing[0];
+    let bestN = tally.get(best.id) || 0;
+    for (const p of existing) {
+      const n = tally.get(p.id) || 0;
+      if (n > bestN) {
+        best = p;
+        bestN = n;
+      }
+    }
+    profileCache = best;
     return profileCache;
   }
   const profile = {
@@ -108,11 +135,72 @@ export async function putMeta(key, value) {
 /** 当前线程 id（旧包用 `thread:<uuid>` 形态）。 */
 export async function currentThreadId() {
   let id = await getMeta('current-thread');
-  if (id) return id;
+  if (id) {
+    // 自愈：meta 指着的这条线程如果一条消息都没有，而库里别的线程有，
+    // 就切到那条。换签名包重装后导入旧资料时踩到过 —— 新装首启自动建了个空线程，
+    // 导入的记录都在旧 threadId 下，界面于是一片空白，看着像「数据没进来」。
+    const empty = !(await threadHasMessages(id));
+    if (empty) {
+      const better = await busiestThreadId();
+      if (better && better !== id) {
+        await putMeta('current-thread', better);
+        await putMeta('current-thread-at', Date.now());
+        return better;
+      }
+    }
+    return id;
+  }
   id = `thread:${uuid()}`;
   await putMeta('current-thread', id);
   await putMeta('current-thread-at', Date.now());
   return id;
+}
+
+/** 这条线程下还有没有消息（软删的不算）。 */
+async function threadHasMessages(threadId) {
+  try {
+    const profile = await ensureProfile();
+    const db = await openDb();
+    const n = await new Promise((resolve, reject) => {
+      const t = db.transaction(STORE_HEADS, 'readonly');
+      const r = t.objectStore(STORE_HEADS).index('profileKindThread').count([profile.id, 'message', threadId]);
+      r.onsuccess = () => resolve(r.result || 0);
+      r.onerror = () => reject(r.error);
+    });
+    return n > 0;
+  } catch (err) {
+    return true;
+  }
+}
+
+/** 消息最多的那条线程（自愈用；没有就 null）。 */
+async function busiestThreadId() {
+  try {
+    const profile = await ensureProfile();
+    const db = await openDb();
+    const rows = await new Promise((resolve, reject) => {
+      const t = db.transaction(STORE_HEADS, 'readonly');
+      const r = t.objectStore(STORE_HEADS).index('profileKind').getAll([profile.id, 'message']);
+      r.onsuccess = () => resolve(r.result || []);
+      r.onerror = () => reject(r.error);
+    });
+    const tally = new Map();
+    for (const h of rows) {
+      if (!h.threadId || h.deleted) continue;
+      tally.set(h.threadId, (tally.get(h.threadId) || 0) + 1);
+    }
+    let best = null;
+    let bestN = 0;
+    for (const [tid, n] of tally) {
+      if (n > bestN) {
+        best = tid;
+        bestN = n;
+      }
+    }
+    return best;
+  } catch (err) {
+    return null;
+  }
 }
 
 /** 切到某个线程（聊天历史页点一条就走这里）。 */

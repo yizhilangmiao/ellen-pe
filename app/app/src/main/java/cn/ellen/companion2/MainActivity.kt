@@ -2,6 +2,7 @@ package cn.ellen.companion2
 
 import android.content.Intent
 import android.os.Bundle
+import android.webkit.WebView
 import com.getcapacitor.BridgeActivity
 // App 插件管两件事：backButton 事件（我们的返回键裁决全靠它）与 minimizeApp()。
 // 少了它，web 侧 App.addListener('backButton') 会抛「not implemented on android」，
@@ -30,6 +31,10 @@ import cn.ellen.companion2.plugin.EllenVolumePlugin
 class MainActivity : BridgeActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 让 WebView 的 devtools 一直可用：正式包出问题时，只有这一条路能看库里的真东西
+        // （2026-11-13 真机导入资料后聊天页空白，就是靠它才查出是 profile/线程没切）。
+        // 影响面：只有连着 adb（USB 调试已开）的机器才能连上，不联网、不对外暴露。
+        WebView.setWebContentsDebuggingEnabled(true)
         registerPlugin(AppPlugin::class.java)
         registerPlugin(EchoPlugin::class.java)
         registerPlugin(EllenReleaseInfoPlugin::class.java)

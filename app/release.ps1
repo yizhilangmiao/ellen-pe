@@ -18,6 +18,10 @@
 param(
   [string[]]$Abi = @('arm64-v8a', 'x86_64'),
   [switch]$SkipBuild,
+  # 跳过 web 构建（只重新 gradle 时用）。默认必须先 vite build ——
+  # 不跑它，gradle 拿的是 assets\public 里上一次的旧 web，出再多版也看不到改动
+  # （2026-11-13 连出 0.3.4~0.3.7 全白修，就是因为漏了这一步）。
+  [switch]$SkipWeb,
   # 内部自测专用：出 debug 签名包。默认（不加这个）就是正式签名。
   # debug 与 release 签名不同，互相不能覆盖安装 —— 手机装 debug 包没事，发布一律正式签名。
   [switch]$Debug,
@@ -41,6 +45,20 @@ $vc = [regex]::Match($gradleKts, 'versionCode\s*=\s*(\d+)')
 if (-not $vm.Success -or -not $vc.Success) { throw 'build.gradle.kts 里找不到 versionName / versionCode' }
 $version = $vm.Groups[1].Value
 $versionCode = [int]$vc.Groups[1].Value
+
+# ---- 1.5 web 产物：先 vite build，产物落到 app/src/main/assets/public ----
+# 没这一步就是「旧 web + 新原生」：包出了、装了、界面一点没变。
+# 2026-11-13 连出 0.3.4~0.3.7 全白修，就是漏了这一步（release.ps1 只跑 gradle）。
+if (-not $SkipWeb) {
+  $env:npm_config_cache = 'E:\ailian\工具\npm-cache'
+  Push-Location "$root\web"
+  try {
+    & 'E:\ailian\工具\node\node-v24.21.0-win-x64\node.exe' node_modules\vite\bin\vite.js build --logLevel warn
+    if ($LASTEXITCODE -ne 0) { throw "vite build 失败（exit $LASTEXITCODE）" }
+  } finally { Pop-Location }
+  $idx = Get-Item "$root\app\src\main\assets\public\index.html"
+  Write-Host ("[web] assets\public\index.html  {0}" -f $idx.LastWriteTime)
+}
 
 # ---- 2. 构建（拆包）----
 $variant = if ($Debug) { 'debug' } else { 'release' }

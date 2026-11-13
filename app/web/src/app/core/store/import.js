@@ -426,10 +426,16 @@ export async function importSnapshot(snapshot, { merge = false, onProgress } = {
   invalidateProfile();
 
   // 把「当前线程」指到最近活跃的那个，否则导入完打开是空的。
-  // 合并导入时只在原来没有线程（新装的空库）才切，别把人正在聊的那条换掉。
+  // 合并导入时：原来那条线程若是个空壳（新装后自动建、一条消息都没有），也要切过去 ——
+  // 不切的话导完打开还是空白，看起来像数据没进来（2026-11-13 换正式签名包时踩到）。
   const threadId = pickRecentThread(heads);
   const current = await getMeta('current-thread', null).catch(() => null);
-  if (threadId && (!merge || !current)) {
+  let shouldSwitch = !merge || !current;
+  if (!shouldSwitch && current && threadId && current !== threadId) {
+    const here = heads.filter((h) => h.kind === 'message' && h.threadId === current).length;
+    if (here === 0) shouldSwitch = true;
+  }
+  if (threadId && shouldSwitch) {
     await putMeta('current-thread', threadId);
     await putMeta('current-thread-at', Date.now());
   }
