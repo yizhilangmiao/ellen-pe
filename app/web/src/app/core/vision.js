@@ -78,6 +78,10 @@ export const VISION_HINTS = [
   'flash-4.1',
   'flash4.1',
   '4.1-flash',
+  // 2026-11-13 实测：拿 key 打 https://api.deepseek.com/models，deepseek-flash（DeepSeek-V4.1-Flash）
+  // 的 input_modalities 是 ["text","image"]；再发一张 webp 过去它确实读出了画面内容 → 能吃图。
+  // 老大原话：「deepseek v4.1 flash 1017，不是支持图片识别吗」—— 他是对的，之前是白名单没认它。
+  'deepseek-flash',
   'glm-4v',
   'glm-4.1v',
   'internvl',
