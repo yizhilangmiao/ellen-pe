@@ -3,10 +3,14 @@
 # 手动拼这个文件必错字段名，且 sha256 必须与包体逐字节一致，否则客户端校验失败。
 #
 # 用法：
-#   pwsh -File ...\app\release.ps1                      # 出 arm64 + x86_64 两个包和 latest.json
+#   pwsh -File ...\app\release.ps1                      # 默认出【正式签名】包 + latest.json
 #   pwsh -File ...\app\release.ps1 -Abi arm64-v8a       # 只出真机用的那个
 #   pwsh -File ...\app\release.ps1 -SkipBuild           # 只重新算 hash / 重写 latest.json
 #   pwsh -File ...\app\release.ps1 -Notes "修了手记分页"  # 写进 latest.json 的更新说明
+#   pwsh -File ...\app\release.ps1 -Debug               # 内部自测才用：debug 签名，不能发出去
+#
+# 老大 2026-11-13 定：**发布必须用正式签名**。所以默认就是 assembleRelease，
+# 要出 debug 包得显式加 -Debug；出完还校验证书指纹，不对就 throw —— 不靠人记得加参数。
 #
 # 通道（老大 2026-11-10：发布通道先留空）：脚本只产出本地文件，不上传、不写死任何托管地址。
 # 拿到 https 静态站后，把整个输出目录的内容原样传上去即可，latest.json 里的 URL
@@ -14,8 +18,10 @@
 param(
   [string[]]$Abi = @('arm64-v8a', 'x86_64'),
   [switch]$SkipBuild,
-  # 出正式签名包（assembleRelease，走 _build\keystore 里的密钥）。
-  # 不加时出 debug 包 —— debug 与 release 签名不同，互相不能覆盖安装。
+  # 内部自测专用：出 debug 签名包。默认（不加这个）就是正式签名。
+  # debug 与 release 签名不同，互相不能覆盖安装 —— 手机装 debug 包没事，发布一律正式签名。
+  [switch]$Debug,
+  # 兼容老写法：以前要 -Sign 才是正式签名，现在默认就是，传了也不报错。
   [switch]$Sign,
   [string]$Notes = '',
   [string]$BaseUrl = '',
@@ -37,8 +43,8 @@ $version = $vm.Groups[1].Value
 $versionCode = [int]$vc.Groups[1].Value
 
 # ---- 2. 构建（拆包）----
-$variant = if ($Sign) { 'release' } else { 'debug' }
-$task = if ($Sign) { ':app:assembleRelease' } else { ':app:assembleDebug' }
+$variant = if ($Debug) { 'debug' } else { 'release' }
+$task = if ($Debug) { ':app:assembleDebug' } else { ':app:assembleRelease' }
 if (-not $SkipBuild) {
   Push-Location $root
   try {
@@ -97,6 +103,21 @@ if ($back.apk.sha256 -ne $again) { throw "latest.json 里的 sha256 与包体不
 if ($back.versionCode -ne $versionCode) { throw "latest.json 的 versionCode 与 build.gradle.kts 不一致" }
 Write-Host "[verify] version=$version ($versionCode)  abi=$($primary.abi)  size=$($primary.sizeBytes)  sha256 复算一致"
 
+# ---- 5.5 签名自检：发布包必须是正式证书（老大 2026-11-13 定）----
+if (-not $Debug) {
+  $apksigner = Get-ChildItem 'E:/ailian/工具/android-sdk/build-tools/*/apksigner.bat' |
+    Sort-Object FullName -Descending | Select-Object -First 1
+  if (-not $apksigner) { throw '找不到 apksigner.bat（android-sdk/build-tools），没法校验签名' }
+  $wantPrint = 'd8c4ea12050c025d20310491d16c7c5a30594706653dec57acdcc6b3c2e7bcbe'
+  foreach ($m2 in $made) {
+    $printed = & $apksigner.FullName verify --print-certs (Join-Path $out $m2.name) 2>&1 | Out-String
+    if ($printed -notmatch $wantPrint) {
+      throw "包 $($m2.name) 不是正式证书签的（apksigner 没找到 $wantPrint）。发布一律正式签名。"
+    }
+  }
+  Write-Host '[sign] 证书指纹校验通过（正式签名）'
+}
+
 # ---- 6. 其它 ABI 也留一份小清单，方便人工挑包（客户端不读）----
 $index = @{ version = $version; versionCode = $versionCode; builtAt = (Get-Date).ToString('s'); apks = $made } |
   ConvertTo-Json -Depth 5
@@ -106,9 +127,9 @@ Write-Host ''
 Write-Host "输出目录：$out"
 Get-ChildItem $out | ForEach-Object { Write-Host ("  {0}  {1:N0} B" -f $_.Name, $_.Length) }
 Write-Host ''
-if ($Sign) {
-  Write-Host '签名：正式（_build\keystore\ellen-release.jks）'
-  Write-Host '提醒：发版前确认 versionCode 已递增，否则已装的客户端会判「已是最新」，更新根本不会触发。'
+if ($Debug) {
+  Write-Host '签名：debug（自测包，不能发出去；发布用不带 -Debug 的默认模式）'
 } else {
-  Write-Host '提醒：现在是 debug keystore 签名（与正式签名不能互相覆盖安装）。要发出去就加 -Sign。'
+  Write-Host '签名：正式（_build/keystore/ellen-release.jks，指纹已校验）'
+  Write-Host '提醒：发版前确认 versionCode 已递增，否则已装的客户端会判「已是最新」，更新根本不会触发。'
 }
