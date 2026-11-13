@@ -823,6 +823,74 @@ function sendMessage(text, extra = null, opts = null) {
     goChat();
   }
 
+  /**
+   * 历史补算：老大 2026-11-13「以前有的聊天记录如果能读到的话补发信和加好感度，
+   * 每个阶段都有信，最少一千五百字」。
+   * 三件事按顺序：先重放历史把点数/档位补上（只升不降），再按缺的档位一封封写。
+   */
+  async function runBackfill() {
+    if (letterBusy) return null;
+    const config = appState.getConfig();
+    if (!config || !config.endpoint) {
+      flash(s('letter.backfillNoModel'));
+      return null;
+    }
+    letterBusy = true;
+    try {
+      const bf = await import('./core/backfill.js');
+      const found = await bf.planFromHistory();
+      if (!found || !found.gaps || !found.gaps.length) {
+        flash(s('letter.backfillNone'));
+        return { written: [], skipped: [], failed: [] };
+      }
+      if (found.needsPoints) {
+        try {
+          await bf.applyPlan(found.plan);
+        } catch (err) {
+          console.warn('[main] 历史点数没补上', err);
+        }
+      }
+      letterWriting = { chars: 0, target: 1500, at: Date.now(), stage: found.gaps[0].label };
+      flash(s('letter.backfillStart').replace('{n}', String(found.gaps.length)));
+      const res = await bf.writeGaps({
+        config,
+        persona: await readPersona(),
+        onProgress: (d) => {
+          if (!d) return;
+          letterWriting = {
+            chars: d.chars || 0,
+            target: 1500,
+            at: Date.now(),
+            stage: d.label || '',
+            index: typeof d.index === 'number' ? d.index + 1 : 0,
+            total: d.total || 0,
+          };
+          if (letterHandle && typeof letterHandle.setWriting === 'function') {
+            try {
+              letterHandle.setWriting(letterWriting);
+            } catch (err) {
+              console.warn('[main] 补写信进度没推进视图', err);
+            }
+          }
+        },
+      });
+      flash(
+        s('letter.backfillDone')
+          .replace('{n}', String((res.written || []).length))
+          .replace('{fail}', String((res.failed || []).length)),
+      );
+      return res;
+    } catch (err) {
+      console.warn('[main] 补写信失败', err);
+      flash(s('letter.writeFail'));
+      return null;
+    } finally {
+      letterBusy = false;
+      letterWriting = null;
+      await refreshLetterView();
+    }
+  }
+
   function goChat() {
     if (drawer.isOpen()) drawer.close({ silent: true });
     show('chat');
@@ -854,6 +922,8 @@ function sendMessage(text, extra = null, opts = null) {
           // 太短/想再要一封：强制重写，进度直接推回视图
           onRewrite: (id) => maybeWriteLetter(null, { force: true }).then(() => refreshLetterView()),
           onRead: (id) => markLetterRead(id).catch((err) => console.warn('[main] 信已读没落库', err)),
+          // 补写历史档位的信（老大的聊天记录里已经走过的阶段，一封都不该缺）
+          onBackfill: () => runBackfill(),
         });
         letterHandle = handle;
         return handle;

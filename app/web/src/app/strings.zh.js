@@ -545,6 +545,14 @@ export const strings = {
     noticeInChat: '我写了点东西，你有空看。',
     needModel: '还没配聊天模型，她写不了信。',
     backToList: '回信列表',
+    // —— 补写历史档位的信（老大 2026-11-13）——
+    backfillText: '你俩走过了 {stages}，那几封该有的信还欠着。补上之后，每封不少于 1500 字。',
+    backfillBtn: '补写欠着的 {n} 封',
+    backfillRunning: '她在一封封补…',
+    backfillStart: '她从最早那封开始补，共 {n} 封。',
+    backfillDone: '补好了 {n} 封，没写成 {fail} 封。',
+    backfillNone: '该有的信都在了，没有欠的。',
+    backfillNoModel: '还没配聊天模型，补不了信。',
   },
   // —— 亲密度 / 等级 ——
   bond: {

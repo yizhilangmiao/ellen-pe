@@ -381,9 +381,34 @@ export async function maybeLevelUp({ messages = [], at = Date.now() } = {}) {
   return { stage: st.stage, upgraded: !!moved, prevStage, points: st.points };
 }
 
+/**
+ * 按历史消息重算亲密度（补算用）。
+ *
+ * 为什么要有它：0.4.1 之前只有「聊一句 +1」，老用户把几年聊天记录导进来时这些记录一条都没加过点，
+ * 档位一直停在「相识」，信也就永远只有第一封。老大原话：「以前有的聊天记录如果能读到的话
+ * 补发信和加好感度」。所以这里把历史消息按同一套规则重放一遍。
+ *
+ * 只写点数和档位，**不发事件**（补算不是「刚刚升阶」，界面不该弹一堆升阶提示）；
+ * `letters` 一个字都不动 —— 已经写过的信不能被补算抹掉。
+ *
+ * @param {{points:number, stage:string, stageSince?:number, stageMessages?:number, lastDay?:string}} plan
+ */
+export async function seedFromHistory(plan) {
+  const st = await readState();
+  const next = {
+    ...st,
+    points: Math.max(0, Number(plan && plan.points) || 0),
+    stage: STAGES.some((s) => s.id === (plan && plan.stage)) ? plan.stage : st.stage,
+    stageSince: Number(plan && plan.stageSince) || st.stageSince || 0,
+    stageMessages: Math.max(0, Number(plan && plan.stageMessages) || 0),
+    lastDay: (plan && plan.lastDay) || st.lastDay || '',
+    updatedAt: Date.now(),
+  };
+  return snapshotOf(await writeState(next));
+}
+
 /** 全部清零（换设备重来 / 用户主动重置）。只清亲密度，聊天记录一条不动。 */
-export async function reset() {
-  const st = defaultState();
+export async function reset() {  const st = defaultState();
   st.updatedAt = Date.now();
   st.enabled = true;
   await writeState(st);

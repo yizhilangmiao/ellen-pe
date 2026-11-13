@@ -35,6 +35,14 @@ export function renderRichText(text) {
   out = out.replace(/\*\*([^*\n]{1,400})\*\*/g, '<strong>$1</strong>');
   // 还原行内代码
   out = out.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
+  // 动作/神态描写：把括号里的内容换一种写法（细一点、斜一点），读起来跟对话分得开。
+  // 老大原话：「文字里夹杂动作，为了可读性，（动作...）使用其他字体，或者斜体变细」。
+  // 只认 1~80 字的短括号，不跨行；标签内部（strong/code）里若出现括号也照样包，嵌在里面的 span 合法。
+  out = out.replace(/[（(]([^（）()<>\n]{1,80})[）)]/g, (whole, inner) => {
+    const lead = whole.startsWith('（') ? '（' : '(';
+    const tail = whole.endsWith('）') ? '）' : ')';
+    return `<span class="el-act">${lead}${inner}${tail}</span>`;
+  });
   // 换行不转 <br>：气泡本身是 white-space: pre-wrap，转成 <br> 会变成双倍行距。
   return out;
 }

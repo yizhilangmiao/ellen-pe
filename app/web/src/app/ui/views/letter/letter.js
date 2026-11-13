@@ -106,6 +106,9 @@ export function createLetterView({ state } = {}) {
   let pages = [];
   let page = 0;
   let busy = false;
+  let backfillPending = false;
+  // 「已经走过但还没写信」的档位。列表顶部因此会长出一条补写入口（老大 2026-11-13 要的）。
+  let gapStages = [];
   let writingChars = 0;
   let rewritePending = false;
   let disposed = false;
@@ -205,6 +208,8 @@ export function createLetterView({ state } = {}) {
         : s('letter.readAll');
     list.append(summary);
 
+    if (gapStages.length) list.append(backfillCard());
+
     cards.forEach((card) => {
       const item = document.createElement('button');
       item.type = 'button';
@@ -238,6 +243,59 @@ export function createLetterView({ state } = {}) {
     });
 
     body.append(list);
+  }
+
+  // ── 补写历史阶段的信 ──────────────────────────────────────────────
+  /**
+   * 老大 2026-11-13：「以前有的聊天记录如果能读到的话补发信和加好感度，每个阶段都有信」。
+   * 这里只放一个入口，真正的重活（重放历史点数、逐档写信）在 `props.onBackfill` 里，
+   * 因为写信需要 config/persona，那是 main.js 才知道的事。
+   */
+  function backfillCard() {
+    const box = document.createElement('section');
+    box.className = 'el-letter-backfill';
+
+    const text = document.createElement('p');
+    text.className = 'el-letter-backfill-text';
+    const labels = gapStages.map((g) => (g.label ? g.label : stageLabel(g.id))).join(' · ');
+    text.textContent = s('letter.backfillText').replace('{stages}', labels);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'el-secondary el-letter-backfill-btn';
+    btn.textContent = s('letter.backfillBtn').replace('{n}', String(gapStages.length));
+    btn.addEventListener('click', async () => {
+      if (backfillPending) return;
+      if (typeof props.onBackfill !== 'function') {
+        btn.textContent = s('letter.writeFail');
+        return;
+      }
+      backfillPending = true;
+      btn.disabled = true;
+      btn.textContent = s('letter.backfillRunning');
+      try {
+        await props.onBackfill();
+      } catch (err) {
+        console.warn('[letter] 补写信失败', err);
+        btn.textContent = s('letter.writeFail');
+      } finally {
+        backfillPending = false;
+      }
+    });
+
+    box.append(text, btn);
+    return box;
+  }
+
+  async function loadGaps() {
+    try {
+      const mod = await import('../../../core/backfill.js');
+      const plan = await mod.planFromHistory();
+      gapStages = Array.isArray(plan && plan.gaps) ? plan.gaps : [];
+    } catch (err) {
+      console.warn('[letter] 算不出缺哪几封信', err);
+      gapStages = [];
+    }
   }
 
   // ── 读信 ──────────────────────────────────────────────────────────
@@ -473,6 +531,8 @@ export function createLetterView({ state } = {}) {
     }
     if (disposed) return;
     cards = list;
+    await loadGaps();
+    if (disposed) return;
     if (mode !== 'read' && mode !== 'writing') paintList();
   }
 

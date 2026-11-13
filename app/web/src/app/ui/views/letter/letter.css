@@ -391,3 +391,34 @@
   border-radius: var(--z-r-3);
   color: var(--z-ink-2);
 }
+
+/* —— 补写历史档位的信（老大 2026-11-13）—— */
+.ellen-app[data-skin='zzz'] .el-letter-backfill {
+  margin-bottom: calc(12 * var(--u));
+  padding: calc(12 * var(--u)) calc(14 * var(--u));
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-2);
+  background: var(--z-card);
+  box-shadow: var(--z-hard-s);
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-backfill-text {
+  margin: 0 0 calc(10 * var(--u));
+  color: var(--z-ink-2);
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(20 * var(--u));
+  text-wrap: pretty;
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-backfill-btn {
+  width: 100%;
+  min-height: calc(34 * var(--u));
+  border: 1px solid var(--z-line-hair);
+  border-radius: var(--z-r-3);
+  color: var(--z-ink);
+  font-size: calc(13 * var(--u));
+}
+
+.ellen-app[data-skin='zzz'] .el-letter-backfill-btn:disabled {
+  opacity: 0.6;
+}

@@ -80,22 +80,21 @@
 }
 
 .ellen-app[data-skin='zzz'] .el-msg[data-role='assistant']::before {
-  content: '艾';
+  /* 老大 2026-11-13：头像换成她本人那张（头、棒棒糖、手、项圈都要看得见），不再用「艾」字占位。
+     图在 assets/ellen-avatar.webp（256²，从立绘裁的 940² 方框）。 */
+  content: '';
   grid-column: 1;
   grid-row: 1 / span 3;
   align-self: start;
   margin-top: calc(2 * var(--u));
   width: calc(32 * var(--u));
   height: calc(32 * var(--u));
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: var(--z-r-3);
-  background: var(--z-card);
-  color: var(--z-ink-2);
-  font-family: var(--z-font-display);
-  font-size: calc(15 * var(--u));
-  line-height: 1;
+  background-color: var(--z-card);
+  background-image: url('../assets/ellen-avatar.webp');
+  background-size: cover;
+  background-position: 50% 32%;
+  background-repeat: no-repeat;
   box-shadow: var(--z-hard-s);
 }
 
