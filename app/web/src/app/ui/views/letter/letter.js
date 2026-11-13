@@ -70,14 +70,18 @@ function firstLine(card) {
  * 单独一段超过预算就独占一页（长段落硬切会断句，宁可一页长一点）。
  */
 const PAGE_BUDGET = 200;
+/** 把一封拆成段落列表（通读与分页共用一套口径）。 */
+function flattenParagraphs(paragraphs, fallbackText) {
+  const list = (Array.isArray(paragraphs) ? paragraphs : []).map((p) => String(p || '').trim()).filter(Boolean);
+  if (list.length) return list;
+  return String(fallbackText || '')
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 function paginate(paragraphs, fallbackText) {
-  let list = (Array.isArray(paragraphs) ? paragraphs : []).map((p) => String(p || '').trim()).filter(Boolean);
-  if (!list.length) {
-    list = String(fallbackText || '')
-      .split(/\n+/)
-      .map((p) => p.trim())
-      .filter(Boolean);
-  }
+  const list = flattenParagraphs(paragraphs, fallbackText);
   if (!list.length) return [];
   const pages = [];
   let cur = [];
@@ -551,7 +555,8 @@ export function createLetterView({ state } = {}) {
   async function openLetter(card) {
     if (!card || disposed) return;
     opened = card;
-    pages = paginate(card.paragraphs, card.text);
+    // 整封一次铺满信纸，上下滑着读（老大 2026-11-13：一页全写满，尽量不用翻页）
+    pages = [flattenParagraphs(card.paragraphs, card.text)];
     page = 0;
     paintRead();
 
