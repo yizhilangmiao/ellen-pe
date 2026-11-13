@@ -93,8 +93,9 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: calc(12 * var(--u)) 0;
+  /* 顶对齐：居中会在第 2/3 步这种短内容上留出一大片空 */
+  justify-content: flex-start;
+  padding: calc(28 * var(--u)) 0 calc(12 * var(--u));
 }
 
 .el-welcome-card {

@@ -92,14 +92,21 @@
 
 .el-river-empty {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(120 * var(--u));
+  left: 50%;
+  transform: translateX(-50%);
+  /* 压在中心光晕上读不清：抬到光晕上方，给一层底片 */
+  top: calc(18 * var(--u));
+  max-width: calc(230 * var(--u));
   margin: 0;
+  padding: calc(6 * var(--u)) calc(12 * var(--u));
+  border-radius: 999px;
+  background: rgba(12, 13, 17, 0.62);
+  backdrop-filter: blur(calc(3 * var(--u)));
   text-align: center;
   font-size: calc(12.5 * var(--u));
   line-height: calc(20 * var(--u));
-  color: var(--el-muted);
+  color: var(--el-text);
+  opacity: 0.86;
   pointer-events: none;
 }
 

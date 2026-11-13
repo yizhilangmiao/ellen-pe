@@ -1210,8 +1210,9 @@
 }
 
 .el-stk-tab.is-on {
-  background: var(--el-pink, #ff9fc6);
-  color: #1a1116;
+  background: var(--el-primary, #e4cad7);
+  color: #14170c;
+  font-weight: 500;
 }
 
 .el-stk-grid {
