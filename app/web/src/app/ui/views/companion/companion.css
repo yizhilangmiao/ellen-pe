@@ -332,6 +332,14 @@
   box-shadow: var(--z-hard-t);
 }
 
+/* 便签正文：基础规则是「米白纸 + 墨字」(--el-paper / --el-ink)，zzz 皮肤上面把底换成了
+   深色卡片 --z-card 却没换字色，字还是 --el-ink(=--z-ink-paper #12100f)，深底压深字，
+   正文几乎看不见（老大 2026-11-14 报的「内容是黑色字，看不清」）。
+   只给便签补字色，不动 .el-companion-between —— 那块里的字各有各的颜色，别一起改。 */
+.ellen-app[data-skin='zzz'] .el-companion-note {
+  color: var(--z-ink);
+}
+
 .ellen-app[data-skin='zzz'] .el-companion-label,
 .ellen-app[data-skin='zzz'] .el-companion-note-label,
 .ellen-app[data-skin='zzz'] .el-companion-days-title,
