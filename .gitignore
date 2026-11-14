@@ -22,6 +22,13 @@
 _downloads/
 _下载/
 
+# ── 本地语义召回的模型与推理引擎（共 54 MB，_tools\fetch-models.ps1 一条命令拉回来）──
+# 为什么不进仓库：onnx 23 MB + 两个 wasm 33 MB，进了就永久躺在 git 历史里，
+# 而它们和 /app/app/src/main/assets/asr/ 是同一类东西（可重下的二进制）。
+# 少了它们的后果不是崩，是静默降级回字面+概念召回 —— 所以 fetch-models.ps1 会自检哈希。
+/app/web/public/models/
+/app/web/public/ort/
+
 # ── 旧包解包基线（780 MB，_dev_extract.py 可重建）──
 /work/
 /work_*/

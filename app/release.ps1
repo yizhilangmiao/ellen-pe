@@ -33,7 +33,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = 'E:\ailian\艾莲手机版\创作版\app'
-$out = 'E:\ailian\艾莲手机版\创作版\_build\release'
+# debug 自测包不能落进 release 目录：同名会把正式包覆盖掉（2026-11-14 真踩过，
+# 0.5.0 的 release 包被一个 debug 包顶了，latest.json 的 sha256 当场对不上）。
+$out = if ($Debug) { 'E:\ailian\艾莲手机版\创作版\_build\debug' } else { 'E:\ailian\艾莲手机版\创作版\_build\release' }
 $gradle = 'E:\ailian\工具\gradle-8.11.1\bin\gradle.bat'
 $env:JAVA_HOME = 'C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot'
 $env:GRADLE_USER_HOME = 'E:\ailian\工具\gradle-home'

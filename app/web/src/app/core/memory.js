@@ -26,9 +26,18 @@ import { appendRecord, reviseRecord } from './store/records.js';
 import { ask, stripFence, looseJson } from './chat/oneshot.js';
 
 const PREF_KEY = 'ellen.memory.v1';
+// 抽取游标。为什么需要它：原先的水位是「最近一条记忆的 at」——抽出 0 条时不落库，
+// 水位就一动不动，而抽取只看最后 40 句，于是积压越多越只看得见尾巴，
+// 中间那些话永远进不了抽取范围（2026-11-14 修）。
+// processedAt = 已经看过哪一句（消息时间，向前推进）；
+// doneAt      = 上一次真正抽取的时刻（限流用，别拿消息时间当冷却，否则积压时会被连抽）。
+const CURSOR_KEY = 'ellen.memory.cursor.v1';
 export const DEFAULT_MEMORY_PREFS = { auto: true, minMessages: 4, minGapMin: 20, threshold: 0.62 };
 const LOOKBACK = 40;
 const MAX_ITEMS = 3;
+// 一次最多跑几批。积压 200 句时按 40 一句一批要 5 轮才追平，
+// 一轮 2 批 = 2 次模型调用（每次 maxTokens 700），后台跑，别一口气打完。
+const MAX_BATCHES = 2;
 
 export function readMemoryPrefs() {
   try {
@@ -49,6 +58,38 @@ export function writeMemoryPrefs(patch) {
   const next = { ...readMemoryPrefs(), ...(patch || {}) };
   localStorage.setItem(PREF_KEY, JSON.stringify(next));
   return next;
+}
+
+/** 抽取游标。读不出来就当 0（退化成老逻辑：按最近一条记忆的时间算），不崩。 */
+function readCursor() {
+  try {
+    const raw = localStorage.getItem(CURSOR_KEY);
+    const p = raw ? JSON.parse(raw) : null;
+    const processedAt = Number(p && p.processedAt) || 0;
+    const doneAt = Number(p && p.doneAt) || 0;
+    return { processedAt: processedAt > 0 ? processedAt : 0, doneAt: doneAt > 0 ? doneAt : 0 };
+  } catch (err) {
+    return { processedAt: 0, doneAt: 0 };
+  }
+}
+
+function writeCursor(patch) {
+  const cur = readCursor();
+  const next = {
+    processedAt: Math.max(cur.processedAt, Number(patch && patch.processedAt) || 0),
+    doneAt: Number(patch && patch.doneAt) || cur.doneAt,
+  };
+  try {
+    localStorage.setItem(CURSOR_KEY, JSON.stringify(next));
+  } catch (err) {
+    // 存不下就算了：下一轮会按最近一条记忆重新算，最多白抽一次
+  }
+  return next;
+}
+
+/** 验收/设置页用：现在看到哪了、下次从哪接着看。 */
+export function readMemoryCursor() {
+  return readCursor();
 }
 
 function clampInt(value, fallback, min, max) {
@@ -217,15 +258,27 @@ function readyMessages(messages) {
 }
 
 /** 该不该现在抽一次：新消息够多 + 距上次够久 + 没在跑。 */
-export async function dueFor({ messages, at = Date.now() } = {}) {
+export async function dueFor({ messages, at = Date.now(), listFn = listLatest } = {}) {
   const prefs = readMemoryPrefs();
   if (!prefs.auto) return { due: false, reason: 'off' };
-  const rows = await listLatest('memory', { limit: 1 });
-  const lastAt = rows.length ? Number(rows[0].value && rows[0].value.at) || rows[0].createdAt || 0 : 0;
-  const fresh = readyMessages(messages).filter((m) => (Number(m.createdAt) || 0) > lastAt);
-  if (fresh.length < prefs.minMessages) return { due: false, reason: 'tooFew', count: fresh.length };
-  if (lastAt && at - lastAt < prefs.minGapMin * 60 * 1000) return { due: false, reason: 'tooSoon' };
-  return { due: true, count: fresh.length };
+  const rows = await listFn('memory', { limit: 1 });
+  const memAt = rows.length ? Number(rows[0].value && rows[0].value.at) || rows[0].createdAt || 0 : 0;
+  const cur = readCursor();
+  // 看到哪了：游标与最近一条记忆取更晚的那个（老包没有游标时游标是 0，不影响）
+  const lastAt = Math.max(memAt, cur.processedAt);
+  const fresh = readyMessages(messages)
+    .filter((m) => (Number(m.createdAt) || 0) > lastAt)
+    .sort((a, b) => (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0));
+  if (fresh.length < prefs.minMessages) {
+    return { due: false, reason: 'tooFew', count: fresh.length, fresh };
+  }
+  // 冷却按「上一次真正抽取的时刻」算，不按消息时间：积压时消息很旧，
+  // 拿它当冷却会被连抽。
+  const cooled = Math.max(memAt, cur.doneAt);
+  if (cooled && at - cooled < prefs.minGapMin * 60 * 1000) {
+    return { due: false, reason: 'tooSoon', count: fresh.length, fresh };
+  }
+  return { due: true, count: fresh.length, fresh };
 }
 
 const SYSTEM = [
@@ -259,23 +312,24 @@ function normItems(raw) {
     .slice(0, MAX_ITEMS);
 }
 
-/** 抽一批候选（只调模型，不落库）。 */
-export async function compose({ config, messages, at = Date.now() } = {}) {
+/** 抽一批候选（只调模型，不落库）。batch 给了就只处理这一批，否则按尾巴取 LOOKBACK 句。 */
+export async function compose({ config, messages, at = Date.now(), batch = null, hint = '' } = {}) {
   const prefs = readMemoryPrefs();
   const existing = await listLatest('memory', { limit: 60 });
-  const recent = readyMessages(messages).slice(-LOOKBACK);
+  const recent = Array.isArray(batch) ? batch.slice(-LOOKBACK) : readyMessages(messages).slice(-LOOKBACK);
   const lines = recent.map((m) => `${m.role === 'user' ? '他' : '我'}：${String(m.text).slice(0, 160)}`);
   const known = existing
     .map((r) => textOf(r))
     .filter(Boolean)
     .slice(0, 30)
     .map((t) => `- ${t.slice(0, 80)}`);
-  const prompt = [
-    known.length ? `已经记过的（不要重复记）：\n${known.join('\n')}` : '还没有记过任何事。',
-    '',
-    '最近的对话：',
-    lines.join('\n'),
-  ].join('\n');
+  const head = [];
+  head.push(known.length ? `已经记过的（不要重复记）：\n${known.join('\n')}` : '还没有记过任何事。');
+  if (hint) head.push(hint);
+  head.push('');
+  head.push('最近的对话：');
+  head.push(lines.join('\n'));
+  const prompt = head.join('\n');
   const raw = await ask({
     config,
     maxTokens: 700,
@@ -424,16 +478,55 @@ export function isRunning() {
   return running;
 }
 
-export async function maybeRemember({ config, messages, at = Date.now() } = {}) {
+export async function maybeRemember({
+  config,
+  messages,
+  at = Date.now(),
+  composeFn = compose,
+  writeFn = write,
+  dueFn = dueFor,
+} = {}) {
   if (running) return { skipped: 'running' };
-  const gate = await dueFor({ messages, at });
-  if (!gate.due) return { skipped: gate.reason, count: gate.count };
+  // 锁要在第一个 await 之前就抓住：原来的写法先 await dueFor 再置 running，
+  // 两个调用同时在 dueFor 里挂起时都能过锁，真的并发抽两次（2026-11-14 修）。
   running = true;
+  const out = { ok: true, batches: 0, added: 0, revised: 0, superseded: 0, seen: 0, left: 0 };
   try {
-    const { items } = await compose({ config, messages, at });
-    if (!items.length) return { skipped: 'nothing', items: [] };
-    const res = await write(items, at);
-    return { ok: true, ...res };
+    const gate = await dueFn({ messages, at });
+    if (!gate.due) return { skipped: gate.reason, count: gate.count };
+    // 从「还没看过的最老一句」开始，一批 40 句，最多 MAX_BATCHES 批。
+    // 为什么不用 slice(-40)：那样永远只看尾巴，中间的对话一次也进不来。
+    const all = Array.isArray(gate.fresh) ? gate.fresh : [];
+    let offset = 0;
+    while (offset < all.length && out.batches < MAX_BATCHES) {
+      const batch = all.slice(offset, offset + LOOKBACK);
+      const left = all.length - (offset + batch.length);
+      const hint =
+        left > 0
+          ? `（这一批是较早的对话，后面还有 ${left} 句更晚的，这次先记这一批。）`
+          : '';
+      const { items } = await composeFn({ config, messages, at, batch, hint });
+      out.batches += 1;
+      offset += batch.length;
+      out.seen += batch.length;
+      if (items.length) {
+        const res = await writeFn(items, at);
+        out.added += res.added || 0;
+        out.revised += res.revised || 0;
+        out.superseded += res.superseded || 0;
+      }
+    }
+    out.left = all.length - offset;
+    // 关键：这一轮哪怕一条都没抽出来，游标也往前走。
+    // 否则「没什么可记」的对话会一直顶在队头，把后面的话全挡住。
+    const seenTo = offset > 0 ? Number(all[offset - 1].createdAt) || 0 : 0;
+    writeCursor({ processedAt: seenTo, doneAt: at });
+    if (typeof console !== 'undefined' && out.batches) {
+      console.log(
+        `[memory] 抽取 ${out.batches} 批/${out.seen} 句：新增 ${out.added}、并入 ${out.revised}、翻篇 ${out.superseded}，剩 ${out.left} 句下次看`,
+      );
+    }
+    return out;
   } finally {
     running = false;
   }

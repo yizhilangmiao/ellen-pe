@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>recall bench</title>
+<style>body{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;background:#111;color:#ddd;padding:16px}pre{white-space:pre-wrap}</style>
+</head>
+<body>
+<pre id="out">booting…</pre>
+<script type="module">
+import { appendRecord } from '/src/app/core/store/records.js';
+import { recall, invalidateRecall, vecTerm } from '/src/app/core/chat/recall.js';
+import { ensureEmbedder, embedStatus, warmup, embedMany, embedOne, cosine } from '/src/app/core/chat/embed.js';
+
+const out = document.getElementById('out');
+const log = (s) => { out.textContent += s + '\n'; };
+out.textContent = '';
+window.__done = false;
+
+// ── 40 条合成记忆：都是「生活里真会记下来的那种句子」，带 tags（真系统也是这么给的）
+const MEM = [
+  ['在看《繁花》，看到第 8 集，还剩十几集没看完', ['追剧', '繁花']],
+  ['上周去看了《沙丘 2》，IMAX 厅，音效吵得耳朵疼', ['看电影']],
+  ['今天中午吃了火锅，麻辣锅底，辣得一直喝水', ['吃辣', '火锅']],
+  ['她说想吃日料，约了周六去那家新开的寿司店', ['日料', '约饭']],
+  ['昨晚两点多还没睡着，翻来覆去，早上起来头疼', ['失眠']],
+  ['最近开始十一点半就上床，睡够七小时精神好很多', ['早睡']],
+  ['新公司入职第三天，还在熟悉业务，同事挺客气', ['新工作']],
+  ['这周要交季度报表，周五前必须弄完', ['deadline']],
+  ['在准备日语 N2，每天背三十个单词', ['日语', '考试']],
+  ['报了个线上数据分析课，周三晚上直播', ['上课']],
+  ['最近肩膀酸，久坐太久，想去做个推拿', ['肩颈', '酸痛']],
+  ['体检查出维生素 D 偏低，医生让多晒太阳', ['体检']],
+  ['豆豆（猫）昨天吐了毛球，精神还行', ['猫', '豆豆']],
+  ['想给豆豆换个猫砂，现在这款粉尘大', ['猫砂']],
+  ['和妈妈打电话聊了半小时，她又催我回家吃饭', ['妈妈']],
+  ['跟同事小李有点别扭，他把我的方案改得面目全非', ['同事', '冲突']],
+  ['十一想去成都，看熊猫，吃钵钵鸡', ['旅行', '成都']],
+  ['打算明年换个城市生活，还没定下来', ['搬家']],
+  ['今天状态不太好，什么都不想干', ['低落']],
+  ['收到老大的夸，心情好了不少', ['开心']],
+  ['想买双跑鞋，现在这双底都磨平了', ['跑鞋']],
+  ['手机屏幕碎了，纠结换屏还是换新机', ['手机']],
+  ['早上六点半就得起床赶地铁，人挤人', ['地铁', '早起']],
+  ['下雨天打车要等二十分钟', ['打车']],
+  ['这几天降温，晚上开窗有点冷', ['降温']],
+  ['最近循环听《晚风》，适合晚上走路的时候听', ['歌', '晚风']],
+  ['在打《黑神话》，卡在黄风岭那个 boss 过不去', ['游戏', 'boss']],
+  ['她说喜欢下雨天，因为可以不出门', ['喜欢', '下雨']],
+  ['上次吵架是因为我回消息太慢，她等了两个小时', ['吵架']],
+  ['她生日是 3 月 12 号，喜欢白玫瑰', ['生日']],
+  ['想给她买条围巾，天冷了', ['礼物', '围巾']],
+  ['冬天外套不够穿，得添一件羽绒服', ['外套']],
+  ['厨房水龙头漏水，得找师傅来修', ['漏水', '维修']],
+  ['阳台那盆绿萝快死了，可能是浇水太多', ['绿萝']],
+  ['不会弄签证材料，问了在旅行社的朋友', ['签证']],
+  ['电脑蓝屏，重装系统才弄好', ['电脑']],
+  ['这个月房租又涨了两百', ['房租']],
+  ['想攒钱换个相机，还差八千', ['攒钱', '相机']],
+  ['看完了一本《置身事内》，讲地方财政的', ['看书']],
+  ['失眠那几天特别容易暴躁，一点小事就烦', ['暴躁']],
+];
+
+// 期望命中（下标）；null = 无对应记忆，用来测噪声
+const QUERIES = [
+  ['那部电视剧我看到第几集了', 0],
+  ['火锅那次辣得不行', 2],
+  ['睡不着怎么办', 4],
+  ['新工作怎么样', 6],
+  ['报表什么时候要交', 7],
+  ['日语学到哪了', 8],
+  ['肩膀还是酸', 10],
+  ['豆豆最近怎么样', 12],
+  ['我妈又催我回家', 14],
+  ['去成都玩几天', 16],
+  ['今天什么都不想干', 18],
+  ['想买跑鞋', 20],
+  ['手机屏碎了好烦', 21],
+  ['早上赶地铁太挤', 22],
+  ['最近在听什么歌', 25],
+  ['黑神话卡关了', 26],
+  ['她喜欢什么天气', 27],
+  ['上次为什么吵架', 28],
+  ['她生日是哪天', 29],
+  ['厨房漏水', 32],
+  ['今天股票涨了吗', null],
+  ['量子计算的退相干时间是多少', null],
+  // 换词/同义：字面不撞，只有语义能接上（这才是向量该赢的地方）
+  ['凌晨还睁着眼睛', 4],
+  ['单位换了，还在适应', 6],
+  ['辣的吃多了胃不舒服', 2],
+  ['她不爱出门是因为天气', 27],
+  ['想看接下来那几集', 0],
+  ['脖子后面发紧', 10],
+];
+
+const DAY = 86400000;
+const now = Date.now();
+
+try {
+  const t0 = performance.now();
+  const ok = await ensureEmbedder();
+  log(`模型: ok=${ok} ${(performance.now() - t0).toFixed(0)}ms  ${JSON.stringify(embedStatus())}`);
+
+  // 写记忆库（最近的在前，at 递增往回推）
+  let written = 0;
+  for (let i = 0; i < MEM.length; i++) {
+    const [body, tags] = MEM[i];
+    await appendRecord({
+      kind: 'memory',
+      value: { title: body.slice(0, 12), body, summary: body, tags, state: 'active', at: now - i * DAY },
+      at: now - i * DAY,
+    });
+    written++;
+  }
+  invalidateRecall();
+  log(`写入 ${written} 条记忆`);
+
+  // 跑一次，触发建索引 + 后台预热向量
+  await recall('预热', { limit: 1 });
+  const t1 = performance.now();
+  let waited = 0;
+  while (embedStatus().encoded < MEM.length && waited < 120000) {
+    await new Promise((r) => setTimeout(r, 300));
+    waited += 300;
+  }
+  log(`向量预热: encoded=${embedStatus().encoded}/${MEM.length}  ${(performance.now() - t1).toFixed(0)}ms`);
+
+  // ── 对比两套打分
+  const runs = [
+    ['旧（字面+概念）', false],
+    ['新（向量+IDF+概念）', true],
+  ];
+  const summary = [];
+  for (const [label, useVector] of runs) {
+    let h1 = 0, h3 = 0, noise = 0, miss = [];
+    const detail = [];
+    for (const [q, want] of QUERIES) {
+      const items = await recall(q, { limit: 6, useVector });
+      const texts = items.map((it) => it.body || it.title || '');
+      if (want == null) {
+        noise += items.length;
+        detail.push(`  ${q} → 召入 ${items.length} 条`);
+        continue;
+      }
+      const rank = texts.findIndex((t) => t === MEM[want][0]);
+      if (rank === 0) h1++;
+      if (rank >= 0 && rank < 3) h3++;
+      else miss.push(`${q} (期望 #${want})`);
+      detail.push(`  ${q} → ${rank >= 0 ? '#' + (rank + 1) : '未召回'} [${items.map((it) => it.hit).join(',')}]  ${texts.slice(0, 3).join(' | ').slice(0, 72)}`);
+    }
+    summary.push({ label, h1, h3, noise, detail, miss });
+  }
+
+  log('\n══════ 结果 ══════');
+  const total = QUERIES.filter(([, w]) => w != null).length;
+  for (const s of summary) {
+    log(`${s.label}:  hit@1 ${s.h1}/${total}   hit@3 ${s.h3}/${total}   噪声查询召入 ${s.noise} 条`);
+    if (s.miss.length) log(`   错: ${s.miss.join(' / ')}`);
+  }
+
+  log('\n──── 新版逐条 ────');
+  log(summary[1].detail.join('\n'));
+  log('\n──── 旧版逐条 ────');
+  log(summary[0].detail.join('\n'));
+
+  // ── 诊断：原始余弦的绝对分布（阈值 0.36 / 0.12 该定在哪，只能看这个）
+  const memVecs = await embedMany(MEM.map((m) => m[0]));
+  log('\n──── 原始余弦分布（top3 / 均值 / 最大最小值）────');
+  for (const q of ['今天股票涨了吗', '量子计算的退相干时间是多少', '肩膀还是酸', '凌晨还睁着眼睛', '想看接下来那几集']) {
+    const qv = await embedOne(q, { query: true });
+    const arr = memVecs.map((v, i) => [cosine(qv, v), i]).sort((a, b) => b[0] - a[0]);
+    const mean = arr.reduce((x, [s]) => x + s, 0) / arr.length;
+    log(
+      "  " + q + "  top: " + arr.slice(0, 3).map(([s, i]) => s.toFixed(3) + '#' + i).join(' ') +
+      "   mean=" + mean.toFixed(3) + "  min=" + arr[arr.length - 1][0].toFixed(3) + "  max=" + arr[0][0].toFixed(3)
+    );
+  }
+
+  window.__done = true;
+} catch (e) {
+  log('ERR ' + ((e && (e.stack || e.message)) || String(e)));
+  window.__done = true;
+}
+</script>
+</body>
+</html>

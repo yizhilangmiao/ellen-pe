@@ -15,6 +15,8 @@ import { splitReply, shouldSplit } from '../reply-split.js';
 import { extractTone, toneEnabled } from '../tone.js';
 import { readVisionConfig, visionPlan, resolveVisionTarget, buildVisionParts, downscalePlan, FRAME_MAX_SIDE } from '../vision.js';
 import { readDocument } from '../documents.js';
+import { trimHistory, mergeSplitSegments, inputBudgetOf, replyBudgetOf, estimateTokens, shrinkForRetry } from './budget.js';
+import { readPersona } from '../persona.js';
 
 // 单块密文上限：native 每次最多给 0x4000 原始字节（21848 个 base64 字符），
 // 这里只是给个防御性上限，正常永远碰不到。
@@ -77,6 +79,48 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * 整段糊在气泡里没法看（旧实现就是这样），所以这里解析出 code/message，
  * 挑一句中文主文案，原文放进 detail 让小字显示。
  */
+/** 读一次错误体（服务端把原因写在里面）。读不到就当没有，不阻塞。 */
+async function readErrorBody(rid) {
+  try {
+    const first = await call('EllenModelHttp', 'read', { requestId: rid, sequence: 1 });
+    if (!first || !first.data) return '';
+    const bin = atob(first.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 这条错误是不是「上下文太长」。
+ *
+ * 各家措辞不一样，但都绕不开 length / context / token：
+ *   OpenAI   context_length_exceeded · "maximum context length is N tokens"
+ *   百炼     "Range of input length should be [1, N]"
+ *   Kimi     "token amount ... exceeds"
+ *   GLM      "tokens is too long"
+ * 只认这些词。真正的 400（模型名不对、参数写错）不能当成超限去重试，
+ * 否则会白花一次请求还把人引偏。
+ */
+export function looksLikeOverflow(status, rawBody) {
+  if (status !== 400 && status !== 413) return false;
+  const s = String(rawBody || '').toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes('context_length') ||
+    s.includes('context length') ||
+    s.includes('maximum context') ||
+    s.includes('too many tokens') ||
+    s.includes('token amount') ||
+    s.includes('tokens is too long') ||
+    s.includes('input length') ||
+    s.includes('prompt is too long') ||
+    s.includes('reduce the length')
+  );
+}
+
 export function explainFailure(status, rawBody) {
   let code = '';
   let message = '';
@@ -119,6 +163,14 @@ export function explainFailure(status, rawBody) {
   // 兜底：模型名不对这类 400 服务端会回一长串英文（还带 request_id），
   // 原文只该进系统条，不该糊在她的话里。这里只给一句能干点什么的话。
   if (status === 400) {
+    // 上下文超限要单独说：这个错已经自动砍半重发过一次了，还失败说明
+    // 连「人设 + 你这一句」都放不下，得让人真的动手（调小条数或换模型）。
+    if (looksLikeOverflow(status, rawBody)) {
+      return {
+        text: '这段聊得太长了，服务端装不下。去设置里把「带多少条上下文」调小一点，或者换个上下文更大的模型再试。',
+        code,
+      };
+    }
     return { text: '这次请求被服务端退了。多半是模型名不对——回设置里挑一个平台推荐的模型再试。', code };
   }
   if (message) {
@@ -216,7 +268,7 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
     try {
       const prefs = readChatPrefs();
 
-      const history = state
+      const rawHistory = state
         .getMessages()
         .filter((m) => m.id !== reply.id && !m.pending && !m.recalled)
         // 图片/表情没有正文，进历史会变成空消息，模型读不懂；引用只留正文。
@@ -227,9 +279,13 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
           let content = String(m.text || '').trim();
           if (!content && m.stickerId) content = own ? '（我发了个表情）' : '（她发了个表情）';
           if (!content) content = '（发了一张图）';
-          return { role: own ? 'user' : 'assistant', content };
-        })
-        .slice(-prefs.history);
+          return { role: own ? 'user' : 'assistant', content, segIndex: m.segIndex || 0 };
+        });
+
+      // 拆条并回一条，再按条数截：一条回复被切成三段发出来，落库是三条独立消息
+      // （带 segIndex/segCount）。不合并的话「带 20 条上下文」实际只带得回七八轮，
+      // 而且模型读到的是三段断开的话，接不上那是同一口气说完的。
+      let history = mergeSplitSegments(rawHistory).slice(-prefs.history);
 
       // 人设每轮现取：设置页改完立刻生效
       let sys = systemPrompt;
@@ -242,24 +298,26 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         }
       }
 
-      const messages = sys ? [{ role: 'system', content: sys }, ...history] : history;
-
       // 记忆召回：把「她记得的事」拼进 system 段（不进聊天记录，界面看不到）
       let recalled = [];
       if (prefs.recall && trimmed) {
         try {
-          // scorer:'semantic' = 字面分 + 概念分取大（同义句才召得回来）；scorer 内部抛错会自己退回字面
-          recalled = await recall(trimmed, { limit: prefs.recallLimit, scorer: 'semantic' });
+          // 查询串带上最近两轮「我说的话」：
+          // 「那部没看完」「后来呢」「它」这种指代只靠最后一句接不住 —— 上一句说了什么，
+          // 才是这条记忆能不能被翻出来的关键。只取 user 侧，她自己的话会把话题带回她自己。
+          const priorMine = history
+            .filter((m) => m.role === 'user')
+            .map((m) => String(m.content || '').replace(/（[^）]*）/g, '').trim())
+            .filter((s) => s && !s.includes(trimmed) && s.length >= 2)
+            .slice(-2);
+          const queryText = priorMine.length ? [...priorMine, trimmed].join(' ').slice(-160) : trimmed;
+          // 不传 scorer = 混合分（向量 + IDF 字面 + 概念/标签），向量没就绪时自动只用后两层
+          recalled = await recall(queryText, { limit: prefs.recallLimit });
         } catch (err) {
           console.warn('[chat] 召回失败，这次不带记忆', err);
         }
       }
-      if (recalled.length) {
-        const block = renderRecall(recalled);
-        const sysIdx = messages.findIndex((m) => m.role === 'system');
-        if (sysIdx >= 0) messages[sysIdx] = { role: 'system', content: `${messages[sysIdx].content}\n\n${block}` };
-        else messages.unshift({ role: 'system', content: block });
-      }
+      const recallBlock = recalled.length ? renderRecall(recalled) : '';
       state.setRecall?.(recalled.map((r) => ({ kind: r.kind, title: r.title, score: r.score })));
 
       // 排期 §7：视觉只在最后一轮真正送图 —— 历史里的图仍是「（发了一张图）」纯文字，
@@ -273,10 +331,10 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
           if (plan.usable) {
             const doc = await readDocument(pending.uri);
             const b64 = await shrinkToJpeg(doc.base64, doc.mimeType, vision.maxSide);
-            const idx = lastIndexOfRole(messages, 'user');
+            const idx = lastIndexOfRole(history, 'user');
             if (b64 && idx >= 0) {
-              const said = String(messages[idx].content || '').trim() || '（看看这个）';
-              messages[idx] = { role: 'user', content: buildVisionParts({ jpegBase64: b64, text: said }) };
+              const said = String(history[idx].content || '').trim() || '（看看这个）';
+              history[idx] = { role: 'user', content: buildVisionParts({ jpegBase64: b64, text: said }) };
               sendCfg = resolveVisionTarget({ vision, chat: cfg });
             }
           }
@@ -286,38 +344,66 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         console.warn('[chat] 这一轮的图没送出去，退回纯文字', err);
       }
 
+      // ── 上下文预算 ────────────────────────────────────────────
+      // 在这之前整个请求只有「条数」一个旋钮，没有 token 计数：贴一篇长文、
+      // 或者把「带多少条上下文」调到 50，8k 窗口的模型当场就满，服务端回 400，
+      // 而 explainFailure 那时候说的还是「多半是模型名不对」。
+      // 现在按模型窗口留出回复余量，从最老的历史开始丢。**界面上一条都不少**
+      // （聊天记录原样在），只是这一次请求带不动那么多 —— 用户全程无感。
+      const replyLength = readPersona().length || 'normal';
+      const sysText = [sys, recallBlock].filter(Boolean).join('\n\n');
+      const budget = Math.max(512, inputBudgetOf({ model: sendCfg.model, replyLength }) - estimateTokens(sysText));
+      const cut = trimHistory(history, budget);
+      if (cut.dropped > 0) {
+        console.log(`[chat] 这次超出预算：少带 ${cut.dropped} 条历史（${cut.tokens}/${cut.budget}）`);
+      }
+      history = cut.kept;
+
+      const messages = sysText ? [{ role: 'system', content: sysText }, ...history] : history;
+      const maxTokens = replyBudgetOf(replyLength);
+
       // 思考模式：聊天偏好优先，没设就跟随模型自身默认
       const think = prefs.thinking !== 'default' ? prefs.thinking : cfg.thinking || 'default';
 
-      const body = JSON.stringify({
-        model: sendCfg.model,
-        stream: true,
-        messages,
-        ...(think && think !== 'default' ? { thinking: { type: think } } : {}),
-      });
-
-      const head = await call('EllenModelHttp', 'open', {
-        requestId: rid,
-        url: sendCfg.endpoint,
-        apiKey: sendCfg.apiKey,
-        body,
-      });
-
-      const status = head && head.status;
-      if (typeof status === 'number' && status >= 400) {
-        // 错误体也会走 read()，读一次把服务端的原话捞出来
-        let detail = '';
-        try {
-          const first = await call('EllenModelHttp', 'read', { requestId: rid, sequence: 1 });
-          if (first && first.data) {
-            const bin = atob(first.data);
-            const bytes = new Uint8Array(bin.length);
-            for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-            detail = new TextDecoder('utf-8').decode(bytes);
-          }
-        } catch {
-          /* 读不到错误体不阻塞 */
+      // ── 发送 + 溢出自动降级 ──────────────────────────────────
+      // 第一次按预算送。要是服务端仍然说「太长」（不同平台对窗口的算法和我们的
+      // 估算总会有出入），就地砍掉一半历史、换一个新事务重发一次；用户只会看到
+      // 回复晚来一秒，不会看到报错，也不会被要求自己动手改设置。
+      let attempt = messages;
+      let txId = rid;
+      let status = 0;
+      let detail = '';
+      for (let round = 0; round < 2; round += 1) {
+        if (round > 0) {
+          txId = newRequestId('chat');
+          ctl.requestId = txId;
         }
+        const body = JSON.stringify({
+          model: sendCfg.model,
+          stream: true,
+          messages: attempt,
+          max_tokens: maxTokens,
+          ...(think && think !== 'default' ? { thinking: { type: think } } : {}),
+        });
+        const head = await call('EllenModelHttp', 'open', {
+          requestId: txId,
+          url: sendCfg.endpoint,
+          apiKey: sendCfg.apiKey,
+          body,
+        });
+        status = (head && head.status) || 0;
+        if (!(status >= 400)) break;
+        // 错误体也会走 read()，读一次把服务端的原话捞出来
+        detail = await readErrorBody(txId);
+        if (round === 0 && looksLikeOverflow(status, detail)) {
+          attempt = shrinkForRetry(attempt);
+          console.warn(`[chat] 服务端说上下文超了，砍到 ${attempt.length} 条重发一次`);
+          continue;
+        }
+        break;
+      }
+
+      if (typeof status === 'number' && status >= 400) {
         const explained = explainFailure(status, detail);
         const where = platformOf(cfg.platform);
         state.updateMessage(reply.id, {
@@ -330,7 +416,7 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         return;
       }
 
-      const finalText = await readAll(rid, (partial) => {
+      const finalText = await readAll(txId, (partial) => {
         // 流式只改内存：每个 chunk 都落库会把 revision 撑成几百条
         state.updateMessage(reply.id, { text: partial }, { persist: false });
       });

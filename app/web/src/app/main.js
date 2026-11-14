@@ -39,6 +39,8 @@ import { createCompanionView } from './ui/views/companion/companion.js';
 import { createAppState } from './core/state.js';
 import { createChatSession } from './core/chat/session.js';
 import { recall } from './core/chat/recall.js';
+import { warmup as warmEmbed } from './core/chat/embed.js';
+import { windowOf, estimateTokens, inputBudgetOf, trimHistory, mergeSplitSegments } from './core/chat/budget.js';
 import { createSettingsView } from './ui/views/settings/settings.js';
 import { createModelPage } from './ui/views/settings/page-model.js';
 import { createVoicePage } from './ui/views/settings/page-voice.js';
@@ -61,7 +63,7 @@ import {
 import { dropDb } from './core/store/db.js';
 import { pushMaterial, takePending, readState as readProactiveState } from './core/proactive.js';
 import { maybeCompose as maybeWriteJournal, dueFor as journalDue, todayJournal, dayKey } from './core/journal.js';
-import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs } from './core/memory.js';
+import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs, readMemoryCursor } from './core/memory.js';
 import { setThread as setBackgroundThread, takeChatReply } from './core/background.js';
 import { loadConfig as loadAsrConfig, isUsable as asrUsable, transcribe as transcribeAudio } from './core/asr.js';
 import { createVoiceInput } from './core/voice-input.js';
@@ -267,6 +269,10 @@ async function main() {
     /* 忽略 */
   }
   applyTheme(root, theme);
+
+  // 语义向量预热：首屏渲染完约 2.5 秒后，后台加载 bge-small-zh（22.8 MB）。
+  // 失败静默降级（召回退回字面+概念），不挡任何界面、不阻塞聊天。
+  warmEmbed();
 
   // 情绪状态缓存：一条消息里要读两次（拼 prompt + 记事件），5 秒内复用同一份，
   // 免得同一句话 settle 两遍、也免得两次落盘互相覆盖。
@@ -1392,6 +1398,15 @@ async function syncProactive() {
     // 备份/导出验收：只生成清单，不落盘
     exportPreview: () => buildManifest().then((r) => ({ stats: r.stats, manifestBytes: r.stats.manifestBytes, head: r.manifestText.slice(0, 200) })),
     recall: (text, opts) => recall(text, opts),
+    // 上下文预算验收口：给定模型和一段历史，看这次到底会带几条、多少 token。
+    // 「会不会满」这类问题不该靠推理回答，在这里问它。
+    budget: {
+      window: (model) => windowOf(model),
+      estimate: (text) => estimateTokens(text),
+      input: (opts) => inputBudgetOf(opts),
+      trim: (messages, b) => trimHistory(messages, b),
+      merge: (messages) => mergeSplitSegments(messages),
+    },
     asr: { load: () => loadAsrConfig(), transcribe: (input) => transcribeAudio(input), isUsable: (cfg) => asrUsable(cfg) },
     voiceStore: { list: () => voiceStorage(), prune: (opts) => pruneVoices(opts), reconcile: () => reconcileVoiceFiles() },
     voice: {
@@ -1435,6 +1450,10 @@ async function syncProactive() {
     memory: {
       due: () => memoryDue({ messages: appState.getMessages() }),
       prefs: () => readMemoryPrefs(),
+      // 看到哪了 —— 抽到第几句、上次什么时候抽的
+      cursor: () => readMemoryCursor(),
+      // 验收用：跑一次自动抽取（带批处理与游标推进，不看门槛之外的额外限制）
+      run: () => maybeRemember({ config: appState.getConfig(), messages: appState.getMessages() }),
       // 验收用：不看门槛直接抽一次并落库
       force: () => rememberNow({ config: appState.getConfig(), messages: appState.getMessages() }),
     },
