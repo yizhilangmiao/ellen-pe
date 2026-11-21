@@ -1,0 +1,181 @@
+/* ============================================================
+ * 启动自检弹窗（2026-11-20 · 0.5.16）
+ * 「进程序之后自动核对本机和更新站，落后就问要不要更新」的那张卡。
+ *
+ * 手机版尺寸规矩：不写像素，一律 calc(N * var(--u))；只有 1px 细线可以留 px。
+ * 单位用 vmin 的比例已经在 --u 里（clamp(0.84px, 0.2315vmin, 1.16px)），别在这层再乘 vw。
+ * 颜色全走 --el-settings-* 令牌，浅色主题自动跟着变；zzz 皮肤下也能看（不写死皮肤色）。
+ * ============================================================ */
+
+.el-update-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 120; /* 抽屉 55/56、输入条 45、最高 99 —— 弹窗要压在它们上面 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(24 * var(--u));
+  background: #00000073;
+  animation: el-update-fade calc(140 * 1ms) ease-out;
+}
+
+.el-update-card {
+  width: min(100%, calc(330 * var(--u)));
+  max-height: 82vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(9 * var(--u));
+  padding: calc(18 * var(--u)) calc(16 * var(--u)) calc(14 * var(--u));
+  border: 1px solid var(--el-settings-line);
+  border-radius: calc(18 * var(--u));
+  background: var(--el-settings-surface);
+  color: var(--el-settings-ink);
+  box-shadow: var(--el-settings-shadow);
+  font-family: var(--el-font-family);
+  animation: el-update-rise calc(170 * 1ms) ease-out;
+}
+
+.el-update-title {
+  font-size: calc(16 * var(--u));
+  line-height: calc(23 * var(--u));
+  font-weight: 700;
+}
+
+.el-update-row {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+}
+
+.el-update-cur {
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-settings-muted);
+}
+
+.el-update-latest {
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(19 * var(--u));
+  font-weight: 600;
+  color: var(--el-settings-accent);
+}
+
+.el-update-notes {
+  font-size: calc(13 * var(--u));
+  line-height: calc(21 * var(--u));
+  color: var(--el-settings-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(150 * var(--u));
+  overflow-y: auto;
+  padding: calc(9 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--el-settings-readonly);
+}
+
+.el-update-barwrap {
+  height: calc(6 * var(--u));
+  border-radius: calc(99 * var(--u));
+  background: var(--el-settings-raised);
+  overflow: hidden;
+}
+
+.el-update-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--el-settings-accent);
+  transition: width calc(220 * 1ms) ease-out;
+}
+
+.el-update-status {
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-settings-muted);
+}
+
+.el-update-actions {
+  display: flex;
+  gap: calc(9 * var(--u));
+  margin-top: calc(3 * var(--u));
+}
+
+.el-update-btn {
+  flex: 1;
+  min-height: calc(42 * var(--u));
+  padding: 0 calc(14 * var(--u));
+  border: 1px solid transparent;
+  border-radius: calc(12 * var(--u));
+  font-family: inherit;
+  font-size: calc(14 * var(--u));
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform calc(90 * 1ms) ease-out, opacity calc(90 * 1ms) ease-out;
+}
+
+.el-update-btn:active {
+  transform: scale(0.98);
+}
+
+.el-update-btn.is-primary {
+  background: var(--el-settings-primary);
+  color: var(--el-settings-primary-ink);
+}
+
+.el-update-btn.is-ghost {
+  background: transparent;
+  border-color: var(--el-settings-control-line);
+  color: var(--el-settings-ink);
+}
+
+.el-update-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.el-update-skip {
+  align-self: center;
+  margin-top: calc(2 * var(--u));
+  padding: calc(4 * var(--u)) calc(6 * var(--u));
+  border: 0;
+  background: none;
+  color: var(--el-settings-muted);
+  font-family: inherit;
+  font-size: calc(11.5 * var(--u));
+  text-decoration: underline;
+  text-underline-offset: calc(2 * var(--u));
+  cursor: pointer;
+}
+
+@keyframes el-update-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes el-update-rise {
+  from {
+    opacity: 0;
+    transform: translateY(calc(10 * var(--u)));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 用户开了「减少动态」就别动 */
+@media (prefers-reduced-motion: reduce) {
+  .el-update-mask,
+  .el-update-card {
+    animation: none;
+  }
+  .el-update-bar {
+    transition: none;
+  }
+}

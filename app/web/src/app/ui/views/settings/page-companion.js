@@ -16,10 +16,10 @@ import { PLATFORMS as ASR_PLATFORMS, loadConfig as loadAsrConfig, saveConfig as 
 import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakVoice, stop as stopVoice, state as voiceState, readKey as readVoiceKey, writeKey as writeVoiceKey, clearKey as clearVoiceKey } from '../../../core/speech.js';
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
-import { buildManifest } from '../../../core/store/export.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
-import { readAutonomyPrefs, writeAutonomyPrefs, INTERVAL_OPTIONS, DAILY_OPTIONS } from '../../../core/autonomy-prefs.js';
+import { describeActivity, sleepWindowText } from '../../../core/activity.js';
+import { readAutonomyPrefs, writeAutonomyPrefs, INTERVAL_OPTIONS, DAILY_OPTIONS, DAILY_MIN_OPTIONS } from '../../../core/autonomy-prefs.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';
 import { RELATIONSHIPS, relationship, setRelationship } from '../../../core/companion.js';
 import { readChatPrefs, writeChatPrefs, resetChatPrefs, HISTORY_OPTIONS } from '../../../core/chatprefs.js';
@@ -81,6 +81,9 @@ export function createCompanionPage({ state, onChange } = {}) {
         b.textContent = r.label;
         b.addEventListener('click', () => {
           currentRhythm = r.id;
+          // 先落盘再重排：落盘是「他选了什么」，重排是「什么时候生效」，
+          // 前者不能依赖后者成功（native 插件在网页预览里根本没有）
+          writeAutonomyPrefs({ rhythmId: currentRhythm });
           paintProactive();
           // 改了节奏就先重排 —— 否则要等当前那次闹钟响完才生效
           pushMaterial({ config: state?.getConfig(), messages: state?.getMessages(), rhythmId: currentRhythm })
@@ -111,7 +114,9 @@ export function createCompanionPage({ state, onChange } = {}) {
       proCard.append(proHead, proHint, proRhythmLabel, proSegments, proRow, proSched, proNote);
       el.append(proCard);
 
-      let currentRhythm = 'normal';
+      // 节奏是用户选过的偏好，不是这一页的临时状态：进来时就按落盘的那档点亮，
+      // 否则返回再进必定回到「自然一些」（bug1）。
+      let currentRhythm = readAutonomyPrefs().rhythmId;
       let proEnabled = false;
       let proBusy = false;
 
@@ -192,9 +197,15 @@ export function createCompanionPage({ state, onChange } = {}) {
         paintProactive();
         try {
           const res = await call('EllenAutonomy', 'runNow', { dryRun: false });
+          // 被「她这会儿不该开口」的闸门挡下来时，说人话而不是甩一个 code。
+          // 这两个 code 是正常的跳过，不是故障——用户点「试一次」看到红字会以为坏了。
+          const skipText = {
+            APP_FOREGROUND: s('settings.proactiveSkipAppForeground'),
+            RECENT_CHAT: s('settings.proactiveSkipRecentChat'),
+          }[res?.code];
           proNote.textContent = res && res.ok
             ? `${s('settings.proactiveTested')} ${res.text}`
-            : `${s('settings.proactiveFail')} ${res?.code || ''}`;
+            : skipText || `${s('settings.proactiveFail')} ${res?.code || ''}`;
           // 立刻把这句话落成聊天记录，别等用户离开设置页再同步
           if (res && res.ok) {
             const pending = await takePending();
@@ -260,6 +271,31 @@ export function createCompanionPage({ state, onChange } = {}) {
         }
       );
 
+      // 「每天最少」：0 = 不强制（默认）。上限管「别烦我」，这一档管「别把我晾着」。
+      // 下限定得比上限高时，normalize 会把上限抬上去，不是把下限砍下来。
+      const aMin = segmentField(
+        s('settings.autonomyMin'),
+        DAILY_MIN_OPTIONS.map((n) => ({
+          value: n,
+          label: n === 0 ? s('settings.autonomyMinOff') : `${n} ${s('settings.autonomyDailyUnit')}`,
+        })),
+        autonomy.dailyMin,
+        (v) => {
+          autonomy = writeAutonomyPrefs({ dailyMin: Number(v) });
+          paintAutonomy();
+          syncAutonomy();
+        }
+      );
+
+      const aMinHint = document.createElement('p');
+      aMinHint.className = 'el-settings-hint';
+      const paintMinHint = () => {
+        const on = autonomy.dailyMin > 0;
+        aMinHint.textContent = on
+          ? `${s('settings.autonomyMinHintOn')} ${autonomy.dailyMin} ${s('settings.autonomyDailyUnit')}`
+          : s('settings.autonomyMinHintOff');
+      };
+
       // 免打扰起止都是 0-23 整点：24 个按钮用 chip 横排（自带换行），
       // 分段控件不换行，24 个挤一行会窄到点不准
       function hourField(labelText, key) {
@@ -295,6 +331,49 @@ export function createCompanionPage({ state, onChange } = {}) {
       quietHint.className = 'el-settings-card-hint';
       quietHint.textContent = s('settings.autonomyQuietHint');
 
+      // 跟着学出来的作息走：默认开。开着时下面两个整点只是「还没学到之前的兜底」，
+      // 所以显示成灰的 —— 但不禁用，冷启动那几天它们真的在用。
+      const followRow = document.createElement('div');
+      followRow.className = 'el-settings-row';
+      const followLabel = document.createElement('div');
+      followLabel.className = 'el-settings-row-main';
+      const followTitle = document.createElement('div');
+      followTitle.className = 'el-settings-row-title';
+      followTitle.textContent = s('settings.autonomyFollow');
+      const followNote = document.createElement('div');
+      followNote.className = 'el-settings-row-sub';
+      followLabel.append(followTitle, followNote);
+      const followBtn = document.createElement('button');
+      followBtn.type = 'button';
+      followBtn.className = 'el-settings-segment';
+      followRow.append(followLabel, followBtn);
+
+      function paintFollow() {
+        const on = autonomy.followActivity !== false;
+        followBtn.textContent = on ? s('settings.on') : s('settings.off');
+        followBtn.classList.toggle('is-active', on);
+        followBtn.classList.toggle('is-ghost', !on);
+        try {
+          if (on) {
+            const w = sleepWindowText(null);
+            followNote.textContent = s('settings.autonomyFollowOn').replace('{w}', `${w.start}–${w.end}`);
+          } else {
+            followNote.textContent = describeActivity();
+          }
+        } catch {
+          followNote.textContent = s('settings.autonomyQuietHint');
+        }
+        for (const node of [quietFromField.field, quietToField.field]) {
+          node.classList.toggle('is-muted', on);
+        }
+      }
+
+      followBtn.addEventListener('click', () => {
+        autonomy = writeAutonomyPrefs({ followActivity: autonomy.followActivity === false });
+        paintAutonomy();
+        syncAutonomy(); // 时段是 native 排程依据，改完要重推一次才生效
+      });
+
       aCard.append(
         aHead,
         aHint,
@@ -303,7 +382,10 @@ export function createCompanionPage({ state, onChange } = {}) {
         quietFromField.field,
         quietToField.field,
         quietHint,
-        aDaily
+        followRow,
+        aDaily,
+        aMin,
+        aMinHint
       );
       el.append(aCard);
 
@@ -313,6 +395,9 @@ export function createCompanionPage({ state, onChange } = {}) {
         aStatus.textContent = autonomy.enabled ? s('settings.on') : s('settings.off');
         markSegments(aInterval, autonomy.intervalH);
         markSegments(aDaily, autonomy.dailyMax);
+        markSegments(aMin, autonomy.dailyMin);
+        paintMinHint();
+        paintFollow();
         for (const b of quietFromField.buttons) {
           b.classList.toggle('is-active', b.dataset.value === String(autonomy.quietFrom));
         }
@@ -320,8 +405,12 @@ export function createCompanionPage({ state, onChange } = {}) {
           b.classList.toggle('is-active', b.dataset.value === String(autonomy.quietTo));
         }
         // 关掉总开关时下面几组只是看着在、点不动 —— 藏起来他会以为设置丢了
-        for (const node of [aInterval, aDaily, quietFromField.field, quietToField.field]) {
+        for (const node of [aInterval, aDaily, aMin, aMinHint, followRow]) {
           node.classList.toggle('is-muted', !autonomy.enabled);
+        }
+        // 两个整点字段的灰态要同时看「总开关」和「跟不跟作息」
+        if (autonomy.enabled && autonomy.followActivity !== false) {
+          for (const node of [quietFromField.field, quietToField.field]) node.classList.add('is-muted');
         }
       }
 

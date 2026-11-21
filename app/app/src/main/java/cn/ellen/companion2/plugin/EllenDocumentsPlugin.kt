@@ -34,6 +34,12 @@ class EllenDocumentsPlugin : Plugin() {
 
     private fun dir(): File = File(context.filesDir, "attachments").apply { mkdirs() }
 
+    /**
+     * 聊天里「发图」落到这儿。文件名和目录都由 EllenMediaPlugin.pickImage 决定，
+     * 本插件只负责把它读成 base64 交给 WebView。
+     */
+    private fun photosDir(): File = File(context.filesDir, "photos")
+
     private fun authority(): String = "${context.packageName}.fileprovider"
 
     private fun newId(): String = UUID.randomUUID().toString().replace("-", "").take(16)
@@ -72,7 +78,19 @@ class EllenDocumentsPlugin : Plugin() {
         if (name.isBlank() || name.contains('/') || name.contains(backslash) || name.contains("..")) {
             throw IllegalArgumentException("附件名不合法。")
         }
-        return File(dir(), name)
+        // 两处都要找：本插件的附件目录 + 聊天发图的照片目录。
+        //
+        // 为什么：聊天里发图走 EllenMediaPlugin.pickImage，文件写在 filesDir/photos/；
+        // 而把附件读成 base64 的是本插件，原来固定只在 filesDir/attachments/ 找。
+        // 写侧和读侧对不上 → 图发出去读不回来：气泡变虚线占位、视觉模型那一轮
+        // 拿不到图（她根本没看见）、设置里的视觉试读也读不出。
+        // EllenMediaPlugin 自己的 photoFile() 就是两处都找的，这里照它补上。
+        val attachment = File(dir(), name)
+        if (attachment.isFile) return attachment
+        val photo = File(photosDir(), name)
+        if (photo.isFile) return photo
+        // 都不在：返回附件目录下的路径，让调用方给出既有的「找不到这个附件」提示
+        return attachment
     }
 
     /** save({name, base64}) → {uri, bytes, name, mimeType} */

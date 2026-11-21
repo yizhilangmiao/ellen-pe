@@ -95,9 +95,22 @@ foreach ($a in $Abi) {
 # ---- 4. latest.json：字段照 EllenUpdates 的 check 契约 ----
 # 客户端只认这些键：schemaVersion / platform / packageName / channel / version /
 # versionCode / publishedAt / minSdkVersion / notes / apk{sha256,url,sizeBytes}
+#   另加 apks[]{abi,sha256,url,sizeBytes}：按 ABI 挑了包才能更新。
+#   0.5.15 之前只写单 apk，而 native 的单 apk 只服务 LEGACY_ABI（arm64-v8a）——
+#   x86_64 设备（模拟器）会一直得到「这个架构还没有新包」，看起来像更新功能坏了。
+#   两个都写：老 native 读 apk，新 native 优先读 apks。
 # url 用 -BaseUrl 拼（不传就写裸文件名，方便先本地验，上线时必须给完整 https 地址）
 $primary = $made[0]
-$url = if ($BaseUrl) { "$($BaseUrl.TrimEnd('/'))/$($primary.name)" } else { $primary.name }
+$urlBase = if ($BaseUrl) { $BaseUrl.TrimEnd('/') } else { '' }
+$url = if ($urlBase) { "$urlBase/$($primary.name)" } else { $primary.name }
+$apkList = @($made | ForEach-Object {
+  [ordered]@{
+    abi       = $_.abi
+    sha256    = $_.sha256
+    url       = if ($urlBase) { "$urlBase/$($_.name)" } else { $_.name }
+    sizeBytes = $_.sizeBytes
+  }
+})
 $manifest = [ordered]@{
   schemaVersion  = 1
   platform       = 'android'
@@ -109,6 +122,7 @@ $manifest = [ordered]@{
   minSdkVersion  = 24
   notes          = $Notes
   apk            = [ordered]@{ sha256 = $primary.sha256; url = $url; sizeBytes = $primary.sizeBytes }
+  apks           = $apkList
 }
 $json = $manifest | ConvertTo-Json -Depth 5
 $manifestPath = Join-Path $out 'latest.json'
@@ -121,6 +135,14 @@ $back = Get-Content $manifestPath -Raw | ConvertFrom-Json
 $again = (Get-FileHash (Join-Path $out $primary.name) -Algorithm SHA256).Hash.ToLower()
 if ($back.apk.sha256 -ne $again) { throw "latest.json 里的 sha256 与包体不一致：$($back.apk.sha256) vs $again" }
 if ($back.versionCode -ne $versionCode) { throw "latest.json 的 versionCode 与 build.gradle.kts 不一致" }
+# 逐条核 apks：每条 abi 的 sha256 都要和磁盘上的包对上，否则那台架构的客户端会下到一半报校验失败
+foreach ($a in @($back.apks)) {
+  if (-not $a) { continue }
+  $f = Join-Path $out (Split-Path $a.url -Leaf)
+  if (-not (Test-Path $f)) { throw "latest.json 的 apks 里 $($a.abi) 指向的 $($a.url) 在输出目录里不存在" }
+  $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+  if ($h -ne $a.sha256) { throw "latest.json 的 apks 里 $($a.abi) 的 sha256 与包体不一致：$($a.sha256) vs $h" }
+}
 Write-Host "[verify] version=$version ($versionCode)  abi=$($primary.abi)  size=$($primary.sizeBytes)  sha256 复算一致"
 
 # ---- 5.5 签名自检：发布包必须是正式证书（老大 2026-11-13 定）----

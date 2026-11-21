@@ -305,11 +305,8 @@ export async function latestOf(head) {
   return rev || null;
 }
 
-/**
- * 按 thread + kind 倒序取最近 limit 条（转成升序返回）。
- * 索引 profileKindThread = [profileId, kind, threadId]
- */
-export async function recentRecords(kind, threadId, limit = 50) {
+/** 某 thread + kind 的全部 head（未删除），按 messageTime 降序。游标顺序不可信，见下。 */
+async function scanThreadHeads(kind, threadId) {
   const profile = await ensureProfile();
   const db = await openDb();
   const heads = await new Promise((resolve, reject) => {
@@ -317,10 +314,10 @@ export async function recentRecords(kind, threadId, limit = 50) {
     const idx = t.objectStore(STORE_HEADS).index('profileKindThread');
     const range = IDBKeyRange.only([profile.id, kind, threadId]);
     const out = [];
-    const cur = idx.openCursor(range, 'prev');
+    const cur = idx.openCursor(range);
     cur.onsuccess = () => {
       const c = cur.result;
-      if (!c || out.length >= limit) {
+      if (!c) {
         resolve(out);
         return;
       }
@@ -329,15 +326,54 @@ export async function recentRecords(kind, threadId, limit = 50) {
     };
     cur.onerror = () => reject(cur.error);
   });
-  // 索引是 [profileId, kind, threadId]，不保证按时间序，自己排一下
-  heads.sort((a, b) => (b.messageTime || b.createdAt || 0) - (a.messageTime || a.createdAt || 0));
-  const trimmed = heads.slice(0, limit).reverse();
+  // 索引是 [profileId, kind, threadId]，不保证按时间序，自己排一下。
+  // 同一毫秒的两条用 id 兜底，保证顺序稳定（否则每次读出来的次序会飘）。
+  const timeOf = (h) => h.messageTime || h.createdAt || 0;
+  heads.sort((a, b) => timeOf(b) - timeOf(a) || (a.id < b.id ? -1 : 1));
+  return heads;
+}
+
+async function revsOf(heads) {
   const revs = [];
-  for (const h of trimmed) {
+  for (const h of heads) {
     const rev = await latestOf(h);
     if (rev) revs.push(rev);
   }
   return revs;
+}
+
+/**
+ * 按 thread + kind 倒序取最近 limit 条（转成升序返回）。
+ * 索引 profileKindThread = [profileId, kind, threadId]
+ *
+ * 2026-11-14 修：以前游标一拿够 limit 条就停（`out.length >= limit`），
+ * 但 head 的主键 `id` 是 `message:<uuid>`，同属一个 [profile, kind, thread] 的
+ * 记录在这个复合索引里 key 全相同，游标顺序实际是 UUID 字典序 —— 随机。
+ * 于是「最近 200 条」变成了「随机 200 条再排序」，时间上散布、中间大片空洞。
+ * 实测 500 条消息里取 200 条，缺 116 条、117 处断点，界面表现就是
+ * 「聊着聊着往上翻，缺了一些聊天记录」。
+ * 所以必须先全量收齐再排序截断（orderby 只能靠 JS 做，游标顺序不可信）。
+ */
+export async function recentRecords(kind, threadId, limit = 50) {
+  const heads = await scanThreadHeads(kind, threadId);
+  return revsOf(heads.slice(0, limit).reverse());
+}
+
+/**
+ * 取比 beforeAt 更早的一页（升序返回），给「往上翻加载更早」用。
+ * 同毫秒时按 id 切开：降序列表里同时间段的 id 是升序排的，所以「更早」= id 更大。
+ */
+export async function recordsBefore(kind, threadId, beforeAt, limit = 100, beforeId = '') {
+  const at = Number(beforeAt) || 0;
+  const heads = await scanThreadHeads(kind, threadId);
+  const timeOf = (h) => h.messageTime || h.createdAt || 0;
+  const older = heads.filter((h) => {
+    const t = timeOf(h);
+    if (t < at) return true;
+    if (t === at) return beforeId ? String(h.id) > String(beforeId) : false;
+    return false;
+  });
+  return revsOf(older.slice(0, limit).reverse());
 }
 
 /** 导出全部（迁移/备份用）——流式读，不一次性把大表塞内存。 */

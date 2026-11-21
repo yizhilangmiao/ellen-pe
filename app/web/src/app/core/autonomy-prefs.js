@@ -9,21 +9,41 @@
 //
 // 字段名说明：quietFrom/quietTo 是本模块的主名，读出来时额外带
 // quietStart/quietEnd 镜像，方便按契约名写的调用方直接用。
+import { sleepWindowOf } from './activity.js';
+
 const KEY = 'ellen.autonomy.v1';
 
 const HOUR = 60 * 60 * 1000;
 
+/**
+ * 三档节奏的 id 白名单。真身在 core/proactive.js 的 RHYTHMS，
+ * 这里只留 id —— 因为「她多久找你一次」这个选择必须落盘，
+ * 否则设置页重新 mount 又会读回默认的「自然一些」（2026-11-20 修的 bug1）。
+ */
+export const RHYTHM_IDS = ['often', 'normal', 'rare'];
+
 export const DEFAULT_AUTONOMY = {
   enabled: true,
+  // 主动消息的节奏档位（设置页那三个按钮）。改这里等于改默认档。
+  rhythmId: 'normal',
   intervalH: 4,
+  // 免打扰窗默认跟着学出来的作息走（corectivity.js 从消息时间戳算），
+  // 关掉才用下面这两个手设的整点。跟着作息是为了「他也睡了就别吵」。
+  followActivity: true,
   quietFrom: 22,
   quietTo: 8,
   dailyMax: 3,
+  // 「每天最少几条」。0 = 不强制（默认，保持老行为）。
+  // 注意它跟 dailyMax 不是一回事：dailyMax 管「别烦我」，dailyMin 管「别把我晾着」。
+  dailyMin: 0,
 };
 
 /** 设置页可选的间隔/条数（跟 UI 上的按钮一一对应，别只改一边）。 */
 export const INTERVAL_OPTIONS = [2, 4, 6, 8];
 export const DAILY_OPTIONS = [2, 3, 4, 6];
+
+/** 「每天最少」的选项：比上限多一个 0（不强制）。 */
+export const DAILY_MIN_OPTIONS = [0, 2, 3, 4, 6];
 
 function clampInt(value, min, max, fallback) {
   const n = Number(value);
@@ -66,13 +86,21 @@ function normalize(raw) {
   );
   const prefs = {
     enabled: src.enabled === undefined ? DEFAULT_AUTONOMY.enabled : !!src.enabled,
+    // 只认白名单里的三档：老数据/手改坏了就回落默认，不让一个野值把按钮全点亮不中
+    rhythmId: RHYTHM_IDS.includes(src.rhythmId) ? src.rhythmId : DEFAULT_AUTONOMY.rhythmId,
+    followActivity:
+      src.followActivity === undefined ? DEFAULT_AUTONOMY.followActivity : !!src.followActivity,
     intervalH: clampInt(src.intervalH, 1, 24, DEFAULT_AUTONOMY.intervalH),
     quietFrom,
     quietTo,
     dailyMax: clampInt(src.dailyMax, 1, 20, DEFAULT_AUTONOMY.dailyMax),
+    dailyMin: clampInt(src.dailyMin, 0, 20, DEFAULT_AUTONOMY.dailyMin),
     sentToday: clampInt(src.sentToday, 0, 999, 0),
     sentDay: typeof src.sentDay === 'string' ? src.sentDay : '',
   };
+  // 下限不许超过上限：用户把「最少」拧到比「最多」还大时，抬上限而不是砍下限——
+  // 他想要的是「至少 N 条」，砍成 M 条等于把话吞回去。
+  if (prefs.dailyMin > prefs.dailyMax) prefs.dailyMax = prefs.dailyMin;
   // 契约名镜像：同一份数据两个名字，读的人不用再猜
   prefs.quietStart = prefs.quietFrom;
   prefs.quietEnd = prefs.quietTo;
@@ -85,10 +113,12 @@ function persist(prefs) {
       KEY,
       JSON.stringify({
         enabled: prefs.enabled,
+        rhythmId: prefs.rhythmId,
         intervalH: prefs.intervalH,
         quietFrom: prefs.quietFrom,
         quietTo: prefs.quietTo,
         dailyMax: prefs.dailyMax,
+        dailyMin: prefs.dailyMin,
         sentToday: prefs.sentToday,
         sentDay: prefs.sentDay,
       })
@@ -134,6 +164,16 @@ export function resetAutonomyPrefs() {
 export function isWithinQuiet(now, prefs) {
   const when = now instanceof Date ? now : new Date();
   const p = prefs || readAutonomyPrefs();
+  const minute = when.getHours() * 60 + when.getMinutes();
+  if (p.followActivity !== false) {
+    // 学出来的作息：分钟级，跨夜也对（sleepWindowOf 已经 normalize 过）
+    const learned = sleepWindowOf(null);
+    if (learned && learned.start !== learned.end) {
+      return learned.start < learned.end
+        ? minute >= learned.start && minute < learned.end
+        : minute >= learned.start || minute < learned.end;
+    }
+  }
   const hour = when.getHours();
   const from = p.quietFrom !== undefined ? p.quietFrom : p.quietStart;
   const to = p.quietTo !== undefined ? p.quietTo : p.quietEnd;
@@ -194,8 +234,26 @@ export function canPingNow(ctx = {}) {
   return { ok: true, reason: '' };
 }
 
-/** 契约名（`allowToday(prefs, sent)`）：只问条数，不问时段。 */
-export function allowToday(prefs, sent) {
+/**
+ * 今天还差几条才够「最少 N 条」。0 = 不需要补。
+ *
+ * 跟 canPingNow 分工：canPingNow 回答「现在能不能发」，这个回答「今天够不够」。
+ * 两个都要过才允许补足发送。
+ * @param {{sentToday?:number, now?:Date}} [ctx]
+ */
+export function topUpNeeded(ctx = {}) {
+  const prefs = readAutonomyPrefs();
+  if (!prefs.enabled || prefs.dailyMin <= 0) return 0;
+  const now = ctx.now instanceof Date ? ctx.now : new Date();
+  const sent = Number.isFinite(Number(ctx.sentToday))
+    ? Number(ctx.sentToday)
+    : readSentToday(now);
+  // 上限优先：已经发满 dailyMax，就算没到 dailyMin 也不再补（上限是硬门）
+  if (sent >= prefs.dailyMax) return 0;
+  return Math.max(0, Math.min(prefs.dailyMin, prefs.dailyMax) - sent);
+}
+
+/** 契约名（`allowToday(prefs, sent)`）：只问条数，不问时段。 */export function allowToday(prefs, sent) {
   const p = prefs || readAutonomyPrefs();
   const used = Number.isFinite(Number(sent)) ? Number(sent) : 0;
   return !!p.enabled && used < p.dailyMax;
@@ -217,7 +275,12 @@ export function msUntilQuietEnd(now, prefs) {
   const p = prefs || readAutonomyPrefs();
   if (!isWithinQuiet(when, p)) return 0;
   const end = new Date(when.getTime());
-  end.setHours(p.quietTo, 0, 0, 0);
+  if (p.followActivity !== false) {
+    const learned = sleepWindowOf(null);
+    end.setHours(0, learned ? learned.end : p.quietTo, 0, 0);
+  } else {
+    end.setHours(p.quietTo, 0, 0, 0);
+  }
   if (end.getTime() <= when.getTime()) end.setDate(end.getDate() + 1);
   return end.getTime() - when.getTime();
 }

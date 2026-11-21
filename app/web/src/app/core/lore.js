@@ -12,6 +12,7 @@
 // 硬指标：buildLoreBlock() 的返回值 ≤ LORE_MAX_BYTES(3 KB)。超了先丢样本、再丢第二条世界书、
 //   再丢世界设定，最后才硬截断——常驻事实永远保住。
 import { CARD_IDS, DEFAULT_CARD_ID, cardOf } from '../assets/lore/index.js';
+import { applyRoleTheme } from './theme.js';
 
 const KEY = 'ellen.lore.v1';
 
@@ -157,7 +158,7 @@ export function readCardId() {
 
 /** 切卡；认不出来的 id 不写进去（避免包一层脏数据让下次启动回落到默认卡还以为是用户选的）。 */
 export function writeCardId(id) {
-  if (!CARD_IDS.includes(id)) return readCardId();
+  if (!CARD_IDS.includes(id)) return { cardId: readCardId() };
   try {
     localStorage.setItem(KEY, JSON.stringify({ cardId: id }));
   } catch {
@@ -178,7 +179,21 @@ export function readLoreSelection() {
 export function applyLoreSelection(lore) {
   const id = lore && typeof lore === 'object' ? lore.cardId : null;
   if (!CARD_IDS.includes(id)) return readCardId();
-  return writeCardId(id);
+  writeCardId(id);
+  // 角色包可以带一套配色（.card.theme.colors）。这里有三个来源，优先级从高到低：
+  // 用户当场手改 > 角色包 > 全局/预设。applyRoleTheme 自己判「用户手改过没」，
+  // 手改过就只记角色 id、不碰颜色——换角色不该把他挑的色抹掉。
+  try {
+    const card = cardOf(id) || {};
+    const roleColors = card.theme && typeof card.theme === 'object' ? card.theme.colors : null;
+    applyRoleTheme(id, roleColors);
+  } catch (err) {
+    // 配色是观感，不该把切卡这件事带崩
+    console.warn('[lore] 套角色配色失败', err);
+  }
+  // 返回形状与 readLoreSelection() 一致（{ cardId }）：page-lore 把结果直接当 selection 用，
+  // 早先这里返回的是 id 字符串，于是「切到哪张」在界面上永远显示成默认卡。
+  return { cardId: id };
 }
 
 /** 当前卡的一句话说明，给设置页用。 */

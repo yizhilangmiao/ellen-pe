@@ -15,7 +15,6 @@ import { PLATFORMS as ASR_PLATFORMS, loadConfig as loadAsrConfig, saveConfig as 
 import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakVoice, stop as stopVoice, state as voiceState, readKey as readVoiceKey, writeKey as writeVoiceKey, clearKey as clearVoiceKey } from '../../../core/speech.js';
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
-import { buildManifest } from '../../../core/store/export.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';

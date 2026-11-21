@@ -17,6 +17,7 @@ import {
   relationship,
   setRelationship,
   maybeRecordMood,
+  readWarmth,
 } from '../../../core/companion.js';
 import { isUsable } from '../../../core/config.js';
 import portraitUrl from '../../../assets/ellen-portrait.webp';
@@ -186,15 +187,8 @@ export function createCompanionView({ state }) {
     hint.textContent = s('companion.betweenHint');
     box.append(hint);
 
-    const mail = document.createElement('button');
-    mail.type = 'button';
-    mail.className = 'el-companion-mail';
-    mail.setAttribute('aria-label', s('companion.mail'));
-    // 「写信给她」用寄出箭头，别和下面「她写给你的信」抢同一个信封图标。
-    mail.append(iconEl('send'));
-    // 信箱 = 写信给她（旧包是一份草稿，新壳直接进反馈页，M7 · D12）
-    mail.addEventListener('click', () => push('feedback'));
-    box.append(mail);
+    // 老大 2026-11-17：这块右边的寄出箭头点进去其实是反馈页，不该在相处页露脸。
+    // 反馈渠道已经收在「设置 → 关于 → 反馈」里了，这里不再放入口。
 
     let current = RELATIONSHIPS[0];
     badge.addEventListener('click', () => {
@@ -214,6 +208,16 @@ export function createCompanionView({ state }) {
     box.setLevel = (rel) => {
       current = rel || RELATIONSHIPS[0];
       paint();
+    };
+    // 感受那句话：接七维派生的关系温度；读不出来就保留兜底文案（不显示假数据）。
+    box.setWarmth = (warmth) => {
+      if (warmth && warmth.text) {
+        hint.textContent = warmth.text;
+        box.dataset.warmth = String(warmth.score);
+      } else {
+        hint.textContent = s('companion.betweenHint');
+        delete box.dataset.warmth;
+      }
     };
     return box;
   }
@@ -667,6 +671,11 @@ export function createCompanionView({ state }) {
     root._mood.paint(mood);
     root._note.paint(mood);
     root._between.setLevel(rel);
+    // 「我们之间」那句感受要接当下情绪倾向（七维派生），读失败就退回兜底文案。
+    // 放在 setLevel 之后：换档位会重画 badge/menu，但不会碰 hint。
+    const warmth = await readWarmth({ relationship: rel && rel.id });
+    if (!root || !root._between) return;
+    root._between.setWarmth(warmth);
   }
 
   async function readCheckin() {

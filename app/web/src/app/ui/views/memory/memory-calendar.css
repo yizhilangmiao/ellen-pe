@@ -204,3 +204,164 @@
 /* 记忆列表分页容器：与手记卡片列表同样的竖向间隔 */
 .el-memory-cards { display: flex; flex-direction: column; gap: calc(10 * var(--u)); }
 .el-memory-cards > * { flex: 0 0 auto; }
+
+/* ── 纪念日（2026-11-21）────────────────────────────────────────────
+   日历格子上的第二个点放左上角：右下角那个点一直是「这天写过手记」，
+   两个语义、两个角，扫一眼不会混。每年重复的是实心，只这一年的画空心。 */
+.el-journal-day-cell.is-anniv::before,
+.el-journal-day-cell.is-anniv-once::before {
+  content: '';
+  position: absolute;
+  top: calc(4 * var(--u));
+  left: 50%;
+  transform: translateX(calc(-6 * var(--u)));
+  width: calc(4 * var(--u));
+  height: calc(4 * var(--u));
+  border-radius: 50%;
+  background: var(--jr-rose);
+}
+
+.el-journal-day-cell.is-anniv-once::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 calc(1.2 * var(--u)) var(--jr-rose);
+}
+
+/* 空日子现在也能点（点了给一句提示），别用 default 光标骗人 */
+.el-journal-day-cell:not(.is-blank) {
+  cursor: pointer;
+}
+
+.el-anniv-section {
+  margin-top: calc(14 * var(--u));
+}
+
+.el-anniv-head {
+  margin: 0 0 calc(6 * var(--u));
+  font-size: calc(11 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--el-paper-muted);
+}
+
+.el-anniv-empty {
+  margin: 0;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: color-mix(in srgb, var(--el-paper) 70%, transparent);
+  color: var(--el-paper-muted);
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(18 * var(--u));
+}
+
+.el-anniv-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+}
+
+.el-anniv-card {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border: 0;
+  border-radius: calc(14 * var(--u));
+  background: var(--el-paper);
+  color: var(--el-ink);
+  font-family: inherit;
+  text-align: left;
+  box-shadow: 0 calc(2 * var(--u)) calc(8 * var(--u)) rgba(0, 0, 0, 0.05);
+}
+
+.el-anniv-card.is-today {
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--jr-rose);
+}
+
+.el-anniv-date {
+  flex: 0 0 auto;
+  font-size: calc(13 * var(--u));
+  letter-spacing: calc(0.4 * var(--u));
+  color: var(--jr-rose);
+}
+
+.el-anniv-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+}
+
+.el-anniv-title {
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.el-anniv-note {
+  font-size: calc(11 * var(--u));
+  line-height: calc(16 * var(--u));
+  color: var(--el-paper-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.el-anniv-away {
+  flex: 0 0 auto;
+  font-size: calc(11 * var(--u));
+  color: var(--jr-muted);
+}
+
+/* 两秒就散的一句提示（点空日子 / 标完 / 取消标完） */
+.el-memory-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84 * var(--u));
+  transform: translateX(-50%) translateY(calc(8 * var(--u)));
+  max-width: min(84%, calc(320 * var(--u)));
+  padding: calc(9 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(999 * var(--u));
+  background: rgba(28, 24, 22, 0.9);
+  color: #f3ece6;
+  font-size: calc(11.5 * var(--u));
+  line-height: calc(17 * var(--u));
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 118;
+}
+
+.el-memory-toast.is-open {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .el-memory-toast { transition: none; }
+}
+
+/* 纪念日的点跟「写过手记」的点同一个玫瑰色（---jr-rose 在两种皮肤下都落在纸上可读），
+   只靠位置（左上 / 右下）与实心/空心区分，不再按皮肤换色 —— 换过一次，看着像两个体系。 */
+
+.ellen-app[data-skin='zzz'] .el-anniv-card {
+  border-radius: var(--z-r-2);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+}
+
+.ellen-app[data-skin='zzz'] .el-anniv-date,
+.ellen-app[data-skin='zzz'] .el-anniv-title {
+  color: var(--z-ink-paper);
+}
+
+.ellen-app[data-skin='zzz'] .el-anniv-note,
+.ellen-app[data-skin='zzz'] .el-anniv-away,
+.ellen-app[data-skin='zzz'] .el-anniv-head,
+.ellen-app[data-skin='zzz'] .el-anniv-empty {
+  color: var(--z-ink-paper-2);
+}

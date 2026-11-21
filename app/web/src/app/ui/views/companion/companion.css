@@ -212,24 +212,8 @@
   opacity: 0.85;
 }
 
-.el-companion-mail {
-  display: flex;
-  margin: calc(10 * var(--u)) 0 0 auto;
-  width: calc(40 * var(--u));
-  height: calc(40 * var(--u));
-  border-radius: 50%;
-  border: calc(1 * var(--u)) solid var(--el-line);
-  background: var(--el-surface);
-  color: var(--el-muted);
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.el-companion-mail .el-icon svg {
-  width: calc(18 * var(--u));
-  height: calc(18 * var(--u));
-}
+/* 老大 2026-11-17：`.el-companion-mail`（相处页的寄出箭头，实际跳反馈页）已移除，
+   反馈入口只留在「设置 → 关于 → 反馈」。这块样式随之删掉，别让死规则留着。 */
 
 /* ── OUR DAYS, OUR STORY（点线块）──────────────────────────── */
 .el-companion-days {
@@ -330,6 +314,14 @@
   border-radius: var(--z-r-1);
   background: var(--z-card);
   box-shadow: var(--z-hard-t);
+}
+
+/* 老大 2026-11-17：「文字有点靠近框的边缘，要留点空」。
+   只有绝区零皮肤给这块加了框（上面那条），但基础规则 `.el-companion-between`
+   只有 margin-top、没有 padding，于是标题和那句感受直接贴在边框上、右边缘只剩 1px。
+   便签卡自带 padding 所以不露这个问题；这里补齐，和便签卡的内缩对齐。 */
+.ellen-app[data-skin='zzz'] .el-companion-between {
+  padding: calc(14 * var(--u)) calc(18 * var(--u)) calc(16 * var(--u));
 }
 
 /* 便签正文：基础规则是「米白纸 + 墨字」(--el-paper / --el-ink)，zzz 皮肤上面把底换成了

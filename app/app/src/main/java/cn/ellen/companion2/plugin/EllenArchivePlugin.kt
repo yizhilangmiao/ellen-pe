@@ -37,7 +37,10 @@ import java.util.Locale
 class EllenArchivePlugin : Plugin() {
 
     private val magic = "ELLENPK1\n".toByteArray(Charsets.US_ASCII)
-    private val backupNamePattern = Regex("艾莲备份-[0-9]{8}-[0-9]{6}\\.ellenpack")
+    // 分片备份会一次写出好几个包（一库拆成 N 片），片号后缀可选：
+    // 没有它，同一秒内的两片会撞名，createDocument 自动加 "(1)" 之后就不匹配这个正则，
+    // 轮换与「已有 N 份」都会看不见它们。
+    private val backupNamePattern = Regex("艾莲备份-[0-9]{8}-[0-9]{6}(-p[0-9]{3})?\\.ellenpack")
     /** 附件 sha256 的合法形状（与 import.js 的 HEX64 一致）。 */
     private val hex64 = Regex("[a-f0-9]{64}")
 
@@ -541,6 +544,8 @@ class EllenArchivePlugin : Plugin() {
 
     private class Writer(val uri: Uri, val name: String, val files: JSONArray) {
         var out: OutputStream? = null
+        /** 收尾时先不轮换（分片备份的一整轮写完再统一 prune）。 */
+        var deferPrune = false
         var sha = MessageDigest.getInstance("SHA-256")
         var bytes = 0L
         /** 附件区已写字节（不含 magic/长度/manifest）。 */
@@ -691,6 +696,7 @@ class EllenArchivePlugin : Plugin() {
             "write" -> backupWrite(call, value)
             "commit" -> backupCommit(call, value)
             "abort" -> backupAbort(call, value)
+            "prune" -> backupPrune(call, value)
             else -> call.reject("不认识的备份操作：$method", "BACKUP_UNAVAILABLE")
         }
     }
@@ -799,7 +805,15 @@ class EllenArchivePlugin : Plugin() {
         }
 
         val treeUri = Uri.parse(dir)
-        val name = "艾莲备份-${stamp()}.ellenpack"
+        // part > 0 表示这是分片备份的第 part 片；deferPrune 让 commit 先别轮换
+        // （一轮写完 N 片再统一 prune，否则第 4 片一提交就把前 3 片当"最老的"删了）。
+        val part = value.optInt("part", 0)
+        val deferPrune = value.optBoolean("deferPrune", false)
+        val name = if (part > 0) {
+            "艾莲备份-${stamp()}-p${String.format(Locale.US, "%03d", part)}.ellenpack"
+        } else {
+            "艾莲备份-${stamp()}.ellenpack"
+        }
         try {
             val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
             val parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
@@ -811,6 +825,7 @@ class EllenArchivePlugin : Plugin() {
             ) ?: throw IllegalStateException("createDocument 返回 null")
 
             val writer = Writer(docUri, name, declared)
+            writer.deferPrune = deferPrune
             val stream = context.contentResolver.openOutputStream(docUri, "wt")
                 ?: throw IllegalStateException("openOutputStream 返回 null")
             writer.out = stream
@@ -847,6 +862,7 @@ class EllenArchivePlugin : Plugin() {
             out.put("files", declared.length())
             out.put("attachments", writer.offset)
             out.put("missing", names(plan.missing))
+            out.put("part", part)
             call.resolve(out)
         } catch (e: Exception) {
             call.reject("备份没开起来：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
@@ -954,7 +970,9 @@ class EllenArchivePlugin : Plugin() {
             json.put("nextAt", now + json.optInt("intervalDays", 7) * DAY)
             writeState(json)
 
-            val pruned = prune(json)
+            // 分片时这一片只是"整轮备份的一部分"：轮换交给最后统一的 prune，
+            // 否则第 4 片一提交，前 3 片就成了超出 retainGroups 的"最老备份"被删掉。
+            val pruned = if (writer.deferPrune) JSONArray() else prune(json)
             // 备份成功了：nextAt 已经推到下一次，后台提醒跟着重排
             EllenBackupWorker.scheduleNext(context)
 
@@ -972,6 +990,23 @@ class EllenArchivePlugin : Plugin() {
             call.resolve(out)
         } catch (e: Exception) {
             call.reject("备份收尾失败：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
+        }
+    }
+
+    /**
+     * 单独跑一次轮换。分片备份一轮会写很多个包，只能在整轮写完之后再删旧的，
+     * 所以 begin 阶段带 deferPrune、由 web 层在最后统一调这个方法。
+     */
+    private fun backupPrune(call: PluginCall, value: JSObject) {
+        try {
+            val json = withDefaults(readState())
+            val pruned = prune(json, value.optInt("keepAtLeast", 0))
+            val out = JSObject()
+            out.put("pruned", pruned)
+            out.put("state", statePayload())
+            call.resolve(out)
+        } catch (e: Exception) {
+            call.reject("清理旧备份失败：${e.javaClass.simpleName}", "BACKUP_WRITE_FAILED")
         }
     }
 
@@ -1015,8 +1050,11 @@ class EllenArchivePlugin : Plugin() {
     }
 
     /** 只留最近 retainGroups 份，多的删掉。返回被删的文件名。 */
-    private fun prune(state: JSONObject): JSONArray {
-        val keep = state.optInt("retainGroups", BACKUP_RETAIN).coerceIn(1, 10)
+    private fun prune(state: JSONObject, keepAtLeast: Int = 0): JSONArray {
+        val configured = state.optInt("retainGroups", BACKUP_RETAIN).coerceIn(1, 10)
+        // 分片备份一次会写出很多个包，它们是"同一个备份"，不该按"份数"互相删。
+        // 调用方用 keepAtLeast 说明"这一轮至少留这么多份"，取两者较大的。
+        val keep = maxOf(configured, keepAtLeast.coerceIn(0, 1000))
         val groups = listGroups(state)
         val pruned = JSONArray()
         if (groups.size <= keep) return pruned

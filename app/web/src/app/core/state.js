@@ -5,9 +5,11 @@
 //   - 每条消息带 headId，后续修改（流式收尾、失败标记）走 revision 追加
 //   - 落库是异步的，界面不等它 —— 写失败只在控制台报，不挡聊天
 import { loadModelConfig, isUsable } from './config.js';
-import { appendMessage, loadMessages, replaceMessage, currentThreadId, recallMessage as recallInStore } from './store/messages.js';
+import { appendMessage, loadMessages, loadMessagesBefore, replaceMessage, currentThreadId, recallMessage as recallInStore } from './store/messages.js';
 
 const MESSAGE_WINDOW = 200;
+/** 往上翻一页取多少条。太大一次卡顿，太小翻得累。 */
+const OLDER_PAGE = 120;
 
 export function createAppState() {
   let messages = [];
@@ -127,6 +129,32 @@ export function createAppState() {
 
     getConfig() {
       return config;
+    },
+
+    /**
+     * 往上翻一页更早的历史。
+     * 2026-11-14：以前只读最近 200 条，再往上一片空白（老大反馈「往上翻缺了一些
+     * 聊天记录」——那其实两层问题：一是底层取错了 200 条，二是压根没有更早的入口）。
+     * 返回这次补进来的条数，0 表示真的到底了。
+     */
+    async loadOlderMessages(count = OLDER_PAGE) {
+      if (!messages.length) return 0;
+      const first = messages[0];
+      const beforeAt = first.createdAt || 0;
+      try {
+        const list = await loadMessagesBefore(threadId, beforeAt, count, first.headId || '');
+        const have = new Set(messages.map((m) => m.headId || m.id));
+        const fresh = list
+          .filter((m) => !have.has(m.headId || m.id))
+          .map((m) => ({ ...m, persisted: true }));
+        if (!fresh.length) return 0;
+        messages = fresh.concat(messages);
+        emit();
+        return fresh.length;
+      } catch (err) {
+        console.error('[state] 更早的消息读不出来', err);
+        return 0;
+      }
     },
 
     async setConfig(next) {

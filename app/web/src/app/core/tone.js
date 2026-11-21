@@ -196,9 +196,14 @@ export function toneTierIdOf(dims) {
 }
 
 /**
- * 回复长度 / 姿态：**唯一一处**。
+ * 姿态：**只说态度，不数字数**。
  * 文档（五章 2 表）给了两条硬联动：fatigue > 60 → 句子短、不推进话题；
- * affection < 30 → 客气、问一句答一句。散在两个文件里早晚会互相打架，所以收在这里。
+ * affection < 30 → 客气、问一句答一句。
+ *
+ * 2026-11-20 改：原来这里连句数一起定（「两三个短句就停」「两三句把意思说清楚」），
+ * 和 persona.js 的 LENGTH_LINES、affect-events.js 的 STYLE_LINE（「2~4 句」）三处并存。
+ * 模型收到三个互相矛盾的量，只能挑最宽的那个执行 —— 于是「一次说多少」这个设置形同虚设。
+ * 长度只归 persona.js 一处；这里只交代态度，「累」和「客气」本身就会让话变短。
  * @returns {{length:'short'|'normal'|'polite', fatigueShort:boolean, polite:boolean, line:string}}
  */
 export function styleOf(dims) {
@@ -211,12 +216,12 @@ export function styleOf(dims) {
   const polite = affection < 30;
 
   const bits = [];
-  if (polite) bits.push('客气一点，问一句答一句，不撒娇、不追问，也不主动换话题');
-  else if (fatigueShort) bits.push('累，句子短，两三个短句就停，不推进话题也不反问');
-  else bits.push('两三句把意思说清楚，说完就停');
+  if (polite) bits.push('客气，问一句答一句，不撒娇、不追问、也不主动换话题');
+  else if (fatigueShort) bits.push('累，话到嘴边就停，不推进话题、也不反问');
+  else bits.push('松弛，说完就停，不找补');
 
   const length = polite ? 'polite' : fatigueShort ? 'short' : 'normal';
-  return { length, fatigueShort, polite, line: `回复长度：${bits.join('；')}。` };
+  return { length, fatigueShort, polite, line: `姿态：${bits.join('；')}。` };
 }
 
 /** 调试用：一眼看全语气与长度怎么落的。 */

@@ -1,0 +1,151 @@
+/* 纪念日编辑面板 + 日历格长按菜单。
+   编辑卡片本身复用 memory-editor.css 的 .el-editor-*（同一套遮罩/输入/按钮），
+   这里只补两样独有的东西：底部那杯菜单，以及卡片上那行日期。 */
+
+.el-anniv-day {
+  margin: calc(-4 * var(--u)) 0 calc(6 * var(--u));
+  font-size: calc(13 * var(--u));
+  letter-spacing: calc(1 * var(--u));
+  color: var(--el-settings-accent);
+}
+
+/* ── 长按日历弹出的菜单（底部抽屉）────────────────────────────── */
+.el-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: calc(10 * var(--u));
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.18s ease;
+  z-index: 116;
+}
+
+.el-sheet-scrim.is-open {
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.el-sheet {
+  width: 100%;
+  max-width: calc(420 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  padding: calc(12 * var(--u));
+  border-radius: calc(20 * var(--u));
+  /* 颜色必须走 --el-settings-*：zzz 皮肤下 --el-ink 是「纸上墨」（深色），
+     配 --el-settings-surface 的深色卡片会变成深底深字（实测整杯菜单看不见）。 */
+  background: var(--el-settings-surface);
+  color: var(--el-settings-ink);
+  box-shadow: 0 calc(-6 * var(--u)) calc(28 * var(--u)) rgba(0, 0, 0, 0.28);
+  transform: translateY(calc(14 * var(--u)));
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.el-sheet.is-open {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.el-sheet-title {
+  padding: 0 calc(6 * var(--u));
+  font-size: calc(12 * var(--u));
+  letter-spacing: calc(0.8 * var(--u));
+  color: var(--el-settings-muted);
+}
+
+.el-sheet-sub {
+  padding: 0 calc(6 * var(--u)) calc(4 * var(--u));
+  font-size: calc(13 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-settings-ink);
+}
+
+.el-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+}
+
+/* 每一项都要看得像「能按的东西」：一块有底有边的整条 + 右箭头。
+   老大真机反馈：原来只有文字，跟下面那个取消条比，完全看不出能点。 */
+.el-sheet-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--u));
+  width: 100%;
+  padding: calc(14 * var(--u)) calc(16 * var(--u));
+  border: 1px solid var(--el-settings-line);
+  border-radius: calc(14 * var(--u));
+  background: var(--el-settings-raised);
+  color: var(--el-settings-ink);
+  font-family: inherit;
+  font-size: calc(14 * var(--u));
+  line-height: calc(20 * var(--u));
+  font-weight: 500;
+  text-align: left;
+}
+
+.el-sheet-item::after {
+  content: '›';
+  flex: 0 0 auto;
+  font-size: calc(16 * var(--u));
+  line-height: 1;
+  opacity: 0.55;
+}
+
+/* 这杯菜单里最想让人点的那个（标成纪念日）：用主题主色，一眼是按钮 */
+.el-sheet-item.is-primary {
+  border-color: transparent;
+  background: var(--el-settings-primary);
+  color: var(--el-settings-primary-ink);
+  font-weight: 600;
+}
+
+.el-sheet-item.is-primary::after {
+  opacity: 0.75;
+}
+
+.el-sheet-item.is-danger {
+  color: var(--el-settings-error);
+  border-color: color-mix(in srgb, var(--el-settings-error) 42%, var(--el-settings-line));
+}
+
+.el-sheet-item:active {
+  transform: scale(0.994);
+  filter: brightness(0.94);
+}
+
+/* 取消不跟上面那些抢注意力：没有边框、底色更浅、隔开一段 */
+.el-sheet-cancel {
+  appearance: none;
+  margin-top: calc(6 * var(--u));
+  padding: calc(13 * var(--u)) calc(10 * var(--u));
+  border: 0;
+  border-radius: calc(14 * var(--u));
+  background: transparent;
+  color: var(--el-settings-muted);
+  font-family: inherit;
+  font-size: calc(13.5 * var(--u));
+  text-align: center;
+}
+
+.el-sheet-cancel:active {
+  background: var(--el-settings-raised);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .el-sheet-scrim,
+  .el-sheet {
+    transition: none;
+  }
+}
+
+.ellen-app[data-skin='zzz'] .el-sheet {
+  border-radius: var(--z-r-2);
+  box-shadow: var(--z-hard-s), var(--z-hard-edge);
+}

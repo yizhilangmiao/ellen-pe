@@ -12,10 +12,14 @@ import { recall, renderRecall } from './recall.js';
 import { keepAlive } from '../background.js';
 import { readChatPrefs } from '../chatprefs.js';
 import { splitReply, shouldSplit } from '../reply-split.js';
+import { guardReply, describeHit } from '../time-guard.js';
+import { polishReply, describePolish } from '../reply-polish.js';
 import { extractTone, toneEnabled } from '../tone.js';
 import { readVisionConfig, visionPlan, resolveVisionTarget, buildVisionParts, downscalePlan, FRAME_MAX_SIDE } from '../vision.js';
 import { readDocument } from '../documents.js';
 import { trimHistory, mergeSplitSegments, inputBudgetOf, replyBudgetOf, estimateTokens, shrinkForRetry } from './budget.js';
+import { createSseReader } from './sse.js';
+import { samplingFor, looksLikeParamReject } from './sampling.js';
 import { readPersona } from '../persona.js';
 
 // 单块密文上限：native 每次最多给 0x4000 原始字节（21848 个 base64 字符），
@@ -186,9 +190,8 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
 
   async function readAll(rid, onDelta) {
     const decoder = new TextDecoder('utf-8');
-    let carry = '';
+    const sse = createSseReader(onDelta);
     let seq = 0;
-    let text = '';
 
     for (let i = 0; i < MAX_CHUNKS; i++) {
       const chunk = await call('EllenModelHttp', 'read', { requestId: rid, sequence: seq + 1 });
@@ -199,37 +202,19 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         const bin = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-        const piece = decoder.decode(bytes, { stream: true });
-        carry += piece;
-
-        // 按 SSE 事件切分：空行分隔；只认 data: 行
-        let idx;
-        while ((idx = carry.indexOf('\n\n')) >= 0) {
-          const raw = carry.slice(0, idx);
-          carry = carry.slice(idx + 2);
-          for (const line of raw.split('\n')) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data:')) continue;
-            const payload = trimmed.slice(5).trim();
-            if (payload === '[DONE]') continue;
-            try {
-              const obj = JSON.parse(payload);
-              const delta = obj && obj.choices && obj.choices[0] && obj.choices[0].delta;
-              const piece2 = delta && (delta.content || '');
-              if (piece2) {
-                text += piece2;
-                onDelta(text);
-              }
-            } catch {
-              // 非 JSON 的 data 行直接跳过（服务端偶尔插 ping）
-            }
-          }
-        }
+        // stream:true 让跨 chunk 被劈开的多字节汉字能拼回来；解析/拼帧交给 sse 模块
+        sse.feed(decoder.decode(bytes, { stream: true }));
       }
 
-      if (chunk && chunk.done) break;
+      if (chunk && chunk.done) {
+        // 先把 decoder 里可能挂着的半个多字节字符吐出来，再收尾
+        sse.feed(decoder.decode());
+        break;
+      }
     }
-    return text;
+    // flush 会把最后一帧（没有结尾空行的那个）也吃进来。以前这里直接 break，
+    // 最后半句就没了 —— 表现是她说的话到一半停住、或末尾少几个字。
+    return sse.flush();
   }
 
   /**
@@ -373,7 +358,13 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
       let txId = rid;
       let status = 0;
       let detail = '';
-      for (let round = 0; round < 2; round += 1) {
+      // 采样参数：温度/核采样/存在惩罚。默认那套（1.0/1.0/0）挑的是「最可能的说法」，
+      // 每句都正确、都体面、都没有意外 —— 那正是助手腔。见 chat/sampling.js。
+      // 服务端不认这些字段时（Anthropic 收 presence_penalty 会 400，还有些推理模型
+      // 一律拒绝），去掉重发一次，用户不会看到报错。
+      let sampling = samplingFor(sendCfg);
+      let samplingDropped = false;
+      for (let round = 0; round < 3; round += 1) {
         if (round > 0) {
           txId = newRequestId('chat');
           ctl.requestId = txId;
@@ -383,6 +374,7 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
           stream: true,
           messages: attempt,
           max_tokens: maxTokens,
+          ...sampling,
           ...(think && think !== 'default' ? { thinking: { type: think } } : {}),
         });
         const head = await call('EllenModelHttp', 'open', {
@@ -398,6 +390,14 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         if (round === 0 && looksLikeOverflow(status, detail)) {
           attempt = shrinkForRetry(attempt);
           console.warn(`[chat] 服务端说上下文超了，砍到 ${attempt.length} 条重发一次`);
+          continue;
+        }
+        // 服务端不认采样参数：去掉再发一次。这条要放在溢出判断之后 ——
+        // 上下文超长也常是 400，但那种错误里没有参数名，looksLikeParamReject 会放行。
+        if (!samplingDropped && looksLikeParamReject(status, detail)) {
+          samplingDropped = true;
+          sampling = {};
+          console.warn('[chat] 这个服务端不认采样参数，去掉 temperature/top_p 重发一次');
           continue;
         }
         break;
@@ -443,6 +443,31 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
         }
       }
 
+      // 时间一致性：下午三点冒出「时候不早啦快睡」这类话，前提就是错的。
+      // 删句不重写 —— 重写要再调一次模型，用户已经看到流式的字了，换气泡体验更差。
+      try {
+        const guarded = guardReply(finalBody);
+        if (guarded.changed) {
+          console.warn('[chat]', describeHit(guarded));
+          finalBody = guarded.text;
+        }
+      } catch (err) {
+        console.warn('[chat] 时间守卫出错，按原文显示', err);
+      }
+
+      // 助手腔：尾巴（「希望对你有帮助」）和连问两三句，交给确定性代码处理。
+      // 为什么不写进 prompt：禁令是概率性的、模型会漏；这两件事是确定的，而且只动
+      // 尾巴和多出来的问句，不重写正文，不会把她的语气改掉。
+      try {
+        const polished = polishReply(finalBody);
+        if (polished.changed) {
+          console.warn('[chat]', describePolish(polished));
+          finalBody = polished.text;
+        }
+      } catch (err) {
+        console.warn('[chat] 回复打磨出错，按原文显示', err);
+      }
+
       // 拆条：一次说完的话分两三条气泡，像真的在聊天；关掉就整条显示
       let segs = [];
       try {
@@ -452,6 +477,12 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
       }
 
       if (segs.length > 1) {
+        // 顺序不能反：必须先把第一条截成 segs[0]，再补后面的段。
+        // 反过来（先 addMessage）会踩一个坑：addMessage 会 persist → 界面按库里的消息重载一次，
+        // reply.id 那个 local id 就失效了，后面的 updateMessage 静默落空，第一条永远停在全文。
+        // 老代码顺序是对的，问题只在段间那 320~580ms 的 await sleep —— 那半秒里屏幕上就是
+        // 「她说了一半突然缩回去」，2026-11-20 老大报的「打一半突然消失」正是它。
+        // 所以：保留顺序，去掉睡，整个拆条在一个同步块里做完，浏览器只绘制最终态。
         state.updateMessage(reply.id, {
           text: segs[0].text,
           pending: false,
@@ -460,8 +491,6 @@ export function createChatSession({ state, systemPrompt = '', getSystemPrompt = 
           ...(replyTone ? { tone: replyTone } : {}),
         });
         for (let i = 1; i < segs.length; i += 1) {
-          // 段间留一点空：一口气全冒出来就不像打字了
-          await sleep(320 + Math.random() * 260);
           state.addMessage({
             role: 'assistant',
             text: segs[i].text,

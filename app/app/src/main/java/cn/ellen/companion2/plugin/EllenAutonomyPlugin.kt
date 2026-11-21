@@ -60,6 +60,8 @@ class EllenAutonomyPlugin : Plugin() {
             maxGapMs = call.getLong("maxGapMs") ?: (3L * 60 * 60 * 1000),
             quietStart = call.getInt("quietStart") ?: 23,
             quietEnd = call.getInt("quietEnd") ?: 8,
+            dailyMin = call.getInt("dailyMin") ?: 0,
+            dailyMax = call.getInt("dailyMax") ?: 3,
             memories = memories,
             recent = recent,
         )

@@ -718,8 +718,17 @@ export async function recall(
   }
 
   if (!picked.length) {
-    // 一句都没对上：退回最近的几条，别让她失忆
-    picked = scored.sort((a, b) => (b.entry.at || 0) - (a.entry.at || 0)).slice(0, Math.min(3, limit));
+    // 一句都没对上。
+    //
+    // 2026-11-20 改：原来这里无条件退回「最近 3 条」，等于**每一轮** system 段里都挂着
+    // 一份「这些是你记得的事」清单。模型看见现成清单就会在回复里兑现一句
+    // 「对了，你昨天提过的那件事我一直记着」—— 每句都汇报一次记忆，这是最像 AI 的地方。
+    // 真人不这样：想不起来就不提，想起来了也是顺口一句，不会先声明「我记得」。
+    //
+    // 现在只有「这句话本身在问过去」才兜底，其余情况宁可不带记忆。
+    if (asksAboutPast(text)) {
+      picked = scored.sort((a, b) => (b.entry.at || 0) - (a.entry.at || 0)).slice(0, Math.min(2, limit));
+    }
   }
 
   return picked.map((r) => ({
@@ -732,9 +741,40 @@ export async function recall(
   }));
 }
 
-/** 把召回结果拼成一段给模型看的文字。没有就返回空串。 */
+/**
+ * 这句话在问过去吗？空命中时要不要兜底记忆，全看它。
+ *
+ * 只认指向过去的词。真人也只在这种时候翻记忆，其余时候是就着眼前这句接话。
+ * 宁可漏（这轮少提一件旧事），不要错（每个话题都硬塞一段回忆）。
+ */
+const PAST_WORDS = [
+  '记得', '还记得', '记住', '上次', '那次', '那天', '那时候', '当时', '以前', '之前',
+  '说过', '提过', '聊过', '讲过', '前几天', '上周', '上个月', '去年', '昨天', '前天',
+  '后来呢', '然后呢', '结果呢', '怎么说的',
+];
+
+export function asksAboutPast(text) {
+  const s = String(text || '');
+  if (!s) return false;
+  return PAST_WORDS.some((w) => s.includes(w));
+}
+
+/**
+ * 把召回结果拼成一段给模型看的文字。没有就返回空串。
+ *
+ * 2026-11-20 改：原来是一句「这些是你记得的事，和现在的话题有关就用得上，不相关就忽略」
+ * 加一张清单 —— 那读起来是**任务**（「这里有材料，请用上」），不是素材提示。
+ * 模型接到任务就会交付：开场先声明「我记得你说过…」，或者为了用上材料硬开一个新话题。
+ * 现在明说不许声明、不许拿它起话题，接不上就当没看见；条数也压到 2 条、每条 40 字，
+ * 免得清单本身成了 prompt 里的主角。
+ */
 export function renderRecall(items) {
   if (!items || !items.length) return '';
-  const lines = items.map((it, i) => `${i + 1}. [${it.kind === 'journal' ? '手记' : '记忆'}] ${it.title}：${it.body}`);
-  return `这些是你记得的事，和现在的话题有关就用得上，不相关就忽略：\n${lines.join('\n')}`;
+  const lines = items.slice(0, 2).map((it, i) => {
+    const body = String(it.body || '').replace(/\s+/g, ' ').slice(0, 40);
+    return `${i + 1}. [${it.kind === 'journal' ? '手记' : '记忆'}] ${it.title}：${body}`;
+  });
+  return `你脑子里顺带记着的几件事（不是任务清单）：\n${lines.join('\n')}\n`
+    + '接得上就顺口带一句，接不上就当没看见；'
+    + '不要宣称「我记得」「你上次说过」，也不要为了用上它而新开一个话题。';
 }

@@ -31,6 +31,44 @@ let cached = null;
 let audioEl = null;
 let playingUrl = '';
 
+/**
+ * 「这一条念完了吗」的等待器。
+ *
+ * 为什么需要有它：`speak()` 里的 `await audioEl.play()` 只等到**开始播**就返回了
+ * （<audio> 的 play() 语义如此）。所以调用方想「一条一条接着念」时，拿不到
+ * 「念完」这个时刻——照直觉写成 for 循环逐条 await，每条都会在下一条开始时被
+ * `new Audio` 掐断，听起来跟「只念一条」一模一样。0.5.x 的朗读 bug 就是栽在这。
+ */
+let doneResolve = null;
+let donePromise = null;
+
+function beginDone() {
+  // 上一轮要是还没结（比如被强停），先把它 resolve 掉，别让调用方永久挂住
+  settleDone();
+  donePromise = new Promise((resolve) => {
+    doneResolve = resolve;
+  });
+  return donePromise;
+}
+
+function settleDone() {
+  const resolve = doneResolve;
+  doneResolve = null;
+  donePromise = null;
+  if (resolve) resolve();
+}
+
+/**
+ * 等当前这条念完。`onended` / `onerror` / 被 `stop()` 三种情况都算完成。
+ * 没有在念的时候立刻 resolve —— 调用方不用区分「本来就静音」和「刚念完」。
+ *
+ * 注意：只覆盖 <audio> 那条主路（minimax）。系统 TTS 兜底分支拿不到可靠的
+ * 完成事件，调用方应当自己加超时，不要把等待完全押在这上面。
+ */
+export function whenDone() {
+  return donePromise || Promise.resolve();
+}
+
 export function readPrefs() {
   if (cached) return { ...cached };
   let raw = null;
@@ -132,6 +170,8 @@ function stopAudio() {
     }
     playingUrl = '';
   }
+  // 主动停也算「这一条结束了」，否则连读的调用方会一直等下去
+  settleDone();
 }
 
 function base64ToBlobUrl(base64, mime) {
@@ -161,13 +201,30 @@ async function speakCloud(body, prefs) {
   const mime = res.format === 'mp3' ? 'audio/mpeg' : `audio/${res.format || 'mpeg'}`;
   playingUrl = base64ToBlobUrl(res.base64, mime);
   audioEl = new Audio(playingUrl);
-  audioEl.onended = () => stopAudio();
-  await audioEl.play();
-  return { speaking: true, provider: 'minimax', bytes: res.bytes || 0 };
+  const done = beginDone();
+  audioEl.onended = () => {
+    stopAudio();
+    settleDone();
+  };
+  // 解码失败 / 网络中断也要结，不然连读会卡在这一条上
+  audioEl.onerror = () => {
+    stopAudio();
+    settleDone();
+  };
+  try {
+    await audioEl.play();
+  } catch (err) {
+    stopAudio();
+    settleDone();
+    throw err;
+  }
+  return { speaking: true, provider: 'minimax', bytes: res.bytes || 0, done };
 }
 
 export async function speak(text, opts = {}) {
-  const body = String(text || '').trim();
+  // 这里再过一次 plain：chat 那条路自己剥过，通话播报（call.js）是把原始台词直接传进来的，
+  // 不剥的话「（她顿了一下）」照样会被念出来。plain 是幂等的，多过一遍没有副作用。
+  const body = plain(text);
   if (!body) return { speaking: false, skipped: true };
   const prefs = readPrefs();
   const provider = opts.provider || prefs.provider || 'system';
@@ -218,7 +275,6 @@ export async function onSpeech(cb) {
   return listen('EllenSpeech', 'speechEvent', cb);
 }
 
-/** 只念纯文本：把 Markdown 的强调符号与代码围栏剥掉，别让引擎念出星号。 */
 /** 随机语音条：把一句话念成一条「语音条」挂在气泡里。
  *  为什么按概率而不是全量：每条都合成既费钱又吵，偶尔一条才有「她随手发了条语音」的感觉。
  *  概率固定 1/7，不做开关档位 —— 用户要的就是「开/关」两态。 */
@@ -256,12 +312,27 @@ export async function synthesizeUrl(text, opts = {}) {
   return { url: base64ToBlobUrl(res.base64, res.format || 'mp3'), bytes: res.bytes, ms: res.ms };
 }
 
+/** 只念纯文本：剥 Markdown 符号，也剥「（动作）」——动作是写给眼睛看的，念出来就出戏。
+ *
+ *  0.5.3 以前的坑：动作开起来之后，`（她轻轻叹了口气）` 原样进了 TTS，整条朗读都是括号旁白。
+ *  规则：括号内 1~60 字、不含换行、不嵌套才剥（超长/带换行的多半是正文补充说明，不动）；
+ *  全角半角圆括号、方括号、星号动作各剥一遍；剥完一个字都不剩就退回原文，
+ *  别把空串塞给合成接口（那边会报「这条台词暂时无法合成」，看起来比念括号更像坏了）。
+ */
 export function plain(text) {
-  return String(text || '')
+  const flat = String(text || '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`([^`]*)`/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/^[>\-\s]*/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
+  if (!flat) return '';
+  const bare = flat
+    .replace(/[（(][^（()）\r\n]{1,60}[）)]/g, '')
+    .replace(/[【\[][^【】\[\]\r\n]{1,60}[】\]]/g, '')
+    .replace(/\*[^*\r\n]{1,60}\*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return /[\p{L}\p{N}]/u.test(bare) ? bare : flat;
 }

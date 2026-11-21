@@ -83,6 +83,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- PackageInstaller 会话结果：装完 / 被拦 / 待确认都从这里回来。
+             不导出，只接系统发的显式 Intent。 -->
+        <receiver
+            android:name=".plugin.UpdateInstallReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

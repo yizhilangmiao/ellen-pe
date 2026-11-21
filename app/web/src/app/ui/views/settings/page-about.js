@@ -14,7 +14,6 @@ import { PLATFORMS as ASR_PLATFORMS, loadConfig as loadAsrConfig, saveConfig as 
 import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as speakVoice, stop as stopVoice, state as voiceState, readKey as readVoiceKey, writeKey as writeVoiceKey, clearKey as clearVoiceKey } from '../../../core/speech.js';
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot } from '../../../core/store/import.js';
-import { buildManifest } from '../../../core/store/export.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
 import { readPersona, writePersona, resetPersona, describePersona, TONES, LENGTHS } from '../../../core/persona.js';
@@ -104,7 +103,12 @@ export function createAboutPage({ state, onChange } = {}) {
       function paintUpdate(st) {
         const cur = (st && st.current) || {};
         const phase = (st && st.phase) || 'idle';
-        upStatus.textContent = s(`settings.updatePhase_${phase}`) || '';
+        // current / idle 是「没有更新」的两种正常态。native 那边可能给了更具体的话
+        // （比如「这个架构（x86_64）还没有新包。」），优先显示它，别一律糊成
+        // 「已经是最新的」——否则用户以为更新检查没问题，其实只是没这个架构的包。
+        const phaseText = s(`settings.updatePhase_${phase}`) || '';
+        const nativeMsg = (st && st.message) || '';
+        upStatus.textContent = ((phase === 'current' || phase === 'idle') && nativeMsg) ? nativeMsg : phaseText;
         upVer.textContent = cur.version ? `${s('settings.updateCurrent')}${cur.version}（${cur.versionCode}）` : '';
         const latest = st && st.latest;
         if (latest && (phase === 'available' || phase === 'downloading' || phase === 'ready' || phase === 'verifying')) {

@@ -19,10 +19,28 @@ import {
   msUntilQuietEnd,
   msUntilNextDay,
 } from './autonomy-prefs.js';
+import { phaseLine } from '../assets/lore/day.js';
 
 const DEFAULT_PERSONA =
   '你是艾莲，一个会主动惦记他的女孩。说话口语、短、不客套，像是在微信里随手发一条。';
 
+/**
+ * 主动消息的人设 = 底 + 此刻的时间与她自己的状态。
+ *
+ * 为什么必须带时间：之前 prompt 里没有钟点，模型只能从记忆里猜「现在该说什么」，
+ * 于是凌晨两点也会冒一句「起来没」。钟点和「她这会儿在做什么」是事实，
+ * 给了事实它才不会替自己编一个下午。
+ */
+export function buildProactivePersona(now = Date.now()) {
+  const when = new Date(now);
+  const hour = when.getHours();
+  const minute = when.getMinutes();
+  const clock = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const dayName = '日一二三四五六'[when.getDay()];
+  return `${DEFAULT_PERSONA}
+现在是周${dayName} ${clock}。${phaseLine(now)}
+你不是在回消息，是你自己想起来了才发——所以别提「刚看到」「回你」这类话。`;
+}
 const DEFAULT_RHYTHM = {
   minGapMs: 60 * 60 * 1000,
   maxGapMs: 3 * 60 * 60 * 1000,
@@ -67,10 +85,12 @@ export async function readState() {
  * 字段缺省就保留旧值，所以这里必须把该有的都带上）。
  */
 export async function pushMaterial({ config, messages, rhythmId } = {}) {
-  const rhythm = { ...DEFAULT_RHYTHM, ...rhythmOf(rhythmId || 'normal') };
   // 设置页的「隔多久 / 免打扰」压过节奏按钮的默认值：
   // 用户亲手调过的那两个数才是他真正想要的，节奏只是没调时的预设。
   const autonomy = readAutonomyPrefs();
+  // 调用方没传节奏时必须回落到「他上次选的那档」，不能回落 normal ——
+  // 否则任何一次 syncAutonomy/开关都会把「别太频繁」悄悄改回「自然一些」。
+  const rhythm = { ...DEFAULT_RHYTHM, ...rhythmOf(rhythmId || autonomy.rhythmId) };
   const gapMs = intervalMs(autonomy);
   const minGapMs = Math.max(rhythm.minGapMs, gapMs);
   const maxGapMs = Math.max(rhythm.maxGapMs, Math.round(gapMs * 1.6));
@@ -93,13 +113,17 @@ export async function pushMaterial({ config, messages, rhythmId } = {}) {
     .map((m) => ({ role: m.role, text: String(m.text).slice(0, 300) }));
 
   return call('EllenAutonomy', 'setContext', {
-    persona: DEFAULT_PERSONA,
+    persona: buildProactivePersona(),
     endpoint: config?.endpoint || '',
     model: config?.model || '',
     minGapMs,
     maxGapMs,
     quietStart: autonomy.quietFrom,
     quietEnd: autonomy.quietTo,
+    // 下限交给 native 自己数、自己补：
+    // 后台发送时 web 不在场，只有 native 知道今天真发了几条。
+    dailyMin: autonomy.dailyMin,
+    dailyMax: autonomy.dailyMax,
     memories,
     recent,
   });

@@ -376,13 +376,23 @@ function dayWord(at, now) {
   return '前几天';
 }
 
-/** 一句写法约束（文档给的那句，别改：它同时压住了长度与解释欲）。 */
-const STYLE_LINE = '写法：2~4 句，动作放（），不解释为什么。';
+/**
+ * 一句写法约束。
+ *
+ * 2026-11-20 改：原来写「写法：2~4 句，动作放（），不解释为什么。」——
+ * 它和 persona.js 的 LENGTH_LINES、tone.js 的 styleOf 都在定句数，三处互相打架，
+ * 模型挑最宽的那个执行，于是「一次说多少」这个设置形同虚设，每条回复都是两三句。
+ * 长度只留 persona.js 一处；这里只说「动作怎么放」和「别解释」。
+ * 顺带把动作收成一轮最多一处：不限量的话模型几乎每句都挂一个（笑）（轻叹），像在演话剧。
+ */
+const STYLE_LINE = '写法：动作真发生时放在（），一轮最多一处；不解释为什么。';
 
 /**
  * 渲染注入块。三条硬要求：
- *   1. 任何状态都不返回空串 —— 空串会让上层退回旧模板，你以为关掉了，其实换了个更差的在说话；
- *   2. 第一人称 2–4 句 + 一句写法约束，总长 ≤ 220 汉字；
+ *   1. 中性且无事时只返回写法约束（2026-11-20 改）：原来每轮无论什么心情都塞一段
+ *      「[此刻] …」，等于每轮都在提醒模型「你正在演一个状态」，人机感的一大半来自这里，
+ *      小半来自它占的预算。现在中性只留「写法：动作放（），别解释」这一句。
+ *   2. 有情绪时第一人称 2–4 句 + 一句写法约束，总长 ≤ 220 汉字；
  *   3. 三种冷分开说，别笼统写「心情不好」。
  */
 export function renderInjection(state, { now = Date.now() } = {}) {
@@ -423,6 +433,11 @@ export function renderInjection(state, { now = Date.now() } = {}) {
   if (dims.fatigue > 65) sentences.push(EXTRA_LINES.tired);
   if (dims.possess > 75) sentences.push(EXTRA_LINES.jealous);
   if (dims.shame > 70) sentences.push(EXTRA_LINES.shy);
+
+  // 中性、又没有冷/怨/第一次/暂停/嘴硬这些事：这一块等于「我心情正常」，
+  // 模型不需要被告知自己心情正常。只留写法约束（动作怎么放、别解释），
+  // 「[此刻] …」和补尾巴整段不注入 —— 省约 40 字，也少一次「她在演」的暗示。
+  if (neutral && sentences.length === 1) return STYLE_LINE;
 
   // 只有一句时补个尾巴：一句是标签，两句才是处境（见 BAND_TAILS 的注释）
   if (sentences.length < 2) sentences.push(neutral ? BAND_TAILS.neutral : BAND_TAILS[band.id]);

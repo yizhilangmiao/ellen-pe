@@ -581,3 +581,162 @@ section[data-view='settings'] .el-settings-entry + .el-settings-entry {
   font-weight: 600;
   color: var(--el-text);
 }
+
+/* —— 「我」的头像（外观页，排期 5）——
+ * 预览用背景图而不是 <img>：换头像时只要改一个 background-image，
+ * 不用管节点增删，也就不会在预览框里留下上一张的残影。
+ */
+.el-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+}
+
+.el-avatar-preview {
+  width: calc(52 * var(--u));
+  height: calc(52 * var(--u));
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background-color: var(--el-surface-2, rgba(255, 255, 255, 0.06));
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--el-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.el-avatar-empty {
+  font-size: calc(10 * var(--u));
+  color: var(--el-text-dim);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.el-avatar-actions {
+  display: flex;
+  gap: calc(8 * var(--u));
+  flex-wrap: wrap;
+}
+
+/* —— 聊天背景的预览框（外观页，排期 6）——
+ * 跟头像那颗长得不一样：背景是画面，得给个横向的框才看得出铺满 / 完整。
+ * 圆角用 8u 而不是 50%：这是缩略图不是头像。
+ */
+.el-wall-preview {
+  width: calc(96 * var(--u));
+  height: calc(58 * var(--u));
+  border-radius: calc(8 * var(--u));
+}
+
+/* 说明文字：12u + 次要色。之前只写了 .is-warn 一档，基础样式缺失，
+ * 于是「我的头像」那条说明按段落默认字号渲染，比卡片标题还大一截。 */
+.el-settings-hint {
+  margin: 0;
+  font-size: calc(12 * var(--u));
+  line-height: calc(19 * var(--u));
+  color: var(--el-current-muted);
+}
+
+/* 选图失败时把 hint 压成提示色。默认 hint 是灰的，混在说明里看不出来 */
+.el-settings-hint.is-warn {
+  color: var(--el-warning, #e08b5a);
+}
+
+/* —— 配色（外观页 · 排期 4b） ——
+ * 预设一排按钮，下面七格取色器两列摆开；对比度不达标时在中间插一条提示。
+ * 尺寸一律 calc(N * var(--u))，不写 px。
+ */
+.el-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u));
+}
+
+.el-preset-row .el-settings-segment {
+  flex: 1 1 calc(66 * var(--u));
+  min-width: calc(60 * var(--u));
+}
+
+.el-preset-row .el-settings-segment[disabled] {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.el-color-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(8 * var(--u)) calc(10 * var(--u));
+}
+
+.el-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+  padding: calc(5 * var(--u)) calc(8 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--el-current-raised);
+}
+
+.el-color-name {
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+  color: var(--el-current-muted);
+}
+
+/* 取色块：默认的 input[type=color] 在安卓上带内边距和方角，得自己削 */
+.el-color-input {
+  flex: 0 0 auto;
+  width: calc(34 * var(--u));
+  height: calc(24 * var(--u));
+  padding: 0;
+  border: none;
+  border-radius: calc(7 * var(--u));
+  background: none;
+  appearance: none;
+}
+
+.el-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.el-color-input::-webkit-color-swatch {
+  border: 1px solid var(--el-current-control-line);
+  border-radius: calc(7 * var(--u));
+}
+
+.el-color-warn {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--el-settings-error-bg, #412632);
+  color: var(--el-settings-error, #ffc1cc);
+  font-size: calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
+}
+
+.el-color-warn.is-hidden {
+  display: none;
+}
+
+.el-color-warn-text {
+  flex: 1;
+}
+
+.el-color-warn .el-settings-segment {
+  flex: 0 0 auto;
+  padding: calc(5 * var(--u)) calc(10 * var(--u));
+  white-space: nowrap;
+}
+
+.el-color-reset {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding: calc(6 * var(--u)) calc(12 * var(--u));
+  color: var(--el-current-accent);
+}

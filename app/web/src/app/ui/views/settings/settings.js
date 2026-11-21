@@ -135,6 +135,9 @@ export function createSettingsView({ state } = {}) {
 
       // —— 其他 ——
       el.append(group('settings.groupOther'));
+      // 外观：亮暗/跟系统。放在「其他」最前，因为它是第一眼就会被找的那类设置
+      const appearanceEntry = entry({ view: 'settings-appearance', titleKey: 'settings.entryAppearance', summary: s('settings.entryAppearanceSum') });
+      el.append(appearanceEntry.row);
       const aboutEntry = entry({ view: 'settings-about', titleKey: 'settings.entryAbout', summary: s('settings.entryAboutSum') });
       el.append(aboutEntry.row);
 

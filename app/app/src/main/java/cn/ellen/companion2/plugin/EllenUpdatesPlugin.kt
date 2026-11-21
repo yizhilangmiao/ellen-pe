@@ -1,11 +1,12 @@
 package cn.ellen.companion2.plugin
 
+import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import androidx.core.content.FileProvider
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -25,6 +26,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  2. cancel 不删 part，续传要用；
  *  3. 校验失败才删；
  *  4. install 先看 canRequestPackageInstalls()，不能装就跳「未知来源」设置页，绝不代点；
+ *  4b.  真正装的动作走 PackageInstaller 会话，不走 FileProvider —— 小米的安装器会把
+ *        「安装包扫描」丢给另一个进程，临时 URI 授权到不了那里，用户看到的是
+ *        「解析软件包时出现问题。(11) Permission Denial: opening provider FileProvider」；
  *  5. 清单地址留空即可（老大要求发布通道先留空），此时 phase = unpublished。
  */
 @CapacitorPlugin(name = "EllenUpdates")
@@ -48,8 +52,18 @@ class EllenUpdatesPlugin : Plugin() {
 
     private fun prefs() = context.getSharedPreferences("ellen-updates-v1", android.content.Context.MODE_PRIVATE)
 
-    private fun apkFile(): File = File(context.cacheDir, "update.apk")
-    private fun partFile(): File = File(context.cacheDir, "update.part")
+    /**
+     * 包放 filesDir，不放 cacheDir。
+     *
+     * cacheDir 是「系统随时可以清」的目录：存储紧张时 Android 会主动删它，
+     * 100 MB 的安装包被顺手清掉之后，用户装失败再点就只剩「重新下载」一条路（老大 2026-11-14 报的现象）。
+     * filesDir 归应用自己管，不会被系统清理，装十次失败也能再点十次。
+     */
+    private fun updatesDir(): File =
+        File(context.filesDir, "updates").apply { if (!exists()) mkdirs() }
+
+    private fun apkFile(): File = File(updatesDir(), "update.apk")
+    private fun partFile(): File = File(updatesDir(), "update.part")
 
     private fun currentVersion(): Pair<String, Long> = try {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -174,9 +188,86 @@ class EllenUpdatesPlugin : Plugin() {
         return state
     }
 
+    /**
+     * 删掉已经装进系统的那个安装包。
+     *
+     * 只在「包里的 versionCode ≤ 当前装的 versionCode」时删 —— 这说明它已经生效了，
+     * 留着只是一百多兆的垃圾。反过来（包里版本更高）说明还没装，不能动。
+     *
+     * 读 getPackageArchiveInfo 只解 manifest，不扫全包，开销可以接受；
+     * 而且没有文件时直接返回，绝大多数调用是零成本的。
+     */
+    private fun pruneInstalledApk() {
+        val apk = apkFile()
+        if (!apk.exists()) return
+        val packed = runCatching {
+            context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)?.longVersionCode ?: 0L
+        }.getOrDefault(0L)
+        if (packed <= 0L) return
+        val installed = currentVersion().second.toLong()
+        if (packed > installed) return
+        runCatching {
+            if (apk.exists()) apk.delete()
+            if (partFile().exists()) partFile().delete()
+            prefs().edit().remove("pendingCode").apply()
+        }
+    }
+
+    /**
+     * 判定「这次安装到底成没成」。
+     *
+     * 两条证据按顺序用：
+     *  1. 广播结果（receiver 写进 prefs）—— 快，但装成功那一刻应用正在被替换，
+     *     STATUS_SUCCESS 常常投递不到，不能只靠它；
+     *  2. 版本码兜底 —— install() 时记下目标 versionCode，现在装到没装到一比就知道。
+     *     这条不看广播，所以一定有效。
+     */
+    private fun settleInstall(raw: JSONObject): JSONObject {
+        val merged = mergeInstallResult(raw)
+        if (merged.optString("phase") != "installing") return merged
+        val pending = runCatching { prefs().getInt("pendingCode", 0) }.getOrDefault(0)
+        if (pending <= 0) return merged
+        val code = currentVersion().second
+        if (code < pending) return merged
+        prefs().edit().remove("pendingCode").apply()
+        // 这个包已经装进系统了，留在私有目录只是一百多兆的垃圾
+        pruneInstalledApk()
+        val done = JSONObject(merged.toString())
+        done.put("phase", "ready")
+        done.put("message", "装好了，重新打开一下就是新版本。")
+        return done
+    }
+
+    /**
+     * 把 PackageInstaller 会话的结果并回状态。
+     *
+     * receiver 与 Capacitor 插件不是同一个对象，结果只能经 SharedPreferences 传；
+     * 读到就清掉，否则每次 state() 都会重复播报同一条。
+     *
+     * 成功也不报「装完了」就完事：新版要等应用重启才生效，所以一律退回 ready，
+     * 让人重新打开一次，而不是留一个骗人的成功态。
+     */
+    private fun mergeInstallResult(raw: JSONObject): JSONObject {
+        val p = prefs()
+        val result = p.getString(UpdateInstallReceiver.KEY_RESULT, "").orEmpty()
+        if (result.isEmpty()) return raw
+        val message = p.getString(UpdateInstallReceiver.KEY_MESSAGE, "").orEmpty()
+        p.edit()
+            .remove(UpdateInstallReceiver.KEY_RESULT)
+            .remove(UpdateInstallReceiver.KEY_MESSAGE)
+            .apply()
+        val phase = raw.optString("phase")
+        if (phase != "installing" && phase != "ready") return raw
+        val out = JSONObject(raw.toString())
+        out.put("phase", "ready")
+        out.put("message", if (result == "ok") "装好了，重新打开一下就是新版本。" else message)
+        return out
+    }
+
     @PluginMethod
     fun state(call: PluginCall) {
-        val saved = readState()
+        pruneInstalledApk()
+        val saved = settleInstall(readState())
         if (saved.length() == 0) {
             val empty = manifestUrl().isEmpty()
             call.resolve(
@@ -212,8 +303,14 @@ class EllenUpdatesPlugin : Plugin() {
             kept.remove("received")
             kept.remove("total")
             kept.remove("lastError")
-            if (kept.optString("phase") == "unpublished") kept.put("phase", "idle")
-            call.resolve(publish("idle", ""))
+            // 只在「还没有状态」时给 idle。启动时无条件 publish("idle") 会把
+            // 「刚交给系统安装、等版本码兜底」的 installing 抹掉 —— 前端重启后就看不到结果了。
+            val phase = kept.optString("phase")
+            if (phase.isEmpty() || phase == "unpublished") {
+                call.resolve(publish("idle", ""))
+            } else {
+                call.resolve(publish(phase, kept.optString("message")))
+            }
         }
     }
 
@@ -240,7 +337,19 @@ class EllenUpdatesPlugin : Plugin() {
                 val version = json.optString("version")
                 val versionCode = json.optLong("versionCode", 0L)
                 val (currentName, currentCode) = currentVersion()
-                val apk = json.optJSONObject("apk") ?: throw IllegalStateException("清单里没有 apk")
+                if (!json.has("apks") && !json.has("apk")) {
+                    throw IllegalStateException("清单里没有 apk")
+                }
+                // 按本机 ABI 挑包。清单里没有本机架构那一条，就是「这个架构还没发」，
+                // 不是「有新版本」—— 否则 x86_64 模拟器天天提示更新，点下去下的是 arm 包，装不上。
+                val abi = deviceAbi()
+                val picked = pickApk(json, abi)
+                if (picked == null) {
+                    publish("current", "这个架构（$abi）还没有新包。")
+                    return@execute
+                }
+                val apk = picked.first
+                val apkAbi = picked.second
                 val sha = apk.optString("sha256").lowercase()
                 if (!Regex("[a-f0-9]{64}").matches(sha)) {
                     throw IllegalStateException("清单里的 sha256 不合法")
@@ -255,19 +364,32 @@ class EllenUpdatesPlugin : Plugin() {
                         put("sha256", sha)
                         put("url", absoluteUrl(url, apk.optString("url")))
                         put("sizeBytes", apk.optLong("sizeBytes", 0L))
+                        put("abi", apkAbi)
                     })
                 }
 
                 // 同版本重发（versionCode 一样但包换了）也算有更新：
                 // 只比 versionCode 的话，改了个字重发一版就永远推不下去。
+                //
+                // 但只在「清单这条和本机架构对得上」时才判：老清单那条是 arm64 包，
+                // x86_64 模拟器上装的是全 ABI 包，sha 必然不同 —— 按原来写法它每次都报
+                // 「有同版本的新包」，这就是那条误报的来源。
                 val installedSha = installedApkSha()
+                val abiFits = apkAbi.isEmpty() || apkAbi.equals(abi, ignoreCase = true)
                 val republished = versionCode == currentCode &&
                     installedSha.isNotEmpty() &&
+                    abiFits &&
                     !installedSha.equals(sha, ignoreCase = true)
-                if (versionCode > currentCode) {
-                    publish("available", "有新版本：$version", JSObject().apply { put("latest", latest) })
-                } else if (republished) {
-                    publish("available", "有同版本的新包：$version", JSObject().apply { put("latest", latest) })
+                // 包要是已经下好并校验过了，就别再让用户点一次「下载」：
+                // 之前 check 完一律回 available，界面按钮就变成「下载」，看起来像 100 MB 要重下一遍。
+                val staged = stagedPackageReady(sha, apk.optLong("sizeBytes", 0L))
+                if (versionCode > currentCode || republished) {
+                    val note = if (versionCode > currentCode) "有新版本：$version" else "有同版本的新包：$version"
+                    publish(
+                        if (staged) "ready" else "available",
+                        if (staged) "安装包已经下好了，直接点安装。" else note,
+                        JSObject().apply { put("latest", latest) },
+                    )
                 } else {
                     publish("current", "已经是最新的（$currentName）。", JSObject().apply { put("latest", latest) })
                 }
@@ -280,6 +402,55 @@ class EllenUpdatesPlugin : Plugin() {
         val out = JSObject()
         out.put("started", true)
         call.resolve(out)
+    }
+
+    /**
+     * 这台机器实际在跑哪个 ABI。
+     *
+     * SUPPORTED_ABIS[0] 是首选架构，也就是系统优先加载的那一套 so —— 对
+     * 「我这个包装的是哪个 ABI」这个判断够用了（真机 arm64-v8a、MuMu 模拟器 x86_64）。
+     * 没用 ApplicationInfo.primaryCpuAbi：那个字段在当前 compileSdk 下编译不过。
+     */
+    private fun deviceAbi(): String {
+        return Build.SUPPORTED_ABIS?.firstOrNull().orEmpty()
+    }
+
+    /**
+     * 从清单里挑出属于本机 ABI 的那一条，找不到回 null。
+     *
+     * 清单两种形态：
+     *   新：`apks: [{abi, url, sha256, sizeBytes}]` —— 按 ABI 挑
+     *   老：`apk: {url, sha256, sizeBytes}` —— 历史上一律是 arm64-v8a 的包
+     *
+     * 老格式在非 arm64 机器上一律当「没有本机架构的包」。不这么判，x86_64 模拟器
+     * 拿全 ABI 包的 sha 去比 arm64 包的 sha，永远不同，就一直提示「有同版本的新包」。
+     */
+    private fun pickApk(json: JSONObject, abi: String): Pair<JSONObject, String>? {
+        val list = json.optJSONArray("apks")
+        if (list != null && list.length() > 0) {
+            for (i in 0 until list.length()) {
+                val item = list.optJSONObject(i) ?: continue
+                if (item.optString("abi").equals(abi, ignoreCase = true)) return item to abi
+            }
+            return null
+        }
+        val legacy = json.optJSONObject("apk") ?: return null
+        if (!abi.equals(LEGACY_ABI, ignoreCase = true)) return null
+        return legacy to LEGACY_ABI
+    }
+
+    /**
+     * 本地是否已经躺着一个和清单 sha 对得上的完整包。
+     *
+     * 判据故意只看「长度 + 下载时记下的 sha」，不算一遍 sha256：100 MB 的包在 check 里现算要几秒，
+     * 而这份文件的 sha 早在 finish() 里校验通过过，长度对得上就不会是半截文件。
+     */
+    private fun stagedPackageReady(sha: String, sizeBytes: Long): Boolean {
+        val apk = apkFile()
+        if (!apk.exists() || apk.length() == 0L) return false
+        if (sizeBytes > 0 && apk.length() != sizeBytes) return false
+        val savedSha = prefs().getString("downloadingSha", "") ?: ""
+        return savedSha.equals(sha, ignoreCase = true)
     }
 
     /** 已装包自己的 sha256（同版本重发靠它判断）。按 versionCode 缓存，别每次 check 都读 100 MB。 */
@@ -501,21 +672,78 @@ class EllenUpdatesPlugin : Plugin() {
             call.resolve(out)
             return
         }
-        try {
-            val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", apk)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // 先把上一次的安装结果清掉，否则 state() 会把旧结果当成这一次的
+        runCatching {
+            prefs().edit()
+                .remove(UpdateInstallReceiver.KEY_RESULT)
+                .remove(UpdateInstallReceiver.KEY_MESSAGE)
+                .apply()
+        }
+        // 广播不一定收得到：装成功那一刻本应用正在被替换，STATUS_SUCCESS 可能投递失败。
+        // 所以记下目标版本码，state() 里用「当前版本已经到了没」兜底判成功。
+        // 版本码直接从 apk 文件里读，不依赖 check() 留下的 latest —— 用户可能没点过检查就装。
+        runCatching {
+            val info = context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+            val code = info?.longVersionCode?.toInt() ?: 0
+            if (code > 0) prefs().edit().putInt("pendingCode", code).apply()
+        }
+        publish("installing", "正在交给系统安装…")
+        val out = JSObject()
+        out.put("started", true)
+        call.resolve(out)
+        // 写会话要拷上百兆，绝不能占主线程：resolve 之后丢给 worker
+        worker.execute {
+            try {
+                commitSession(apk)
+            } catch (e: Exception) {
+                // 会话没建起来 ≠ 包有问题：文件还在，状态退回 ready，用户可以再点一次「安装」
+                publish("ready", "没能交给系统安装，再点一次「安装」就行。（${e.javaClass.simpleName}）")
             }
-            publish("installing", "去安装页点一下就好。")
-            context.startActivity(intent)
-            val out = JSObject()
-            out.put("started", true)
-            call.resolve(out)
+        }
+    }
+
+    /**
+     * 把 apk 字节写进 PackageInstaller 会话并提交。
+     *
+     * 为什么不用 FileProvider + ACTION_VIEW（改过的原因）：
+     * 小米的安装器在「安装包扫描」阶段会把 URI 交给另一个进程，而
+     * FLAG_GRANT_READ_URI_PERMISSION 只授予 startActivity 的目标 Activity，
+     * 扫描进程拿不到 → Permission Denial ... not exported from UID，用户看到
+     * 「解析软件包时出现问题。(11)」。会话安装由系统直接读我们写进去的字节，
+     * 不跨进程传 URI，各家 ROM 一致。
+     *
+     * 坑：commit 之后必须等 receiver 收到 STATUS_PENDING_USER_ACTION 再自己
+     * startActivity 弹确认页，否则用户什么都看不到。
+     */
+    private fun commitSession(apk: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        if (Build.VERSION.SDK_INT >= 31) {
+            // 明确要求用户确认：静默装会跳过确认页，这里不是那个场景
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
+        }
+        val sessionId = installer.createSession(params)
+        try {
+            installer.openSession(sessionId).use { session ->
+                apk.inputStream().use { input ->
+                    session.openWrite("base.apk", 0L, apk.length()).use { sink ->
+                        input.copyTo(sink, 256 * 1024)
+                        session.fsync(sink)
+                    }
+                }
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
+                val resultIntent = PendingIntent.getBroadcast(
+                    context,
+                    sessionId,
+                    Intent(context, UpdateInstallReceiver::class.java).setAction(ACTION_INSTALL),
+                    flags
+                )
+                session.commit(resultIntent.intentSender)
+            }
         } catch (e: Exception) {
-            publish("error", "系统安装页面没能打开。（${e.javaClass.simpleName}）")
-            call.reject("系统安装页面未能打开，请重试。", "INSTALL_UNAVAILABLE")
+            runCatching { installer.abandonSession(sessionId) }
+            throw e
         }
     }
 
@@ -609,5 +837,11 @@ class EllenUpdatesPlugin : Plugin() {
 
     private companion object {
         const val DAY = 24L * 60 * 60 * 1000
+
+        /** 老清单里那条 `apk` 一直是这个架构（0.5.x 的包名都带 `-arm64-v8a`）。 */
+        const val LEGACY_ABI = "arm64-v8a"
+
+        /** 安装会话结果广播的 action（receiver 按类找，action 只用于日志辨识） */
+        const val ACTION_INSTALL = "cn.ellen.companion2.INSTALL_RESULT"
     }
 }

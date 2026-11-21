@@ -183,23 +183,88 @@ async function sha256Base64(base64) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** 组出 snapshot + 完整 manifest 文本（含要一起打进去的附件清单）。 */
-export async function buildManifest({ now = Date.now() } = {}) {
-  const [heads, revisions, profiles] = await Promise.all([
-    readAll(STORE_HEADS),
-    readAll(STORE_REVISIONS),
-    readAll(STORE_PROFILES),
-  ]);
-  if (!Array.isArray(heads) || !Array.isArray(revisions)) {
-    throw fail('EXPORT_FAILED', '读不出库里的记录。');
-  }
+/**
+ * 一片里最多装多少**字符**的 records 文本（注意是字符，不是字节）。
+ *
+ * 为什么要有这个数：整库一次性组 manifest 时，JSON.stringify 的副本、
+ * sha256 的 TextEncoder 副本、原生 toByteArray 的副本会同时存在，
+ * 实测 20 MB 文本能过、40 MB 直接把 renderer 顶到 V8 堆上限（1.02 GB）崩掉。
+ *
+ * 又为什么按字符而不是按字节卡：中文一字符 UTF-8 是三字节，5M 字符最坏
+ * 也就 15 MB 字节，正好落在原生单包清单上限（17 MiB）以下；
+ * 纯英文时反而更小——片数多一点没关系，崩了就什么都没有。
+ */
+export const CHUNK_TEXT_MAX = 5 * 1024 * 1024;
 
-  // revision 自带 head id（records.js 写库时同一字段），heads 只用来对账
-  const headIds = new Set(heads.map((h) => h.id));
-  const records = revisions
-    .filter((r) => r && typeof r.revisionId === 'string' && r.revisionId && headIds.has(r.id))
-    .map((r) => slimRevision(r, r.id));
+/**
+ * 只取 heads 的主键。heads 只用来对账「哪些 revision 还活着」，本身不进包，
+ * 所以不用像 readAll 那样把整条 value 拉进内存（几十万条时那是几百 MB）。
+ */
+async function readHeadIdSet() {
+  const db = await openDb();
+  const ids = new Set();
+  await new Promise((resolve, reject) => {
+    const t = db.transaction(STORE_HEADS, 'readonly');
+    const cur = t.objectStore(STORE_HEADS).openKeyCursor();
+    cur.onerror = () => reject(cur.error);
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) {
+        resolve();
+        return;
+      }
+      ids.add(c.primaryKey);
+      c.continue();
+    };
+  });
+  return ids;
+}
 
+/**
+ * 从 lowerKey（不含）往后读一片 revision，凑够 budget 个字符就停。
+ *
+ * 一片一个新事务：游标跨 await 会被提交，再 continue() 抛 TransactionInactiveError
+ * （见 readAll 上方的注释），所以分片靠「记住上一次的 key，下一片开新事务」推进。
+ * @returns {Promise<{records:Array, nextKey:any, done:boolean}>}
+ */
+async function readRecordPage(lowerKey, headIds, budget) {
+  const db = await openDb();
+  const records = [];
+  let chars = 0;
+  let nextKey = null;
+  let done = false;
+  await new Promise((resolve, reject) => {
+    const t = db.transaction(STORE_REVISIONS, 'readonly');
+    const range = lowerKey == null ? null : IDBKeyRange.lowerBound(lowerKey, true);
+    const cur = t.objectStore(STORE_REVISIONS).openCursor(range);
+    cur.onerror = () => reject(cur.error);
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) {
+        done = true;
+        resolve();
+        return;
+      }
+      nextKey = c.primaryKey;
+      const r = c.value;
+      if (r && typeof r.revisionId === 'string' && r.revisionId && headIds.has(r.id)) {
+        const slim = slimRevision(r, r.id);
+        records.push(slim);
+        chars += JSON.stringify(slim).length;
+        if (chars >= budget) {
+          // 不 continue：停在这一条，下一片从它的 key 之后开始
+          resolve();
+          return;
+        }
+      }
+      c.continue();
+    };
+  });
+  return { records, nextKey, done };
+}
+
+/** 把一片的记录组进一个完整 manifest（与旧 buildManifest 的内部结构逐字段一致）。 */
+async function makeBatch({ records, profiles, lore, origin, now, index, withAttachments }) {
   const kinds = {};
   for (const r of records) kinds[r.kind] = (kinds[r.kind] || 0) + 1;
 
@@ -208,18 +273,22 @@ export async function buildManifest({ now = Date.now() } = {}) {
 
   // 语音（及将来的聊天附件）要不要一起打：默认打，超上限就按「新的优先」截断，
   // 截掉的仍在库里、只是不进这个包 —— 用户看到的是 stats.attachmentsSkipped。
-  const attachments = await collectAttachments(records);
-  // lore：把「现在用的是哪张角色卡」一起带走。角色卡本身在包里没有字节（它在 bundle 里），
-  // 这里只记选择——换手机后不该莫名其妙变回原作向。
-  const lore = readLoreSelection();
+  //
+  // 分片时只让第一片带附件：原生 begin 会把清单里的附件字节整个写进容器，
+  // 每片都带就会把同一批 wav 复制 N 份（100 MB 的语音能撑出好几个 GB）。
+  const attachments = withAttachments
+    ? await collectAttachments(records)
+    : { files: [], bytes: 0, skipped: 0 };
   const content = {
     format: TRANSFER_FORMAT,
     formatVersion: CONTENT_FORMAT_VERSION,
-    packageId: `pkg:${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    origin: { deviceId: deviceId(), platform: platform() },
+    packageId: `pkg:${now.toString(36)}-${index.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    origin,
     exportedAt: now,
     snapshot,
     media: { mode: attachments.files.length ? 'include' : 'metadata-only', requiredIds: [] },
+    // lore 每片都带：它只是「现在用的是哪张角色卡」的标识，几十字节，
+    // 复制一份比让导入端遇到缺字段去猜要安全。
     lore,
   };
   const contentText = JSON.stringify(content);
@@ -232,13 +301,17 @@ export async function buildManifest({ now = Date.now() } = {}) {
     files: attachments.files,
   };
   const manifestText = JSON.stringify(manifest);
+  // content 与 pkg 已经把同一份数据挂在两个对象树上，交出去前断开引用，
+  // 让调用方写完这一片就能被 GC 回收（否则连着 N 片会把旧片全留在内存里）。
+  content.snapshot = null;
 
   return {
+    index,
     manifestText,
     manifest,
     stats: {
-      heads: heads.length,
-      revisions: revisions.length,
+      heads: records.length,
+      revisions: records.length,
       profiles: profiles.length,
       records: records.length,
       kinds,
@@ -249,4 +322,51 @@ export async function buildManifest({ now = Date.now() } = {}) {
       loreCardId: lore.cardId,
     },
   };
+}
+
+/**
+ * 逐片产出要写盘的 manifest（大库分片，小库就一片）。
+ *
+ * 用法必须是 `for await`，而且**每拿到一片就立刻写出去**再取下一片：
+ * 生成器内部每次只持有当前这一片的记录，攒在数组里等就白改了。
+ *
+ * @param {{now?:number}} [options]
+ * @returns {AsyncGenerator<{index:number, manifestText:string, manifest:object, stats:object}>}
+ */
+export async function* exportBatches({ now = Date.now() } = {}) {
+  const headIds = await readHeadIdSet();
+  if (!(headIds instanceof Set)) throw fail('EXPORT_FAILED', '读不出库里的记录。');
+  const profiles = await readAll(STORE_PROFILES);
+  // lore：把「现在用的是哪张角色卡」一起带走。角色卡本身在包里没有字节（它在 bundle 里），
+  // 这里只记选择——换手机后不该莫名其妙变回原作向。
+  const lore = readLoreSelection();
+  const origin = { deviceId: deviceId(), platform: platform() };
+
+  let lower = null;
+  let index = 0;
+  let emitted = 0;
+  for (;;) {
+    const page = await readRecordPage(lower, headIds, CHUNK_TEXT_MAX);
+    if (page.records.length) {
+      yield await makeBatch({
+        records: page.records,
+        profiles,
+        lore,
+        origin,
+        now,
+        index,
+        withAttachments: index === 0,
+      });
+      index += 1;
+      emitted += page.records.length;
+    }
+    if (page.done) break;
+    if (page.nextKey == null) break; // 防御：读不到 key 说明游标异常，别死循环
+    lower = page.nextKey;
+  }
+  // 空库也要给一片：导入端靠它知道「这是个空资料包」，而不是「文件坏了」
+  if (index === 0) {
+    yield await makeBatch({ records: [], profiles, lore, origin, now, index: 0, withAttachments: true });
+  }
+  void emitted;
 }

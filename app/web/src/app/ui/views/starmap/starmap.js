@@ -8,8 +8,8 @@
 //   · 每 4~6 条一道很淡的时间刻度，只作分隔；
 //   · 同组的在河的同侧，组内相邻两点用弧线相连；
 //   · 越久远越暗越小；
-//   · 上下拖 = 浏览（原生滚动，不是旋转球）；点一下 → 底部滑出卡片；
-//   · 双指缩放保留，但不宣传 —— 提示只写「上下滑动 · 点开看看」。
+//   · 上下拖 = 浏览（原生滚动，不是旋转球）；左右拖 = 横向看河的两侧（跟手 + 惯性）；
+//   · 双指缩放保留，但不宣传 —— 提示只写「上下滑动 · 左右看看 · 点开看看」。
 //
 // 实现：坐标全在 `core/starmap.js#layoutRiver` 算好（能 node 验算），视图只填空。
 // 画布固定=视口大小，滚动时按 scrollTop 平移重画 —— 不用一张 13000px 高的巨型 canvas
@@ -102,6 +102,11 @@ export function createStarmapView({ state } = {}) {
   let unit = 1; // 设计宽 392 → 实际宽
   let scrollTop = 0;
   let padTop = 0;
+  // 横向视角：0 = 世界原点（中心星）居中。纵向靠原生滚动，横向靠自己重画。
+  let panX = 0;
+  let panMin = 0;
+  let panMax = 0;
+  let panVel = 0;
   let contentH = 0;
   let colors = {};
   let centerColor = null; // 今日情绪档位给中心星染的色；读不到就用 colors.pink
@@ -155,7 +160,7 @@ export function createStarmapView({ state } = {}) {
 
     hintEl = document.createElement('p');
     hintEl.className = 'el-river-hint';
-    hintEl.textContent = t('starmap.hint', '上下滑动 · 点开看看');
+    hintEl.textContent = t('starmap.hint', '上下滑动 · 左右看看 · 点开看看');
 
     // 滚动容器里只放 spacer（撑高度 + 吃手势），画布钉在上层，滚动时按 scrollTop 重画。
     // 这样避开了「sticky 元素排在 spacer 后面就粘不到顶部」的那个坑。
@@ -417,11 +422,78 @@ export function createStarmapView({ state } = {}) {
     const body = data ? data.height : 0;
     contentH = padTop + body * zoom + Math.round(vh * 0.35);
     spacer.style.height = `${contentH}px`;
+    computePanBounds();
+  }
+
+  // ── 横向 ────────────────────────────────────────────────────────
+  // 河是横着能看的：点在 ±190 世界像素里散开，窄屏 + 缩放后两侧会被舞台切掉，
+  // 只能上下滑就永远看不到那半边。这里给一个跟手的横向偏移，画布照旧固定、
+  // 按 panX 重画（和 scrollTop 一个套路），不新增第二层滚动容器。
+  function originX() {
+    return vw / 2 + panX;
+  }
+
+  /** 可拖范围：让所有星点（含标签余量）都能拖进画面，且最少和屏幕同宽。 */
+  function computePanBounds() {
+    if (!points.length) {
+      panMin = 0;
+      panMax = 0;
+      panX = 0;
+      return;
+    }
+    const pad = 18 * unit;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    points.forEach((p) => {
+      const x = p.x * zoom;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    });
+    // 标签挂在点的左右两侧、字号随 unit 走：留 76u 才不会被切掉半个字
+    minX -= 76 * unit;
+    maxX += 76 * unit;
+    // panX 变大 = 整条河往右移。
+    //   内容左沿 = vw/2 + panX + minX ≥ pad   → panX ≥ pad - vw/2 - minX
+    //   内容右沿 = vw/2 + panX + maxX ≤ vw-pad → panX ≤ vw/2 - pad - maxX
+    // 内容比屏幕宽时这两条互相冲突（下限高于上限），那就取中间那段：
+    // 往左能滑到右沿贴边，往右能滑到左沿贴边，任一侧都看得到边。
+    const lo = pad - vw / 2 - minX;
+    const hi = vw / 2 - pad - maxX;
+    panMin = Math.min(lo, hi);
+    panMax = Math.max(lo, hi);
+    if (panMin > 0) panMin = Math.min(panMin, 0);
+    if (panMax < 0) panMax = Math.max(panMax, 0);
+    panX = Math.max(panMin, Math.min(panMax, panX));
+  }
+
+  /** 松手后的惯性：速度按帧衰减，撞到边界就停（不做回弹，回弹在河流上没有意义）。 */
+  function glide() {
+    if (destroyed || !panVel) return;
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 16);
+    const step = () => {
+      if (destroyed || !panVel) return;
+      panX += panVel;
+      panVel *= 0.9;
+      if (panX <= panMin || panX >= panMax) {
+        panX = Math.max(panMin, Math.min(panMax, panX));
+        panVel = 0;
+        schedule();
+        return;
+      }
+      if (Math.abs(panVel) < 0.35) {
+        panVel = 0;
+        schedule();
+        return;
+      }
+      schedule();
+      raf(step);
+    };
+    raf(step);
   }
 
   // ── 绘制 ────────────────────────────────────────────────────────
   function screenOf(p) {
-    return { x: vw / 2 + p.x * zoom, y: padTop + p.y * zoom - scrollTop };
+    return { x: originX() + p.x * zoom, y: padTop + p.y * zoom - scrollTop };
   }
 
   function schedule() {
@@ -444,7 +516,7 @@ export function createStarmapView({ state } = {}) {
     if (shear) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.translate(vw / 2, padTop - scrollTop);
+      ctx.translate(originX(), padTop - scrollTop);
       ctx.rotate(Math.atan(shear));
       const halfW = 165 * unit;
       const g = ctx.createLinearGradient(-halfW, 0, halfW, 0);
@@ -466,7 +538,7 @@ export function createStarmapView({ state } = {}) {
         const nb = nebulae[i];
         const y = padTop + nb.y * zoom - scrollTop * nb.k;
         if (y < -nb.r || y > vh + nb.r) continue;
-        const x = vw / 2 + nb.x * zoom;
+        const x = originX() + nb.x * zoom;
         const rad = nb.r * unit * zoom;
         ctx.globalAlpha = nb.a;
         const sp = glowSprite(colors[nb.tone] || colors.warm, 0.35);
@@ -483,7 +555,7 @@ export function createStarmapView({ state } = {}) {
         const d = dust[i];
         const y = padTop + d.y * zoom - scrollTop * d.k;
         if (y < -6 || y > vh + 6) continue;
-        const x = vw / 2 + d.x * zoom;
+        const x = originX() + d.x * zoom;
         const r = Math.max(0.5, d.r * unit);
         ctx.globalAlpha = d.a;
         ctx.fillStyle = colors[d.tone] || colors.warm;
@@ -500,15 +572,15 @@ export function createStarmapView({ state } = {}) {
       ctx.globalCompositeOperation = 'lighter';
       // 核心给大一点：它是整条带子的「核」，太小就只剩一个点撑不起场；
       // 但别太大 —— 第一版 halo 15 直接糊成一盏灯，压到 10。
-      drawStar(vw / 2, cy, 5.4 * unit, centerColor || colors.pink, 0.5 * fade, { halo: 9, glow: 0.66, core: 0.7 });
-      drawStar(vw / 2, cy, 4.2 * unit, centerColor || colors.pink, 0.95 * fade, { halo: 6.6, glow: 0.58 });
+      drawStar(originX(), cy, 5.4 * unit, centerColor || colors.pink, 0.5 * fade, { halo: 9, glow: 0.66, core: 0.7 });
+      drawStar(originX(), cy, 4.2 * unit, centerColor || colors.pink, 0.95 * fade, { halo: 6.6, glow: 0.58 });
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.42 * fade;
       ctx.strokeStyle = centerColor || colors.pink;
       ctx.lineWidth = Math.max(1, 1 * unit);
       ctx.beginPath();
-      ctx.arc(vw / 2, cy, 10 * unit, 0, Math.PI * 2);
+      ctx.arc(originX(), cy, 10 * unit, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -531,9 +603,9 @@ export function createStarmapView({ state } = {}) {
         const dim = only && only !== pa.kind;
         ctx.globalAlpha = touch ? 0.55 : (focus != null ? 0.03 : (dim ? 0.02 : 0.16));
         ctx.strokeStyle = touch ? colors.pink : colors.warm;
-        const a = { x: vw / 2 + tie.x1 * zoom, y: padTop + tie.y1 * zoom - scrollTop };
-        const b = { x: vw / 2 + tie.x2 * zoom, y: padTop + tie.y2 * zoom - scrollTop };
-        const c = { x: vw / 2 + tie.cx * zoom, y: padTop + tie.cy * zoom - scrollTop };
+        const a = { x: originX() + tie.x1 * zoom, y: padTop + tie.y1 * zoom - scrollTop };
+        const b = { x: originX() + tie.x2 * zoom, y: padTop + tie.y2 * zoom - scrollTop };
+        const c = { x: originX() + tie.cx * zoom, y: padTop + tie.cy * zoom - scrollTop };
         if (Math.max(a.y, b.y) < -60 || Math.min(a.y, b.y) > vh + 60) return;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
@@ -552,9 +624,9 @@ export function createStarmapView({ state } = {}) {
       const dim = only && only !== ln.kind;
       ctx.globalAlpha = dim ? 0.015 : 0.07;
       ctx.strokeStyle = colorOf(ln.kind);
-      const a = { x: vw / 2 + ln.x1 * zoom, y: padTop + ln.y1 * zoom - scrollTop };
-      const b = { x: vw / 2 + ln.x2 * zoom, y: padTop + ln.y2 * zoom - scrollTop };
-      const c = { x: vw / 2 + ln.cx * zoom, y: padTop + ln.cy * zoom - scrollTop };
+      const a = { x: originX() + ln.x1 * zoom, y: padTop + ln.y1 * zoom - scrollTop };
+      const b = { x: originX() + ln.x2 * zoom, y: padTop + ln.y2 * zoom - scrollTop };
+      const c = { x: originX() + ln.cx * zoom, y: padTop + ln.cy * zoom - scrollTop };
       if (Math.max(a.y, b.y) < -40 || Math.min(a.y, b.y) > vh + 40) return;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
@@ -575,10 +647,10 @@ export function createStarmapView({ state } = {}) {
       // 放大到 1.45 倍时括号会被顶出屏幕，钳在画布里；名字跟着往回缩，不然半边字没了
       // 括号要贴着星，不能按布局坐标缩放：1.45 倍时会把括号甩到屏幕边上，跟星脱开。
       // 所以拿成员的屏幕 x 取最外那一颗，再往外让 26u。
-      const memX = (c.members || []).map((i) => vw / 2 + ((data.points && data.points[i]) ? data.points[i].x : 0) * zoom);
+      const memX = (c.members || []).map((i) => originX() + ((data.points && data.points[i]) ? data.points[i].x : 0) * zoom);
       const edge = c.side < 0
-        ? (memX.length ? Math.min(...memX) : vw / 2 + c.x * zoom) - 26 * unit
-        : (memX.length ? Math.max(...memX) : vw / 2 + c.x * zoom) + 26 * unit;
+        ? (memX.length ? Math.min(...memX) : originX() + c.x * zoom) - 26 * unit
+        : (memX.length ? Math.max(...memX) : originX() + c.x * zoom) + 26 * unit;
       const cx = Math.max(26 * unit, Math.min(vw - 26 * unit, edge));
       const on = only == null;
       // 一个主题往往隔着半个月又说一次，所以带子按「连着的那一段」画好几截
@@ -655,7 +727,7 @@ export function createStarmapView({ state } = {}) {
     // 它们围着事件散开，画面才有密度，而且每一颗都对得上真的一句。
     ((data && data.specks) || []).forEach((s) => {
       if (only && only !== s.kind) return;
-      const x = vw / 2 + s.x * zoom;
+      const x = originX() + s.x * zoom;
       const y = padTop + s.y * zoom - scrollTop;
       if (y < -12 || y > vh + 12) return;
       drawStar(x, y, s.r, colors.warm, s.alpha * (focus != null ? 0.4 : 1), { halo: 2.6, glow: 0.5 });
@@ -894,6 +966,7 @@ export function createStarmapView({ state } = {}) {
 
   let touchStart = null;
   let pinchStart = null;
+  let panDrag = null;
 
   function bind() {
     viewport.addEventListener('scroll', () => {
@@ -904,9 +977,60 @@ export function createStarmapView({ state } = {}) {
     // 手势都落在滚动容器上（画布是 pointer-events:none 的装饰层）
     stage.addEventListener('pointerdown', (e) => {
       touchStart = { x: e.clientX, y: e.clientY, at: Date.now() };
+      panVel = 0;
+      if (e.isPrimary === false) {
+        panDrag = null;
+        return;
+      }
+      panDrag = { x: e.clientX, y: e.clientY, pan0: panX, active: false, lx: e.clientX, lt: Date.now() };
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // 老 WebView 不一定有指针捕获，没有也照样能收到 move
+      }
+    });
+
+    // 单指横拖 = 横向看河。竖拖不抢：touch-action 是 pan-y，浏览器自己滚，
+    // 只有「横向位移明显压过纵向」时才接管，免得把上下滚变成半个卡顿。
+    stage.addEventListener('pointermove', (e) => {
+      if (!panDrag) return;
+      const dx = e.clientX - panDrag.x;
+      const dy = e.clientY - panDrag.y;
+      if (!panDrag.active) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+        panDrag.active = true;
+      }
+      const next = Math.max(panMin, Math.min(panMax, panDrag.pan0 + dx));
+      if (next !== panX) {
+        panX = next;
+        schedule();
+      }
+      const now = Date.now();
+      const dt = Math.max(8, now - panDrag.lt);
+      panVel = ((e.clientX - panDrag.lx) / dt) * 16;
+      panDrag.lx = e.clientX;
+      panDrag.lt = now;
+    });
+
+    /** 返回 true = 这一下是横向拖动，不是点击。 */
+    function endPan() {
+      if (!panDrag) return false;
+      const wasPan = panDrag.active;
+      panDrag = null;
+      if (!wasPan) return false;
+      touchStart = null;
+      if (Math.abs(panVel) > 0.6) glide();
+      else panVel = 0;
+      return true;
+    }
+
+    stage.addEventListener('pointercancel', () => {
+      panDrag = null;
+      panVel = 0;
     });
 
     stage.addEventListener('pointerup', (e) => {
+      if (endPan()) return; // 横向拖完松手，别顺手点开一颗星
       if (!touchStart) return;
       const moved = Math.hypot(e.clientX - touchStart.x, e.clientY - touchStart.y);
       const held = Date.now() - touchStart.at;
@@ -920,9 +1044,11 @@ export function createStarmapView({ state } = {}) {
       else if (sheet && !sheet.hidden) closeSheet(); // 点空白处收起，焦点也跟着散掉
     });
 
-    // 双指缩放：保留，但不宣传（提示只写「上下滑动 · 点开看看」）
+    // 双指缩放：保留，但不宣传（提示只写「上下滑动 · 左右看看 · 点开看看」）
     stage.addEventListener('touchstart', (e) => {
       if (e.touches.length !== 2) return;
+      panDrag = null; // 双指了就不是横向滑了，别让第一根手指的位移继续拽着河
+      panVel = 0;
       pinchStart = { d: dist(e.touches), zoom };
     }, { passive: true });
 
@@ -994,6 +1120,9 @@ export function createStarmapView({ state } = {}) {
         groups: ((data && data.groups) || []).map((g) => `${g.kind}:${g.count}`),
         height: (data && data.height) || 0,
         scrollTop,
+        panX: Math.round(panX),
+        panMin: Math.round(panMin),
+        panMax: Math.round(panMax),
         only,
         zoom,
         first: points.slice(0, 3).map((p) => {

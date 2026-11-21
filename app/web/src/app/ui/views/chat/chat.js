@@ -9,6 +9,8 @@ import { speak, stop as stopSpeaking, plain, synthesizeUrl } from '../../../core
 import { readDocument, toBlobUrl, revokeAll } from '../../../core/documents.js';
 import { readVolume, writeVolume, volumeSupported, flushVolume, onVolumeChange } from '../../../core/volume.js';
 import { pickImage, mediaSupported } from '../../../core/media.js';
+import { currentUserAvatar, onUserAvatarChange } from '../../../core/avatar.js';
+import { applyWallpaper, onWallpaperChange } from '../../../core/wallpaper.js';
 import { STICKERS, STICKER_FAVORITES, stickerById, stickerUrl } from '../../../assets/stickers.js';
 import {
   MAX_CUSTOM_STICKERS,
@@ -36,8 +38,10 @@ const ARMING_WAIT_MS = 600;
 // —— 消息级交互的三个常量 ——
 // 450ms 与老包长按一致：再短一点，手指滚动消息时就会弹菜单；再长一点，人会以为按不动。
 const LONG_PRESS_MS = 450;
-// 位移超过这个量就算「在滚动」，不弹菜单（8 是 Android touch slop 的同一量级）
-const LONG_PRESS_SLOP = 8;
+// 位移超过这个量就算「在滚动」，不弹菜单。
+// 12 是实测过的宽容值：8（Android touch slop 的量级）时，手抖 8~12 CSS px 的人
+// 按不出来；12 仍能把真正的滚动（一般 >40）挡在外面。模拟器上 12 不误伤、40 才判滚动。
+const LONG_PRESS_SLOP = 12;
 // 撤回窗口 2 分钟：方案 §六 老大拍板「撤回 2 分钟够」
 const RECALL_WINDOW_MS = 2 * 60 * 1000;
 
@@ -245,13 +249,7 @@ export function createChatView() {
       const panelGrid = document.createElement('div');
       panelGrid.className = 'el-chat-panel-grid';
 
-      // 「我的表情」页签的内容容器：这一轮只有空态，
-      // 下一条任务往 renderPanelMine() 里填真内容即可（入口已经通，不用再改面板）。
-      const panelMine = document.createElement('div');
-      panelMine.className = 'el-chat-panel-mine';
-      panelMine.hidden = true;
-
-      panel.append(panelGrid, panelMine);
+      panel.append(panelGrid);
 
       composer.append(entry, sendRow, tools, panel);
 
@@ -658,6 +656,8 @@ export function createChatView() {
           pressTimer = 0;
         }
         pressOrigin = null;
+        // 必须成对摘掉，否则下一次长按会被上一次残留的 scroll 监听提前作废
+        document.removeEventListener('scroll', cancelPress, { capture: true });
       }
 
       function nodeOf(msg) {
@@ -683,36 +683,93 @@ export function createChatView() {
       }
 
       /**
-       * 长按开菜单。450ms 内位移超过 8 就当成滚动，直接放弃。
+       * 绑长按，幂等：节点上打标记，重复调用不会再绑第二次。
+       * 三条创建路径（renderMessage / appendMessage / patchLast 补绑）都走这里，
+       * 不然同一条消息会被绑多份计时器，一次长按弹出两次菜单。
+       */
+      function bindPress(node, msg) {
+        if (!node || node.dataset.lp === '1') return;
+        node.dataset.lp = '1';
+        attachLongPress(node, msg);
+      }
+
+      /**
+       * 长按开菜单。按住 450ms 且位移不超过 12 就弹；位移更大当成滚动，直接放弃。
        * 不在 pointerdown 里 preventDefault —— 那样消息流就滚不动了。
+       *
+       * 三条入口都得留，因为各家 WebView / ROM 到底给哪一条不保证：
+       *   ① pointerdown+计时器（主路）
+       *   ② touchstart 兜底（老 WebView 没有 PointerEvent 时只有这条路）
+       *   ③ contextmenu（桌面右键；有些 WebView 长按文字只给这个）
+       * 两种"被掐"的情况不再无条件当取消：
+       *   · pointercancel —— WebView 接管文本选择、或系统手势介入时会发它，手指其实还按着原处；
+       *     但它也可能是"滚动接管"的信号，所以只在 cancel 时的坐标已经离原点超过阈值时才取消。
+       *   · pointerleave —— 触屏上常因为容器重排/内部节点替换而误发，只对鼠标生效。
+       * 另外按住期间只要真的滚了一次（scroll 不冒泡，所以挂在 document 捕获阶段），就作废。
        */
       function attachLongPress(node, msg) {
-        node.addEventListener('pointerdown', (e) => {
-          if (e.pointerType === 'mouse' && e.button !== 0) return;
+        const hasPointer = typeof window.PointerEvent === 'function';
+        const startPress = (x, y) => {
           cancelPress();
-          pressOrigin = { x: e.clientX, y: e.clientY };
+          pressOrigin = { x, y };
+          // 滚动一发生就作废：scroll 不冒泡，捕获阶段才收得到
+          document.addEventListener('scroll', cancelPress, { capture: true, passive: true });
           pressTimer = setTimeout(() => {
             pressTimer = 0;
             pressOrigin = null;
+            document.removeEventListener('scroll', cancelPress, { capture: true });
             suppressTapUntil = Date.now() + 600;
             openMessageMenu(msg);
           }, LONG_PRESS_MS);
-        });
-        node.addEventListener('pointermove', (e) => {
+        };
+        const movePress = (x, y) => {
           if (!pressOrigin) return;
-          const dx = Math.abs(e.clientX - pressOrigin.x);
-          const dy = Math.abs(e.clientY - pressOrigin.y);
+          const dx = Math.abs(x - pressOrigin.x);
+          const dy = Math.abs(y - pressOrigin.y);
           if (dx > LONG_PRESS_SLOP || dy > LONG_PRESS_SLOP) cancelPress();
+        };
+
+        node.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          startPress(e.clientX, e.clientY);
         });
+        node.addEventListener('pointermove', (e) => movePress(e.clientX, e.clientY));
         node.addEventListener('pointerup', cancelPress);
-        node.addEventListener('pointercancel', cancelPress);
-        node.addEventListener('pointerleave', cancelPress);
+        node.addEventListener('pointercancel', (e) => movePress(e.clientX, e.clientY));
+        // 鼠标移出才取消；触屏的 pointerleave 不可信（见函数头注释）
+        node.addEventListener('pointerleave', (e) => {
+          if (e.pointerType === 'mouse') cancelPress();
+        });
         // 桌面 / 外接鼠标：右键与长按同义
         node.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           suppressTapUntil = Date.now() + 600;
           openMessageMenu(msg);
         });
+
+        // ② touch 兜底：只在没有 PointerEvent 的 WebView 上生效，否则会和主路重复计时
+        if (!hasPointer) {
+          node.addEventListener(
+            'touchstart',
+            (e) => {
+              if (e.touches.length !== 1) return cancelPress();
+              const t = e.touches[0];
+              startPress(t.clientX, t.clientY);
+            },
+            { passive: true },
+          );
+          node.addEventListener(
+            'touchmove',
+            (e) => {
+              if (!e.touches.length) return;
+              const t = e.touches[0];
+              movePress(t.clientX, t.clientY);
+            },
+            { passive: true },
+          );
+          node.addEventListener('touchend', cancelPress);
+          node.addEventListener('touchcancel', cancelPress);
+        }
       }
 
       /**
@@ -1096,36 +1153,63 @@ export function createChatView() {
 
             // 长按删除：用 pointer 事件而不是 contextmenu —— WebView 里长按图片
             // 会先弹系统菜单，contextmenu 拿不到干净的一次事件。
+            //
+            // 两个标志各管一件事，而且都必须活到 click 之后（click 在 pointerup 之后才触发）：
+            //   moved       这次手势滑走了 → 不弹删除确认，也不发送
+            //   longPressed 这次手势已经弹过删除确认 → 松手不发送
+            //
+            // 不要再用「按下到松开的时间差」判长按：正常快点击只有 80–150ms，
+            // 用 `< 250` 去挡会把每一次正常点击都吞掉（0.5.7 之前就是这个症状：
+            // 点一下没反应，按久了反而既弹删除又发出去）。
             let timer = 0;
             let moved = false;
-            let startAt = 0;
-            const clear = () => {
+            let longPressed = false;
+            let originX = 0;
+            let originY = 0;
+            const clearTimer = () => {
               if (timer) clearTimeout(timer);
               timer = 0;
-              moved = false;
             };
             cell.addEventListener('pointerdown', (ev) => {
               if (ev.button !== undefined && ev.button !== 0) return;
               moved = false;
-              startAt = Date.now();
+              longPressed = false;
+              originX = ev.clientX;
+              originY = ev.clientY;
               timer = setTimeout(() => {
                 timer = 0;
                 if (moved) return;
+                longPressed = true;
                 askDelete(item.id);
               }, 550);
             });
-            cell.addEventListener('pointermove', () => {
+            cell.addEventListener('pointermove', (ev) => {
               if (!timer) return;
-              if (Date.now() - startAt > 120) moved = true;
-              clear();
+              // 位移超过 12px 才算滑动 —— 手指按住时天然有 1–2px 抖动，
+              // 快速点击时也可能滑个七八像素，阈值定太小会把点击吃掉。
+              // 按老写法「任何 pointermove 都取消长按」，长按其实从来没成功过。
+              if (Math.abs(ev.clientX - originX) > 12 || Math.abs(ev.clientY - originY) > 12) {
+                moved = true;
+                clearTimer();
+              }
             });
-            ['pointerup', 'pointercancel', 'pointerleave'].forEach((name) => {
-              cell.addEventListener(name, clear);
+            ['pointerup', 'pointercancel'].forEach((name) => {
+              cell.addEventListener(name, clearTimer);
             });
+            // 不再监听 pointerleave：触摸屏松手后浏览器还会补一个
+            // pointerout + pointerleave（触点消失了），顺序是
+            // pointerup → pointerleave → click。在这里无条件置 moved
+            // 等于每一次正常点击都自己挡掉自己（0.5.7 之后的真凶）。
+            // 「滑走了不算点击」这件事，pointermove 的 8px 判据已经够了：
+            // 手指要离开格子必然先产生位移。
             cell.addEventListener('contextmenu', (ev) => ev.preventDefault());
             cell.addEventListener('click', () => {
-              // 长按已触发过删除确认时，抬手那一下不该把图发出去
-              if (timer || Date.now() - startAt < 250) return;
+              // 长按弹过删除确认，或这次手势滑走了 → 都不该把图发出去
+              if (longPressed || moved) {
+                moved = false;
+                longPressed = false;
+                return;
+              }
               closeSheet();
               if (typeof props.onSticker === 'function') {
                 props.onSticker({ id: item.id, file: item.name, label: item.label || '' });
@@ -1344,10 +1428,22 @@ export function createChatView() {
         pickingImage = true;
         try {
           const picked = await pickImage();
-          // picked:false = 用户取消 / 浏览器环境 / 上一次还没回来，都不用说话
-          if (picked && picked.picked) await props.onPickImage(picked);
+          if (picked && picked.picked) {
+            await props.onPickImage(picked);
+          } else {
+            // 用户自己取消 / 浏览器环境 / 上一次还没回来：都不用说话。
+            // 其余（超时、选择器被系统打断、读不出图）必须说一句 ——
+            // 静默正是「点了没反应」这一类 bug 最难查的地方。
+            const reason = String((picked && picked.reason) || '');
+            // 原生回的是 MEDIA_BUSY，早期代码比的是 'BUSY' —— 名字对不上，于是「上一次还在挑」
+            // 这种本就该静默的情况也会弹一句「这张没取到」，看着像选图失败。两个名字都放过。
+            if (reason && reason !== 'BUSY' && reason !== 'MEDIA_BUSY' && reason !== 'NOT_NATIVE') {
+              flashStickerNote(s('msg.photoFail'));
+            }
+          }
         } catch (err) {
           console.warn('[chat] 选图失败', err);
+          flashStickerNote(s('msg.photoFail'));
         } finally {
           pickingImage = false;
         }
@@ -1445,38 +1541,6 @@ export function createChatView() {
         });
       }
 
-      /**
-       * 「我的表情」占位页。
-       * 下一条任务接法：把这里换成真实的表情管理（收藏 / 上传 / 长按删除）。
-       * 入口已经通了 —— plusBtn 打开面板后点「我的表情」磁贴，
-       * 或者外部直接 api.openComposerPanel('mine')；磁贴本身不用改。
-       */
-      function renderPanelMine() {
-        panelMine.innerHTML = '';
-
-        const head = document.createElement('div');
-        head.className = 'el-chat-panel-head';
-
-        const back = document.createElement('button');
-        back.type = 'button';
-        back.className = 'el-chat-panel-back';
-        back.append(iconEl('back'));
-        back.setAttribute('aria-label', s('chat.panelBack'));
-        back.addEventListener('click', () => openPanel('tools'));
-
-        const title = document.createElement('span');
-        title.className = 'el-chat-panel-title';
-        title.textContent = s('chat.panelMine');
-
-        head.append(back, title);
-
-        const empty = document.createElement('p');
-        empty.className = 'el-chat-panel-empty';
-        empty.textContent = s('chat.panelMineEmpty');
-
-        panelMine.append(head, empty);
-      }
-
       /** 面板内容按「这一瞬间的能力」重建：静音状态、原生能力都可能在这期间变过。 */
       function paintPanel() {
         panelGrid.innerHTML = '';
@@ -1494,8 +1558,6 @@ export function createChatView() {
         tiles.forEach((tile) => panelGrid.append(tile));
 
         panelGrid.hidden = panelTab !== 'tools';
-        panelMine.hidden = panelTab !== 'mine';
-        if (panelTab === 'mine') renderPanelMine();
         paintVolumeUi();
       }
 
@@ -1503,8 +1565,8 @@ export function createChatView() {
        * 开面板。它是 composer 最后一个子节点：一长高，flex 就从 .el-chat-stream 里
        * 拿走对应高度 —— 消息列表被顶起来，最后几条不会被面板盖住。
        */
-      function openPanel(tab = 'tools') {
-        panelTab = tab === 'mine' ? 'mine' : 'tools';
+      function openPanel() {
+        panelTab = 'tools';
         paintPanel();
         panel.hidden = false;
         plusBtn.setAttribute('aria-expanded', 'true');
@@ -1520,7 +1582,6 @@ export function createChatView() {
         // 直接收，不做退场：退场动画会让 stream 的高度晚一帧才回来，滚动位置会跳
         panel.hidden = true;
         panelGrid.innerHTML = '';
-        panelMine.innerHTML = '';
         panelTab = 'tools';
         volumeTile = null;
         plusBtn.setAttribute('aria-expanded', 'false');
@@ -1538,6 +1599,15 @@ export function createChatView() {
 
       // 首屏：先按镜像画（不闪），再问一次原生。浏览器里连问都不问。
       paintVolumeUi(volumeSupported());
+
+      // 「我」的头像：第一次读是异步的（要把 base64 从原生取回来），
+      // 所以先按无头像画，读到之后再把自己那几条消息补上头像。
+      repaintUserAvatars();
+      const offAvatar = onUserAvatarChange(() => repaintUserAvatars());
+
+      // 聊天背景：图在原生侧，读到之后才挂 .has-wall。没设就一直是那面静态墙。
+      applyWallpaper();
+      const offWall = onWallpaperChange(() => applyWallpaper());
       if (volumeSupported()) {
         readVolume().then((res) => {
           volume = volumePercent(res && res.volume);
@@ -2010,6 +2080,29 @@ export function createChatView() {
         return 'text';
       }
 
+      /**
+       * 给一条「我发的」消息挂上头像。
+       *
+       * URL 走 CSS 变量 + 伪元素背景，而不是塞一个 <img>：气泡是 flex column，
+       * 插图会自己变成一个 flex 项、把对齐搞乱；用绝对定位的伪元素则是纯装饰，
+       * 布局一点不受影响，只需要往右边让出一块（padding-right 在 CSS 里）。
+       */
+      function paintUserAvatar(node) {
+        const url = currentUserAvatar();
+        if (!url) {
+          node.classList.remove('has-me-avatar');
+          node.style.removeProperty('--me-avatar');
+          return;
+        }
+        node.classList.add('has-me-avatar');
+        node.style.setProperty('--me-avatar', `url("${url}")`);
+      }
+
+      /** 头像换了以后，把已经画出来的自己那几条一起更新（不整页重画）。 */
+      function repaintUserAvatars() {
+        stream.querySelectorAll(".el-msg[data-role='user']").forEach((n) => paintUserAvatar(n));
+      }
+
       function renderMessage(msg, enter) {
         const node = document.createElement('div');
         node.className = 'el-msg';
@@ -2031,6 +2124,10 @@ export function createChatView() {
           node.append(recallLine(msg));
           return node;
         }
+
+        // 自己的消息旁边挂一颗头像（排期 5）。头像用的是伪元素的 background，
+        // 不是插一个 <img>：这样气泡的 flex 布局一点不用改，只是往右让出一块。
+        if (msg.role === 'user') paintUserAvatar(node);
 
         const quote = quotedBlock(msg);
 
@@ -2061,7 +2158,7 @@ export function createChatView() {
           node.append(speakButton(msg, node));
         }
         // 撤回的、待定的一律不给菜单（能做的动作要么不存在，要么点了没意义）
-        if (!msg.pending) attachLongPress(node, msg);
+        if (!msg.pending) bindPress(node, msg);
         return node;
       }
 
@@ -2095,17 +2192,32 @@ export function createChatView() {
         else delete node.dataset.pending;
         if (last.failed) node.dataset.failed = '1';
         else delete node.dataset.failed;
+        // 流式收尾就地补绑长按：pending 那条出生时是不绑的（打字中按了没意义），
+        // 而收尾走的是这个增量分支、不会重建节点 —— 不补绑的话「刚说完的那条」
+        // 永远长按不出菜单，要等下一次整页 render（切页 / 发新消息）才恢复。
+        if (!last.pending && node.isConnected) bindPress(node, last);
         paintSystemStrip();
       }
 
       let painted = false;
+      // 「往上翻加载更早」的状态：loadingOlder 防连点，noMoreOlder 到底了就不再问
+      let loadingOlder = false;
+      let noMoreOlder = false;
 
-      function render() {
+      /**
+       * 重画整条消息流。
+       * keepViewport=true 时保持用户当前看的那一屏（往上翻补历史时用，否则会直接弹回底部）。
+       */
+      function render(keepViewport = false) {
+        const prevTop = stream.scrollTop;
+        const prevH = stream.scrollHeight;
         stream.innerHTML = '';
         if (!state.messages.length) {
           stream.append(renderEmpty());
           return;
         }
+        const more = renderMoreTip();
+        if (more) stream.append(more);
         // 只有「新到的最后两条」播入场；历史不重播（否则每次切页都像下暴雨）
         const last = state.messages.length - 1;
         state.messages.forEach((msg, i) => {
@@ -2113,8 +2225,56 @@ export function createChatView() {
         });
         painted = true;
         paintSystemStrip();
-        stream.scrollTop = stream.scrollHeight;
+        if (keepViewport) stream.scrollTop = prevTop + (stream.scrollHeight - prevH);
+        else stream.scrollTop = stream.scrollHeight;
       }
+
+      /** 顶部的「更早」提示条：滑到顶时它就是那个能按/能看见的落点。 */
+      function renderMoreTip() {
+        if (noMoreOlder || !props.onLoadOlder) return null;
+        const tip = document.createElement('div');
+        tip.className = 'el-chat-more';
+        tip.textContent = loadingOlder ? s('chat.loadingOlder') : s('chat.loadOlder');
+        tip.dataset.loading = loadingOlder ? '1' : '0';
+        return tip;
+      }
+
+      /** 滚到顶（且确实还有更早的）就取一页，插到前面但不跳视口。 */
+      function maybeLoadOlder() {
+        if (loadingOlder || noMoreOlder || !props.onLoadOlder) return;
+        if (stream.scrollTop > 24) return;
+        // 一屏都没占满时别急着翻：那多半是消息本来就没几条
+        if (stream.scrollHeight <= stream.clientHeight + 40) return;
+        loadingOlder = true;
+        const tip = stream.querySelector('.el-chat-more');
+        if (tip) {
+          tip.textContent = s('chat.loadingOlder');
+          tip.dataset.loading = '1';
+        }
+        Promise.resolve()
+          .then(() => props.onLoadOlder())
+          .then((n) => {
+            if (!n) noMoreOlder = true;
+          })
+          .catch((err) => {
+            console.warn('[chat] 加载更早的消息失败', err);
+            noMoreOlder = true;
+          })
+          .finally(() => {
+            loadingOlder = false;
+            // 补进历史时 setMessages 已经整页重绘过了，这里只收拾提示条：
+            // 到底了就摘掉，没到底就退回「往上翻，看更早的」。
+            const tip = stream.querySelector('.el-chat-more');
+            if (!tip) return;
+            if (noMoreOlder) tip.remove();
+            else {
+              tip.textContent = s('chat.loadOlder');
+              tip.dataset.loading = '0';
+            }
+          });
+      }
+
+      stream.addEventListener('scroll', maybeLoadOlder, { passive: true });
 
       function syncBusy() {
         const voice = state.mode === 'voice';
@@ -2314,6 +2474,8 @@ export function createChatView() {
           closeViewer();
           clearQuote();
           if (typeof offVolume === 'function') offVolume();
+          if (typeof offAvatar === 'function') offAvatar();
+          if (typeof offWall === 'function') offWall();
           quoteBar.remove();
           sheet.remove();
           sheetMask.remove();
@@ -2346,6 +2508,14 @@ export function createChatView() {
             sameCount &&
             list.length > 0 &&
             prev.slice(0, -1).every((m, i) => m.id === list[i].id && m.text === list[i].text);
+          // 往上翻补历史：新列表比旧的长，且旧列表是它的「后缀」——这时要保持视口，
+          // 否则用户正在看的那一屏会被 render() 一把弹回底部。
+          const grewAtHead =
+            !samePrefix &&
+            list.length > prev.length &&
+            prev.length > 0 &&
+            list[list.length - prev.length] &&
+            list[list.length - prev.length].id === prev[0].id;
           state.messages = list.slice();
           // 只有最后一条在变（流式）时走增量，避免整页重绘闪一下
           if (samePrefix) {
@@ -2353,7 +2523,7 @@ export function createChatView() {
             stream.scrollTop = stream.scrollHeight;
             return;
           }
-          render();
+          render(grewAtHead);
         },
         appendMessage(msg) {
           state.messages.push(msg);
@@ -2369,6 +2539,11 @@ export function createChatView() {
           stream.scrollTop = stream.scrollHeight;
         },
         setModel(name) {
+          // 名字没变就什么都别做。这个方法是被 app 层每次状态变化无条件调过来的
+          // （main.js 的 appState.subscribe），它以前每次都会 render() —— 也就是把
+          // stream.innerHTML 清空重画整条消息流。流式时每个 chunk 都会 emit，
+          // 于是她的话每几十毫秒被整页清一次再画回来，看着就是「打一半突然消失」。
+          if (state.model === name) return;
           state.model = name;
           render();
         },
@@ -2408,13 +2583,13 @@ export function createChatView() {
           return true;
         },
         /**
-         * 直接打开「+」面板，可指定页签（'tools' / 'mine'）。
-         * 下一轮做「我的表情」时从这里进：不必让用户先点 + 再点磁贴，
-         * 也不用再改面板结构 —— 页签容器和返回键已经在了。
+         * 直接打开「+」面板。
+         * 参数留着兼容旧调用方，但已经只有一页（表情管理走表情 sheet，
+         * 不再在面板里做第二页）。
          */
-        openComposerPanel(tab) {
+        openComposerPanel() {
           setMode('panel');
-          if (tab === 'mine') openPanel('mine');
+          openPanel();
           return state.mode;
         },
       };
@@ -2431,7 +2606,7 @@ export function createChatView() {
           volumeOf: () => ({ volume, muted }),
           rowsOf: (msg) => menuRowsFor(msg).map((row) => row.label),
           shapeOf,
-          openComposerPanel: (tab) => api.openComposerPanel(tab),
+          openComposerPanel: () => api.openComposerPanel(),
           panelOf: () => ({ mode: state.mode, tab: panelTab, open: !panel.hidden }),
         };
       }

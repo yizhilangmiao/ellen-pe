@@ -18,6 +18,7 @@ import './styles/zz-wall.css';
 import './styles/zz-drawer.css';
 // 批 4：动效层（七条节拍 + 降级链）
 import './styles/zz-motion.css';
+import './styles/update-prompt.css';
 
 import { s } from './strings.zh.js';
 import { iconEl } from './ui/icons.js';
@@ -52,6 +53,7 @@ import { createStarmapView } from './ui/views/starmap/starmap.js';
 import { createAchievementsView } from './ui/views/achievements/achievements.js';
 import { createAboutPage } from './ui/views/settings/page-about.js';
 import { ensureConfigured as ensureUpdateConfigured } from './core/updates.js';
+import { autoCheckOnLaunch } from './ui/update-prompt.js';
 import {
   importSnapshot,
   verifyImport,
@@ -62,14 +64,16 @@ import {
 } from './core/store/import.js';
 import { dropDb } from './core/store/db.js';
 import { pushMaterial, takePending, readState as readProactiveState } from './core/proactive.js';
+import { readAutonomyPrefs, writeAutonomyPrefs } from './core/autonomy-prefs.js';
 import { maybeCompose as maybeWriteJournal, dueFor as journalDue, todayJournal, dayKey } from './core/journal.js';
 import { maybeRemember, rememberNow, dueFor as memoryDue, readMemoryPrefs, readMemoryCursor } from './core/memory.js';
 import { setThread as setBackgroundThread, takeChatReply } from './core/background.js';
+import { watchActivityProfile } from './core/activity-source.js';
 import { loadConfig as loadAsrConfig, isUsable as asrUsable, transcribe as transcribeAudio } from './core/asr.js';
 import { createVoiceInput } from './core/voice-input.js';
 import { prepareVoice, pruneVoices, voiceStorage } from './core/voice-message.js';
 import { readPersona, writePersona, buildSystemPrompt } from './core/persona.js';
-import { buildManifest } from './core/store/export.js';
+import { exportBatches } from './core/store/export.js';
 import { configure as backupConfigure } from './core/backup.js';
 import { autoRun as autoBackup, state as backupState, due as backupDue, run as runBackupOnce } from './core/backup.js';
 import { readChatPrefs, writeChatPrefs } from './core/chatprefs.js';
@@ -91,15 +95,85 @@ import { buildStarmap, dayEvents } from './core/starmap.js';
 import { extractTone, toneEnabled, toneToRate, toneLineOf, styleOf } from './core/tone.js';
 import { pickStickerReply, replyDelay, slotOf } from './core/sticker-reply.js';
 // E4：情绪接线。数值层（affect）→ 事件层（affect-events）→ 提示词/语气/表情
-import { loadAffect, saveAffect, effectiveDesire, derivedMood } from './core/affect.js';
+import { loadAffect, saveAffect, derivedMood } from './core/affect.js';
 import { applyNeglect, applyUtterance, attachToPrompt } from './core/affect-events.js';
 import { createAffectPage } from './ui/views/settings/page-affect.js';
 import { createLorePage } from './ui/views/settings/page-lore.js';
 import { createCallView } from './ui/views/call/call.js';
 import { createCallSettingsPage } from './ui/views/settings/page-call.js';
+import { createAppearancePage } from './ui/views/settings/page-appearance.js';
 import { pickImage as pickMediaImage, saveToAlbum as saveMediaToAlbum } from './core/media.js';
+import {
+  readTheme,
+  writeTheme,
+  resolveTheme,
+  readThemeConfig,
+  themeVars,
+  ALL_THEME_VARS,
+  contrastRatio,
+} from './core/theme.js';
 
-const THEME_KEY = 'ellen-ui-theme';
+// 用户选的档位：system | light | dark。实际生效的 dark|light 由 resolveTheme 算。
+// 老版本只存 dark/light 到另一个 key，迁移在 core/theme.js 的 readTheme 里做。
+let themeMode = 'dark';
+
+/** 系统当前是不是浅色。读不到就当深色（老版本的默认）。 */
+function prefersLight() {
+  try {
+    return window.matchMedia('(prefers-color-scheme: light)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 应用主题档位。
+ *
+ * 三件事必须一起做，少一件就会出现「界面变了状态栏没变」或者
+ * 「这次变了下次启动又回去」：写存储 → 落 data-theme → 同步原生状态栏。
+ * data-theme 挂的是算出来的 dark|light，不是档位本身——CSS 只认这两种。
+ */
+/**
+ * 把自定义配色刷到根元素上（排期 4b）。
+ *
+ * 先清后写：换预设、恢复默认都要把上一次的内联变量撤掉。不清的话，
+ * 内联样式优先级高于 CSS 规则，切回「默认」根本回不去。
+ * colors 为空 = 用 CSS 自带的两套（暗色默认 + light 覆盖）。
+ */
+function applyColors(root, colors) {
+  for (const name of ALL_THEME_VARS) root.style.removeProperty(name);
+  const vars = themeVars(colors);
+  for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
+  // 底色一换成浅的，状态栏图标就得转深，否则白底白图标等于没有。
+  // 这一步不能只放在 applyTheme 里：改配色时档位没变，applyTheme 不会被调到。
+  if (isNative()) {
+    const bg =
+      vars['--el-bg'] ||
+      getComputedStyle(root).getPropertyValue('--el-bg').trim() ||
+      '#000000';
+    const dark = contrastRatio('#ffffff', bg) >= contrastRatio('#000000', bg);
+    call('EllenScreenShell', 'setAppearance', { theme: dark ? 'dark' : 'light' }).catch((err) => {
+      console.warn('[ellen] setAppearance 失败', err);
+    });
+  }
+}
+
+function applyTheme(root, mode) {
+  const next = mode === undefined ? themeMode : mode;
+  themeMode = next;
+  writeTheme(next);
+  const resolved = resolveTheme(next, prefersLight());
+  root.dataset.theme = resolved;
+  // 档位换了要重刷一遍颜色：浅色预设配 light、深色预设配 dark，用户可能只动了档位
+  applyColors(root, readThemeConfig().colors);
+  // 原生侧同步状态栏/导航栏图标明暗与窗口底色（要的是实际生效值，不是档位）
+  if (isNative()) {
+    call('EllenScreenShell', 'setAppearance', { theme: resolved }).catch((err) => {
+      console.warn('[ellen] setAppearance 失败', err);
+    });
+  }
+  return resolved;
+}
 
 function bootError(err) {
   const box = document.createElement('pre');
@@ -107,21 +181,6 @@ function bootError(err) {
   box.textContent = `启动失败：\n${(err && (err.stack || err.message)) || String(err)}`;
   document.body.appendChild(box);
   console.error('[ellen] boot failed', err);
-}
-
-function applyTheme(root, theme) {
-  root.dataset.theme = theme;
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    /* 隐私模式下 localStorage 可能不可写，忽略 */
-  }
-  // 原生侧同步状态栏/导航栏图标明暗与窗口底色
-  if (isNative()) {
-    call('EllenScreenShell', 'setAppearance', { theme }).catch((err) => {
-      console.warn('[ellen] setAppearance 失败', err);
-    });
-  }
 }
 
 function buildShell(root) {
@@ -261,18 +320,32 @@ async function main() {
   const shell = buildShell(root);
   const appState = createAppState();
 
-  // 主题：先恢复上次选择，再跑起来
-  let theme = 'dark';
+  // 主题：先恢复上次选择，再跑起来。readTheme 会顺手把老 key 的亮/暗迁过来。
+  applyTheme(root, readTheme());
+
+  // 「跟系统」档要跟着系统设置走：系统在设置里换深色时，change 事件会来；
+  // 但 App 在后台时这个事件经常收不到，所以回前台时再算一次（很便宜）。
   try {
-    theme = localStorage.getItem(THEME_KEY) || 'dark';
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onSystemTheme = () => {
+      if (themeMode === 'system') applyTheme(root, 'system');
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemTheme);
+    else if (mq.addListener) mq.addListener(onSystemTheme);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) onSystemTheme();
+    });
   } catch {
-    /* 忽略 */
+    /* 老 WebView 没有 matchMedia：跟系统这一档退化成不跟随，不影响其它两档 */
   }
-  applyTheme(root, theme);
 
   // 语义向量预热：首屏渲染完约 2.5 秒后，后台加载 bge-small-zh（22.8 MB）。
   // 失败静默降级（召回退回字面+概念），不挡任何界面、不阻塞聊天。
   warmEmbed();
+
+  // 学作息：读最近 400 条消息的时间戳，算出他大概几点睡几点醒（6 小时内不重算）。
+  // 主动权重的免打扰窗跟着这条曲线走，所以越用越准。失败静默，不挡启动。
+  watchActivityProfile();
 
   // 情绪状态缓存：一条消息里要读两次（拼 prompt + 记事件），5 秒内复用同一份，
   // 免得同一句话 settle 两遍、也免得两次落盘互相覆盖。
@@ -585,30 +658,108 @@ function sendMessage(text, extra = null, opts = null) {
     { priority: 60, name: 'voice-input' },
   );
 
+  // 连读的世代号：新一轮说话、或用户插话时递增，旧的那一轮自己退出。
+  // 没有它的话，用户刚发一条新消息，上一轮还在念第二段、第三段，抢着播。
+  let readAloudSeq = 0;
+  // 上一次念到哪条消息。同一轮重复触发（视图重绘等）不重念。
+  let readAloudTail = '';
+
+  /** 把语气标注换算成朗读参数（「（轻声）」要真的轻声念）。 */
+  function toneOpts(tone) {
+    const opts = {};
+    if (!toneEnabled() || !tone) return opts;
+    try {
+      const t = toneToRate(tone) || {};
+      const base = Number(readVoicePrefs().rate) || 1;
+      if (typeof t.rate === 'number') opts.rate = Math.max(0.5, Math.min(2, base * t.rate));
+      if (typeof t.pitch === 'number') opts.pitch = t.pitch;
+    } catch (err) {
+      console.warn('[main] 语气换算失败，按默认念', err);
+    }
+    return opts;
+  }
+
+  /**
+   * 等一条念完，最多等 ms 毫秒。
+   *
+   * 为什么不能只 await whenDone()：主路（minimax 的 <audio>）能可靠拿到 ended，
+   * 但系统 TTS 兜底分支拿不到完成事件；真卡住时整轮朗读会永远停在第二段。
+   * 超时就走下一条，宁可少念一段，也不要哑在那儿。
+   */
+  function waitOrTimeout(promise, ms) {
+    if (!promise) return Promise.resolve();
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      Promise.resolve(promise).then(finish, finish);
+    });
+  }
+
+  /**
+   * 逐条念完她这一轮说的话。
+   *
+   * 0.5.x 的写法是「从末尾找到第一条 assistant → speak() → return」，
+   * 所以开了「回复拆分」之后只有最下面那条被念（需求 3 那个 bug）。
+   * 这里改成按顺序逐条 await —— 但**不能只把 return 换成 for 循环**：
+   * `speak()` 内部的 `await audioEl.play()` 只等到开始播就返回，
+   * 后一条的 `new Audio` 会把前一条掐断，症状跟原来一模一样。
+   * 所以 speech.js 补了 `whenDone()`，拿「这一条真的播完了」这个时刻。
+   */
+  async function playRun(run) {
+    const seq = ++readAloudSeq;
+    for (const item of run) {
+      if (seq !== readAloudSeq) return;
+      let done = null;
+      try {
+        const res = await speakOut(item.body, item.opts);
+        done = res && res.done;
+      } catch (err) {
+        // 这一条念不出来就跳下一条，别让整轮哑掉
+        console.warn('[main] 朗读失败', err);
+        continue;
+      }
+      if (seq !== readAloudSeq) return;
+      await waitOrTimeout(done, 90000);
+    }
+  }
+
   function maybeReadAloud() {
+    // 新一轮的边界：不管这次念不念，先让上一轮的连读让位
+    readAloudSeq += 1;
     if (!readVoicePrefs().auto) return;
     const list = appState.getMessages();
-    for (let i = list.length - 1; i >= 0; i -= 1) {
-      const m = list[i];
-      if (!m || m.role !== 'assistant' || m.pending || m.failed) continue;
-      const body = plainVoice(m.text);
-      if (body) {
-        // 语气标注：她在气泡里写了「（轻声）」，念的时候也要轻声，不然白标了
-        const opts = {};
-        if (toneEnabled() && m.tone) {
-          try {
-            const tone = toneToRate(m.tone) || {};
-            const base = Number(readVoicePrefs().rate) || 1;
-            if (typeof tone.rate === 'number') opts.rate = Math.max(0.5, Math.min(2, base * tone.rate));
-            if (typeof tone.pitch === 'number') opts.pitch = tone.pitch;
-          } catch (err) {
-            console.warn('[main] 语气换算失败，按默认念', err);
-          }
-        }
-        speakOut(body, opts).catch((err) => console.warn('[main] 朗读失败', err));
-      }
+    if (!list.length) return;
+    const tail = list[list.length - 1];
+    const tailKey = String((tail && (tail.headId || tail.id)) || '');
+    if (!tailKey || tailKey === readAloudTail) return;
+
+    // 末尾是用户消息 = 用户刚说完、她还没回。这时要把上一轮没念完的停掉，
+    // 别出现「我在打字，她还在念上一段」。
+    if (tail && tail.role === 'user') {
+      stopSpeech().catch(() => {});
       return;
     }
+
+    // 取「她这一轮说的话」：从末尾往前扫，遇到用户消息就是这一轮的开头。
+    // 拆条后一轮是多条 assistant 消息，所以这一段要整段都念。
+    const run = [];
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const m = list[i];
+      if (!m) continue;
+      if (m.role === 'user') break;
+      if (m.role !== 'assistant' || m.pending || m.failed || m.recalled) continue;
+      const body = plainVoice(m.text);
+      if (body) run.unshift({ body, opts: toneOpts(m.tone) });
+    }
+    if (!run.length) return;
+    readAloudTail = tailKey;
+    playRun(run).catch((err) => console.warn('[main] 朗读失败', err));
   }
 
   // —— 聊天页长按菜单的四个后端动作 ——
@@ -744,6 +895,8 @@ function sendMessage(text, extra = null, opts = null) {
             return moodSlotNow;
           },
           onSend: (text, extra) => sendMessage(text, extra),
+          // 往上翻到顶就补一页更早的历史；返回补了几条（0 = 真的到底了）
+          onLoadOlder: () => appState.loadOlderMessages(),
           onStop: () => session.stop(),
           // —— 长按菜单的五个出口（缺哪个，聊天页就不显示哪一项）——
           // 撤回：窗口（120 秒）由聊天页判，这里只管写库；返回 value|null
@@ -971,7 +1124,15 @@ function sendMessage(text, extra = null, opts = null) {
   // 情绪只读调试页（七维 / 档位 / 注入块原文）：排期 E4，注册在 settings 抽屉里
   defineView('settings-affect', () => createAffectPage({ state: appState }));
   // 角色卡：换卡 / 写自己的补充设定（排期 4，三层加载由 core/lore.js 管）
-  defineView('settings-lore', () => createLorePage({ state: appState, onChange: () => session.refresh() }));
+  defineView('settings-lore', () => createLorePage({
+    state: appState,
+    onChange: () => {
+      // 切角色可能带着一套新配色：applyLoreSelection 已经写进存储，
+      // 这里按存储重刷根变量，再让会话重建 system prompt。
+      applyColors(root, readThemeConfig().colors);
+      session.refresh();
+    },
+  }));
   // 首次打开引导（排期 5）：走完自己写 markDone，这里只负责切回聊天
   defineView('welcome', () => createWelcomeView({ state: appState, onFinished: () => goChat() }));
   // 语音通话（排期 6）：turn 只负责「说一句、拿回她的回复」，状态机全在 core/call.js
@@ -993,6 +1154,13 @@ function sendMessage(text, extra = null, opts = null) {
     })
   );
   defineView('settings-call', () => createCallSettingsPage({ state: appState, onChange: () => session.refresh() }));
+  // 外观（排期 4a）：只改档位，落地统一走 applyTheme，避免两个写入者抢 data-theme
+  defineView('settings-appearance', () =>
+    createAppearancePage({
+      onChange: (mode) => applyTheme(root, mode),
+      onColors: (colors) => applyColors(root, colors),
+    })
+  );
 
   defineView('notices', () =>
     createPlaceholderView({
@@ -1089,6 +1257,7 @@ function sendMessage(text, extra = null, opts = null) {
     'settings-affect': 'settings',
     'settings-lore': 'settings',
     'settings-call': 'settings',
+    'settings-appearance': 'settings',
     welcome: 'chat',
     notices: 'settings',
     background: 'settings',
@@ -1144,9 +1313,12 @@ function sendMessage(text, extra = null, opts = null) {
 
   // 顶栏动作
   shell.toolButtons.appearance.addEventListener('click', () => {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    applyTheme(root, theme);
-    const label = theme === 'dark' ? s('header.appearanceLight') : s('header.appearanceDark');
+    // 顶栏这一颗永远是「切到另一种」：跟系统档下也按当前实际亮暗来翻，
+    // 翻一下就变成固定档（用户按了这一下，就是不想再跟系统了）。
+    const current = resolveTheme(themeMode, prefersLight());
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(root, next);
+    const label = next === 'dark' ? s('header.appearanceLight') : s('header.appearanceDark');
     shell.toolButtons.appearance.setAttribute('aria-label', label);
   });
   shell.toolButtons.settings.addEventListener('click', () => {
@@ -1241,6 +1413,10 @@ function sendMessage(text, extra = null, opts = null) {
   // 更新清单地址：默认指向自建站，装了包就能直接点「检查更新」，不用先去设置页手打 IP
   ensureUpdateConfigured().catch((err) => console.warn('[main] 同步更新清单地址失败', err));
 
+  // 进程序之后自动核对本机与更新站，落后就弹窗问一句要不要更（老大 2026-11-20 要的）。
+  // 不 await：首屏已经 show 了，别让联网把冷启动卡住；查不到就静默，设置页里手动查才报错。
+  autoCheckOnLaunch().catch((err) => console.warn('[main] 启动自检更新失败', err));
+
   // —— 主动消息：把素材推给 native，并把待读的取回来落成一条消息 ——
   /** 把「磁盘上已经没有的语音文件」在消息里标成 missing。
  *  清理和换机恢复都会造成这种状态；只在启动与清理后跑一次，不扫全库（只扫已加载的）。 */
@@ -1262,28 +1438,29 @@ async function reconcileVoiceFiles() {
   }
 }
 
-  // E4：主动消息的门槛（文档 5章2表「主动消息」行）。
-  // 为什么宁可不发：主动消息的分量全在「她真的想找你」，凑数的一句「在干嘛」
-  // 会把这个分量用光；eff 低的时候安静，比硬找一个话题更对。
-  //
-  // 门槛为什么是 20 而不是 45：日常值（lust30/resist50/affection40）算出来 eff≈3.8，
-  // 45 这条线等于「她永远不主动找你」；eff 自己已经做过「心思量 − 抵抗 × 0.5」的折扣，
-  // 20 相当于「有点想要、也不太抗拒」才开口。lust 真上来时（80/ resist30 → eff≈65）照样能过。
-  // 【待老大复核】这个数字文档没给，20 是我按默认值反推的。
-  const INITIATE_THRESHOLD = 20;
+  // 主动消息的两道情绪闸门。
+  // 为什么不再用 eff 当门槛（原来的 INITIATE_THRESHOLD）：eff 算的是「她想不想给」，
+  // 主动找你说话是「她想不想说」，两件事。日常七维值（lust30/resist50/affection40）
+  // 算出来 eff≈3.8，任何正数门槛都会把她按成哑巴；门槛降到 0 又挡不住「累」和「心冷」。
+  // 所以这里只判两件真正会让她闭嘴的事，eff 交给 BANDS 去决定这句话多黏。
+  const PROACTIVE_FATIGUE_MAX = 80; // 累过头就别硬找话题
+  const PROACTIVE_AFFECTION_MIN = 15; // 心里已经凉了，不会主动凑过来
 
 async function syncProactive() {
     if (!isNative()) return;
     try {
       const st = await readProactiveState();
       if (!st || !st.available || !st.enabled) return;
-      // 先看情绪：低于门槛就不推新素材，native 那边没有素材自然发不出消息。
+      // 先看状态：真拦住就别推素材，native 那边没有素材自然发不出消息。
       // 读失败（null）按「不知道」处理 —— 照旧推，别因为读不到情绪就彻底不吭声。
       const aff = await takeAffect();
       if (aff) {
-        const eff = effectiveDesire(aff.dims);
-        if (eff < INITIATE_THRESHOLD) {
-          console.info('[affect] eff', eff.toFixed(2), '<', INITIATE_THRESHOLD, '这次不主动开口');
+        if (aff.dims.fatigue > PROACTIVE_FATIGUE_MAX) {
+          console.info('[affect] fatigue', aff.dims.fatigue, '>', PROACTIVE_FATIGUE_MAX, '她太累了，这次不主动');
+          return;
+        }
+        if (aff.dims.affection < PROACTIVE_AFFECTION_MIN) {
+          console.info('[affect] affection', aff.dims.affection, '<', PROACTIVE_AFFECTION_MIN, '心里凉着，这次不主动');
           return;
         }
       }
@@ -1331,7 +1508,10 @@ async function syncProactive() {
     }
   }
 
-  let lastRhythmId = 'normal';
+  // 启动时也按「他上次选的那档」推素材：写死 'normal' 的话，每次开 App 都会
+  // 用「自然一些」的间隔把 native 里的排程覆盖一次，用户在设置页选的「别太频繁」
+  // 只在当次会话里有效，重启就没了（bug1 的第二条路径）。
+  let lastRhythmId = readAutonomyPrefs().rhythmId;
   let lastDrainedAt = 0;
   let lastChatReplyAt = 0;
   setBackgroundThread(appState.snapshot().threadId || '');
@@ -1396,7 +1576,13 @@ async function syncProactive() {
     theme: () => root.dataset.theme,
     store: { importSnapshot, verifyImport, rebuildHeads, parseManifest, splitArchive, extractSnapshot, dropDb },
     // 备份/导出验收：只生成清单，不落盘
-    exportPreview: () => buildManifest().then((r) => ({ stats: r.stats, manifestBytes: r.stats.manifestBytes, head: r.manifestText.slice(0, 200) })),
+    // 备份/导出验收：只看第一片（大库会分片，这里不落盘也不写完整包）
+    exportPreview: () => (async () => {
+      for await (const batch of exportBatches()) {
+        return { stats: batch.stats, manifestBytes: batch.stats.manifestBytes, head: batch.manifestText.slice(0, 200) };
+      }
+      return { stats: null, manifestBytes: 0, head: '' };
+    })(),
     recall: (text, opts) => recall(text, opts),
     // 上下文预算验收口：给定模型和一段历史，看这次到底会带几条、多少 token。
     // 「会不会满」这类问题不该靠推理回答，在这里问它。
@@ -1443,7 +1629,11 @@ async function syncProactive() {
       sync: () => syncProactive(),
       drain: () => drainProactive(),
       rhythm: (id) => {
-        if (id) lastRhythmId = id;
+        // 验收口也走同一条落盘：只改内存的话，验完重开页面就看不到自己设的那档
+        if (id) {
+          lastRhythmId = id;
+          writeAutonomyPrefs({ rhythmId: id });
+        }
         return lastRhythmId;
       },
     },

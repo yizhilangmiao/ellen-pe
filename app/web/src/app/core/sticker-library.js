@@ -33,6 +33,12 @@ export const MAX_STICKER_BYTES = 300 * 1024;
 /** 清单版本。将来结构变了靠它迁移，不靠猜字段。 */
 export const CUSTOM_SCHEMA_VERSION = 1;
 
+/**
+ * 孤儿文件的清理宽限期。磁盘上有、清单里没有的 `u_*.gif|webp` 只有
+ * 落盘超过这个时长才允许删 —— 刚导入还没落清单的那几秒不算孤儿。
+ */
+const ORPHAN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** 同时留多少个 blob URL。200 张全展开也不过几百 KB 的 DOM，但 URL 多了会一直占内存。 */
 const MAX_LIVE_URLS = 48;
 
@@ -69,8 +75,13 @@ export function isCustomStickerId(id) {
 function normalizeItem(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const name = String(raw.name || '');
-  const id = String(raw.id || '');
-  if (!name || !id.startsWith(CUSTOM_ID_PREFIX)) return null;
+  if (!name.startsWith('u_')) return null;
+  // id 恒等于 `u:` + 磁盘文件名（见 importCustomSticker 里 id 的构造），
+  // 所以这里从 name 推，而**不去信 meta 里存的那个 id**。
+  // 踩过的坑：老数据里出现过 id 写成裸文件名（少了 `u:`）的条目，
+  // 按 id 判真会把这一条整条丢掉 → 清单里没了它的 name →
+  // 紧接着 reconcile 就把磁盘上这张表情当孤儿删了（用户亲手导入的图）。
+  const id = `${CUSTOM_ID_PREFIX}${name}`;
   return {
     id,
     name,
@@ -171,12 +182,23 @@ async function reconcile() {
   const onDisk = new Set(files.map((f) => String(f.name || '')));
   const before = items.length;
   items = items.filter((it) => onDisk.has(it.name));
-  // 磁盘上有、清单里没有的：只可能是「导入写盘成功后进程被杀」留下的残渣，
-  // 而且必须是原生自己起名的 u_ 前缀文件才敢删（别的手滑放进去的不管）
+  // 磁盘上有、清单里没有的：只可能是「导入写盘成功后进程被杀」留下的残渣。
+  // 清理条件收紧到三条同时成立 —— 宁可留几个孤儿文件（几百 KB），
+  // 也不要再出现「用户亲手导入的表情被自动清理掉」那种事：
+  //   1) 原生自己起名的 u_ 前缀（别的手滑放进 stickers/ 的一律不管）；
+  //   2) 落盘超过 ORPHAN_TTL_MS，排除「刚导入、清单还没落」的进行中状态；
+  //   3) 清单可信（metaTrusted 由 doLoad 保证，读失败根本不会走到这儿）。
   const known = new Set(items.map((it) => it.name));
+  const now = Date.now();
   const orphans = files
-    .map((f) => String(f.name || ''))
-    .filter((n) => n.startsWith('u_') && !known.has(n));
+    .filter((f) => {
+      const n = String(f.name || '');
+      if (!n.startsWith('u_') || known.has(n)) return false;
+      const mtime = Number(f.mtime) || 0;
+      if (!mtime) return false;
+      return now - mtime > ORPHAN_TTL_MS;
+    })
+    .map((f) => String(f.name));
   orphans.forEach((name) => {
     call('EllenMedia', 'deleteSticker', { name }).catch(() => {});
   });

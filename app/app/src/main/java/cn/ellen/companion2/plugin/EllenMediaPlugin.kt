@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Base64
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.getcapacitor.JSArray
@@ -24,6 +25,7 @@ import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
@@ -70,6 +72,19 @@ class EllenMediaPlugin : Plugin() {
      */
     private fun stickersDir(): File = File(context.filesDir, "stickers").apply { mkdirs() }
 
+    /**
+     * 「我」的头像落点。单独一个目录而不是塞进 photos/：
+     * photos/ 里是聊天消息的附图，会随消息删除、也会被清理，头像不该跟着没。
+     * 只存一张 `user.png`，换头像就是整份覆盖。
+     */
+    private fun avatarsDir(): File = File(context.filesDir, "avatars").apply { mkdirs() }
+
+    /**
+     * 聊天页背景单独一个目录。不进 photos/：photos 是「发出去的消息附件」，
+     * 用户清聊天记录时那一套有可能会被带掉；背景是外观设置，得活得比消息久。
+     */
+    private fun wallpapersDir(): File = File(context.filesDir, "wallpapers").apply { mkdirs() }
+
     private fun attachmentsDir(): File = File(context.filesDir, "attachments")
 
     private fun authority(): String = "${context.packageName}.fileprovider"
@@ -110,15 +125,30 @@ class EllenMediaPlugin : Plugin() {
             return
         }
 
+        Log.w("EllenMedia", "picked uri=" + uri + " flags=" + (result.data?.flags ?: -1) + " grant=" + result.data?.clipData?.itemCount)
         val maxSide = intParam(target, "maxSide", DEFAULT_MAX_SIDE).coerceIn(MIN_MAX_SIDE, MAX_MAX_SIDE)
         val maxBytes = longParam(target, "maxBytes", DEFAULT_MAX_BYTES).coerceIn(MIN_MAX_BYTES, MAX_MAX_BYTES)
+
+        // PhotoPicker / 图库给的 content:// 授权绑在发起请求的那个 Activity 与回调线程上：
+        // 一进后台线程 openInputStream 就返回 null（本项目实测：uri=content://media/picker/...
+        // flags=65 仍然读不到）。所以先把字节整块读进内存，线程里只做解码与压缩。
+        val raw = try {
+            readAllBytes(uri)
+        } catch (e: Exception) {
+            Log.w("EllenMedia", "读取失败 " + e.javaClass.simpleName + ": " + e.message + " uri=" + uri)
+            null
+        }
+        if (raw == null || raw.isEmpty()) {
+            rejectOnUi(target, "这张图读不出来，再挑一张试试。", "MEDIA_READ_FAILED")
+            return
+        }
 
         // 解码 + 压质量是几十到几百毫秒的活，放主线程会让「刚选完图」那一秒整屏定住
         Thread {
             try {
-                resolveOnUi(target, compressToPhoto(uri, maxSide, maxBytes))
+                resolveOnUi(target, compressToPhoto(raw, maxSide, maxBytes))
             } catch (e: Exception) {
-                rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}", "MEDIA_DECODE_FAILED")
+                rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}（${e.message.orEmpty()}）", "MEDIA_DECODE_FAILED")
             }
         }.apply { isDaemon = true }.start()
     }
@@ -167,14 +197,31 @@ class EllenMediaPlugin : Plugin() {
         }
     }
 
-    /** 读图 → 校正 EXIF 方向 → 缩到长边上限 → 压到体积上限 → 原子落盘。 */
-    private fun compressToPhoto(uri: Uri, maxSide: Int, maxBytes: Long): JSObject {
-        val resolver = context.contentResolver
+    /** 单张图读取上限：超过这个尺寸的多半不是聊天要用的照片，直接拒掉而不是把内存撑爆。 */
+    private val MAX_SOURCE_BYTES = 48L * 1024 * 1024
 
+    /** 把 content:// 整块读进内存。必须在回调线程（主线程）调用，见 pickedImage 里的注释。 */
+    private fun readAllBytes(uri: Uri): ByteArray? {
+        return context.contentResolver.openInputStream(uri)?.use { stream ->
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(64 * 1024)
+            var total = 0L
+            while (true) {
+                val read = stream.read(buf)
+                if (read <= 0) break
+                total += read
+                if (total > MAX_SOURCE_BYTES) throw IllegalStateException("这张图太大了")
+                out.write(buf, 0, read)
+            }
+            out.toByteArray()
+        }
+    }
+
+    /** 读图 → 校正 EXIF 方向 → 缩到长边上限 → 压到体积上限 → 原子落盘。 */
+    private fun compressToPhoto(source: ByteArray, maxSide: Int, maxBytes: Long): JSObject {
         // 第一遍只读尺寸（inJustDecodeBounds），不占像素内存；拿不到尺寸说明根本不是图
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: throw IllegalStateException("读不到这张图")
+        BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("这不是有效的图片")
 
         // 采样率按 2 的幂往下降，先省内存再谈质量：4000px 的原图直接整张解码会吃掉几十 MB
@@ -183,10 +230,10 @@ class EllenMediaPlugin : Plugin() {
             sample *= 2
         }
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        var bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        var bitmap = BitmapFactory.decodeByteArray(source, 0, source.size, options)
             ?: throw IllegalStateException("解码失败")
 
-        bitmap = applyExifRotation(uri, bitmap)
+        bitmap = applyExifRotation(source, bitmap)
         bitmap = scaleToMaxSide(bitmap, maxSide)
         val bytes = encodeJpeg(bitmap, maxBytes)
         val width = bitmap.width
@@ -214,19 +261,22 @@ class EllenMediaPlugin : Plugin() {
      * 相机拍的照片方向写在 EXIF 里，像素本身是躺着的。
      * 不校正的话聊天里会出现「横着的人」——而位图一旦重新编码，EXIF 就丢了，事后救不回来。
      */
-    private fun applyExifRotation(uri: Uri, bitmap: Bitmap): Bitmap {
+    private fun applyExifRotation(source: ByteArray, bitmap: Bitmap): Bitmap {
         val orientation = try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                ExifInterface(stream).getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL,
-                )
-            } ?: ExifInterface.ORIENTATION_NORMAL
+            ExifInterface(ByteArrayInputStream(source)).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL,
+            )
         } catch (e: Exception) {
             // 读不到 EXIF（部分三方相册导出的图）就按正立处理，别为了元数据把整张图废掉
             ExifInterface.ORIENTATION_NORMAL
         }
 
+        return applyRotationMatrix(bitmap, orientation)
+    }
+
+    /** 按 EXIF 方向把位图摆正；方向是 NORMAL 或摆正失败时原样返回。 */
+    private fun applyRotationMatrix(bitmap: Bitmap, orientation: Int): Bitmap {
         val matrix = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -249,6 +299,21 @@ class EllenMediaPlugin : Plugin() {
         } catch (e: Exception) {
             bitmap
         }
+    }
+
+    /** 按 uri 校正方向：给表情这类还在后台线程读图的老路径用，读不到就按正立处理，绝不因此失败。 */
+    private fun applyExifRotationByUri(uri: Uri, bitmap: Bitmap): Bitmap {
+        val orientation = try {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                ExifInterface(stream).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL,
+                )
+            } ?: ExifInterface.ORIENTATION_NORMAL
+        } catch (e: Exception) {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+        return applyRotationMatrix(bitmap, orientation)
     }
 
     private fun scaleToMaxSide(bitmap: Bitmap, maxSide: Int): Bitmap {
@@ -475,7 +540,7 @@ class EllenMediaPlugin : Plugin() {
                     "MEDIA_TOO_LARGE",
                 )
             } catch (e: Exception) {
-                rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}", "MEDIA_DECODE_FAILED")
+                rejectOnUi(target, "这张图处理不了：${e.javaClass.simpleName}（${e.message.orEmpty()}）", "MEDIA_DECODE_FAILED")
             }
         }.apply { isDaemon = true }.start()
     }
@@ -521,7 +586,7 @@ class EllenMediaPlugin : Plugin() {
         // 静图：走和照片同一套采样/缩放的思路，只是目标尺寸小得多
         val source = decodeScaled(uri, maxSide)
             ?: throw IllegalStateException("解码失败")
-        val rotated = applyExifRotation(uri, source)
+        val rotated = applyExifRotationByUri(uri, source)
         val scaled = scaleToMaxSide(rotated, maxSide)
         val hasAlpha = scaled.hasAlpha()
 
@@ -636,6 +701,13 @@ class EllenMediaPlugin : Plugin() {
         return buffer.toByteArray()
     }
 
+    /** 背景走 JPEG：同样是 1920 长边，PNG 十几 MB、JPEG 几百 KB，而背景不吃透明度。 */
+    private fun encodeJpeg(bitmap: Bitmap, quality: Int): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, buffer)
+        return buffer.toByteArray()
+    }
+
     /** 先写 .part 再改名：中途被杀进程时 stickers/ 里不会留半张图（半张图在面板里就是个破图标）。 */
     private fun writeAtomically(name: String, bytes: ByteArray) {
         val file = File(stickersDir(), name)
@@ -701,6 +773,184 @@ class EllenMediaPlugin : Plugin() {
         val file = File(stickersDir(), name)
         val removed = file.isFile && file.delete()
         call.resolve(JSObject().put("removed", removed))
+    }
+
+    /**
+     * saveUserAvatar({uri}) → {ok, bytes}
+     *
+     * 存「我」的头像。uri 来自 pickImage 返回的那个 content://（指向 photos/），
+     * 先按 512 解码，再居中裁成正方形、缩到 256、编成 PNG 落 avatars/user.png。
+     *
+     * 为什么要裁方：气泡旁边那颗头像是圆的，直接塞长方形会被 CSS 压扁或裁掉半张脸，
+     * 在这边裁好，web 侧就不需要算 object-position。
+     */
+    @PluginMethod
+    fun saveUserAvatar(call: PluginCall) {
+        val raw = call.getString("uri").orEmpty()
+        if (raw.isEmpty()) {
+            call.reject("没有选图。", "AVATAR_NO_URI")
+            return
+        }
+        try {
+            val uri = Uri.parse(raw)
+            val src = decodeScaled(uri, STICKER_MAX_SIDE)
+                ?: run {
+                    call.reject("这张图读不出来。", "AVATAR_DECODE")
+                    return
+                }
+            val side = minOf(src.width, src.height)
+            if (side <= 0) {
+                call.reject("这张图读不出来。", "AVATAR_DECODE")
+                return
+            }
+            val square = Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
+            val scaled = if (side > AVATAR_SIDE) {
+                Bitmap.createScaledBitmap(square, AVATAR_SIDE, AVATAR_SIDE, true)
+            } else {
+                square
+            }
+            val bytes = encodePng(scaled)
+            val file = File(avatarsDir(), "user.png")
+            val part = File(avatarsDir(), "user.png.part")
+            part.outputStream().use { it.write(bytes) }
+            if (file.exists()) file.delete()
+            if (!part.renameTo(file)) throw IllegalStateException("改名失败")
+            resolveOnUi(call, JSObject().put("ok", true).put("bytes", bytes.size))
+        } catch (e: Exception) {
+            rejectOnUi(call, "头像没存下来：${e.message.orEmpty()}", "AVATAR_SAVE_FAILED")
+        }
+    }
+
+    /**
+     * readUserAvatar() → {base64, bytes, mimeType} 或 {empty:true}
+     *
+     * 必须走 base64 而不是把 content:// 直接丢给 <img>：WebView 不认
+     * 我们自己 fileprovider 的 uri（没注册成可拦截的 scheme），只会显示破图。
+     * 头像只有 256 的 PNG，base64 之后也就几十 KB，一次过桥可接受。
+     */
+    @PluginMethod
+    fun readUserAvatar(call: PluginCall) {
+        val file = File(avatarsDir(), "user.png")
+        if (!file.isFile) {
+            resolveOnUi(call, JSObject().put("empty", true))
+            return
+        }
+        try {
+            val bytes = file.readBytes()
+            resolveOnUi(
+                call,
+                JSObject()
+                    .put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    .put("bytes", bytes.size)
+                    .put("mimeType", "image/png"),
+            )
+        } catch (e: Exception) {
+            rejectOnUi(call, "读头像失败：${e.message.orEmpty()}", "AVATAR_READ_FAILED")
+        }
+    }
+
+    /** clearUserAvatar() → {ok}。删的就是那一张，不碰目录本身（目录留着下次写）。 */
+    @PluginMethod
+    fun clearUserAvatar(call: PluginCall) {
+        try {
+            File(avatarsDir(), "user.png").delete()
+            resolveOnUi(call, JSObject().put("ok", true))
+        } catch (e: Exception) {
+            rejectOnUi(call, "清不掉：${e.message.orEmpty()}", "AVATAR_CLEAR_FAILED")
+        }
+    }
+
+    /**
+     * saveWallpaper({uri}) → {ok, bytes, width, height}
+     *
+     * 存聊天页背景。跟头像不同：不裁方、不强制 16:9 —— 用户拿什么图就是什么图，
+     * 铺法（cover / contain）交给 CSS，由用户在外观页选。
+     * 只做两件事：长边压到 1920 以内（手机屏够用，也避免 4000 万像素的图把内存撑爆）、
+     * 编成 JPEG 88 落盘（背景是照片级内容，PNG 会到十几 MB）。
+     */
+    @PluginMethod
+    fun saveWallpaper(call: PluginCall) {
+        val raw = call.getString("uri").orEmpty()
+        if (raw.isEmpty()) {
+            call.reject("没有选图。", "WALL_NO_URI")
+            return
+        }
+        try {
+            val uri = Uri.parse(raw)
+            val src = decodeScaled(uri, WALL_MAX_SIDE)
+                ?: run {
+                    call.reject("这张图读不出来。", "WALL_DECODE")
+                    return
+                }
+            if (src.width <= 0 || src.height <= 0) {
+                call.reject("这张图读不出来。", "WALL_DECODE")
+                return
+            }
+            val longSide = maxOf(src.width, src.height)
+            val bitmap = if (longSide > WALL_MAX_SIDE) {
+                val ratio = WALL_MAX_SIDE.toFloat() / longSide.toFloat()
+                Bitmap.createScaledBitmap(
+                    src,
+                    maxOf(1, (src.width * ratio).toInt()),
+                    maxOf(1, (src.height * ratio).toInt()),
+                    true,
+                )
+            } else {
+                src
+            }
+            val bytes = encodeJpeg(bitmap, 88)
+            val file = File(wallpapersDir(), "wall.jpg")
+            val part = File(wallpapersDir(), "wall.jpg.part")
+            part.outputStream().use { it.write(bytes) }
+            if (file.exists()) file.delete()
+            if (!part.renameTo(file)) throw IllegalStateException("改名失败")
+            resolveOnUi(
+                call,
+                JSObject().put("ok", true).put("bytes", bytes.size)
+                    .put("width", bitmap.width).put("height", bitmap.height),
+            )
+        } catch (e: Exception) {
+            rejectOnUi(call, "背景没存下来：${e.message.orEmpty()}", "WALL_SAVE_FAILED")
+        }
+    }
+
+    /**
+     * readWallpaper() → {base64, bytes, mimeType} 或 {empty:true}
+     *
+     * 同头像，必须走 base64：WebView 不认我们 fileprovider 的 content://。
+     * 背景比头像大得多（1920 长边 JPEG 通常 200–600 KB → base64 后 ×1.37），
+     * 但只在进聊天页时读一次并缓存成 blob URL，不是每帧都过桥。
+     */
+    @PluginMethod
+    fun readWallpaper(call: PluginCall) {
+        val file = File(wallpapersDir(), "wall.jpg")
+        if (!file.isFile) {
+            resolveOnUi(call, JSObject().put("empty", true))
+            return
+        }
+        try {
+            val bytes = file.readBytes()
+            resolveOnUi(
+                call,
+                JSObject()
+                    .put("base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    .put("bytes", bytes.size)
+                    .put("mimeType", "image/jpeg"),
+            )
+        } catch (e: Exception) {
+            rejectOnUi(call, "读背景失败：${e.message.orEmpty()}", "WALL_READ_FAILED")
+        }
+    }
+
+    /** clearWallpaper() → {ok}。只删这一张，目录留着。 */
+    @PluginMethod
+    fun clearWallpaper(call: PluginCall) {
+        try {
+            File(wallpapersDir(), "wall.jpg").delete()
+            resolveOnUi(call, JSObject().put("ok", true))
+        } catch (e: Exception) {
+            rejectOnUi(call, "清不掉：${e.message.orEmpty()}", "WALL_CLEAR_FAILED")
+        }
     }
 
     /**
@@ -797,8 +1047,16 @@ class EllenMediaPlugin : Plugin() {
         }
     }
 
-    /** 页面关掉时把挂起的 Call 清掉：留着就是一个永远不落地的 Promise + 一份 Activity 引用。 */
+    /**
+     * 页面关掉时把挂起的 Call 清掉：留着就是一个永远不落地的 Promise + 一份 Activity 引用。
+     *
+     * 只置 null 不够 —— 那个 Promise 会永远悬着。web 层 core/media.js 用模块级
+     * picking 锁挡重入，锁只在 finally 里复位；Promise 不落地就永远到不了 finally，
+     * 之后每次点相册都静默返回 BUSY，非得重启 App 才好。所以先 reject 再清空。
+     */
     override fun handleOnDestroy() {
+        pickCall?.let { rejectOnUi(it, "这次选择被系统打断了，再点一次试试。", "MEDIA_CANCELLED") }
+        stickerCall?.let { rejectOnUi(it, "这次选择被系统打断了，再点一次试试。", "MEDIA_CANCELLED") }
         pickCall = null
         stickerCall = null
         super.handleOnDestroy()
@@ -824,6 +1082,12 @@ class EllenMediaPlugin : Plugin() {
 
         /** 读回上限：清单里本该 ≤300KB，给到 1MB 是留余量，不是留后门。 */
         const val MAX_STICKER_READ = 1024L * 1024
+
+        /** 「我」的头像：正方形 256，PNG。气泡里那颗小圆点在 2x 屏上也够清楚。 */
+        const val AVATAR_SIDE = 256
+
+        /** 背景长边上限。手机屏 1080×2400，1920 已经比实际显示多，再大只是白占内存。 */
+        const val WALL_MAX_SIDE = 1920
 
         /** 一次最多列 2000 个：目录异常变大时别把回包撑爆（正常上限是 200 张）。 */
         const val MAX_STICKER_LIST = 2000

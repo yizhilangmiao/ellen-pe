@@ -11,7 +11,7 @@
 import { listLatest, earliestMessageAt } from './store/library.js';
 import { getMeta, putMeta, appendRecord } from './store/records.js';
 import { ask } from './chat/oneshot.js';
-import { loadAffect, derivedMood } from './affect.js';
+import { loadAffect, derivedMood, moodIndex } from './affect.js';
 
 const RELATIONSHIPS = [
   { id: 'lover', label: '恋人' },
@@ -95,6 +95,43 @@ export async function currentMood(now = Date.now()) {
   if (!rows.length) return null;
   const card = moodCard(rows[0]);
   return card.mood ? card : null;
+}
+
+// ── 「我们之间」那句话：接当下情绪倾向 ─────────────────────────────
+//
+// 上面「此刻」显示的是情绪词（淡淡的 / 心痒着），便签是她第一人称的一句话；
+// 这块讲的是**关系**温度，所以用 moodIndex（七维合成的一个 0–100 标量）而不是再来一遍 mood。
+// 档位本身也参与：恋人档的 50 分比刚认识档的 50 分热，所以按 relationship 给一点偏移。
+// 分档阈值是照着 DAILY 默认值定的 —— 默认 moodIndex 约 44，恋人档 +8 落在「温的」，
+// 不会是「凉下来了」那种一进页面就被吓一跳的说法。
+const WARMTH_STEPS = [
+  { min: 82, text: '她现在是烫的，碰一下就藏不住。' },
+  { min: 68, text: '暖着。不用说什么，挨着就够。' },
+  { min: 52, text: '温的。想起你会笑一下，不催你。' },
+  { min: 38, text: '有点淡。各忙各的，也没觉得远。' },
+  { min: 0, text: '凉下来了。她在等你先开口。' },
+];
+
+const RELATIONSHIP_WARMTH = { lover: 8, close: 4, friend: 0, new: -6 };
+
+/** 纯函数：七维 + 档位 → 一句话。给测试和别处复用，不读库。 */
+export function warmthOf(dims, relationshipId = DEFAULT_RELATIONSHIP) {
+  const index = Math.round(moodIndex(dims));
+  const bonus = RELATIONSHIP_WARMTH[relationshipId] || 0;
+  const score = Math.max(0, Math.min(100, index + bonus));
+  const step = WARMTH_STEPS.find((w) => score >= w.min) || WARMTH_STEPS[WARMTH_STEPS.length - 1];
+  return { index, score, text: step.text };
+}
+
+/** 读一次七维，给「我们之间」那句感受。persist:false —— 只是看看，不该改状态。 */
+export async function readWarmth({ now = Date.now(), relationship: rel = DEFAULT_RELATIONSHIP } = {}) {
+  try {
+    const state = await loadAffect({ now, persist: false });
+    return warmthOf(state && state.dims, rel);
+  } catch (err) {
+    console.warn('[companion] 关系温度读不出来', err);
+    return null;
+  }
 }
 
 async function lastMoodAt() {

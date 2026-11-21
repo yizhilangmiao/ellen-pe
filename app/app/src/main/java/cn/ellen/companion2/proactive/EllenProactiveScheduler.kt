@@ -84,7 +84,33 @@ object EllenProactiveScheduler {
         val maxGap = material.maxGapMs.coerceAtLeast(minGap)
         // 用一个稳定的伪随机（按 lastAt 取模）在区间里挑一点，避免每轮都是同样的间隔
         val span = (maxGap - minGap).coerceAtLeast(0L)
-        val pick = if (span <= 0) minGap else minGap + ((last / 1000L) % (span / 1000L + 1)) * 1000L
+        val sent = EllenProactiveStore.sentToday(context)
+
+        // 今天条数已经到上限：不必再算间隔，直接排到明天零点（静音段会把零点再推出去）。
+        // 不做这一步的话，闹钟会在今天剩下的时间里反复响、每次被 Runner 按 daily 拒掉再重排。
+        if (material.dailyMax > 0 && sent >= material.dailyMax) {
+            val next = Calendar.getInstance().apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val bounded0 = next.timeInMillis.coerceAtMost(now + MAX_DELAY_MS)
+            EllenProactiveStore.setNextAt(context, bounded0)
+            arm(context, bounded0)
+            return bounded0
+        }
+
+        // 下限没到（今天还欠几条）就用最短间隔往前赶，不再随机往后拖。
+        // 上限 dailyMax 仍然卡着，所以它最多只补到下限，不会变成刷屏。
+        val toppingUp = material.dailyMin > 0 && sent < material.dailyMin
+        val pick = if (toppingUp || span <= 0) {
+            minGap
+        } else {
+            minGap + ((last / 1000L) % (span / 1000L + 1)) * 1000L
+        }
         var at = (if (last > 0) last else now) + pick
 
         // 安静时段：落进去就推到 quietEnd 点
@@ -102,6 +128,18 @@ object EllenProactiveScheduler {
                 if (cal.timeInMillis <= at) cal.add(Calendar.DAY_OF_YEAR, 1)
                 at = cal.timeInMillis
             }
+        }
+
+        // 排程也避开「刚聊完」：否则闹钟会落在用户刚退出 App 的那几分钟里，
+        // 到点被 Runner 的 RECENT_CHAT 闸门拒掉再重排，白跑一轮。
+        // 他说了半句就停的时候门槛挪到 5 分钟（和 Runner 的闸门同一个判据），
+        // 不然闹钟被推到 15 分钟后，五分钟续接永远踩不到点上。
+        val left = EllenProactiveStore.lastUserAt(context)
+        if (left > 0) {
+            val openTopic = EllenProactiveStore.isOpenTopic(EllenProactiveStore.readMaterial(context))
+            val floor = if (openTopic) EllenProactiveStore.FOLLOW_UP_MS else EllenProactiveStore.RECENT_CHAT_MS
+            val notBefore = left + floor
+            if (at < notBefore) at = notBefore
         }
 
         val bounded = at.coerceAtMost(now + MAX_DELAY_MS)

@@ -105,6 +105,11 @@ export async function pickImage(opts = {}) {
       requestId: requestId('pick'),
       maxSide,
       maxBytes,
+    }, {
+      // 别无限等：选择器被系统打断时（页面被回收、相机顶掉）原生现在会 reject
+      // MEDIA_CANCELLED，但万一哪条路还是没落地，90 秒后自己要能爬出来，
+      // 否则 picking 锁一直举着，之后每次点相册都静默 BUSY。
+      timeoutMs: 90000,
     });
     const picked = normalizePicked(res);
     if (!picked.picked) return picked;

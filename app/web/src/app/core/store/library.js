@@ -18,6 +18,58 @@ function getAll(store, index, query) {
   }));
 }
 
+/**
+ * 解一层「被存成字符串的 value」。
+ *
+ * 为什么要有：迁移过来的老数据里有一批 `value` 是 `'{"title":"…","diary":"…"}'`
+ * 这种字符串（也有整条 value 是对象、但 title/diary 各自被编码过一遍的）。
+ * 界面直接读 `v.title` 取不到，卡片上就原样吐出一坨 JSON —— 老大真机截图里
+ * 2026-11-15 那条手记就是这样。
+ *
+ * 只在读取口做，不改库：改数据要写迁移脚本，风险比这大得多；而这里解不出来
+ * 就原样返回，最坏情况跟现在一样。
+ */
+const DECODE_FIELDS = ['title', 'diary', 'thoughts', 'subject', 'summary', 'body'];
+
+function tryParseObject(text) {
+  const t = String(text).trim();
+  if (t.length < 2 || t[0] !== '{' || t[t.length - 1] !== '}') return null;
+  try {
+    const obj = JSON.parse(t);
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeValue(raw) {
+  let v = raw;
+  if (typeof v === 'string') {
+    const parsed = tryParseObject(v);
+    if (!parsed) return v;
+    v = parsed;
+  }
+  if (!v || typeof v !== 'object') return v;
+  let out = v;
+  for (const key of DECODE_FIELDS) {
+    const cur = out[key];
+    if (typeof cur !== 'string' || !cur.trim().startsWith('{')) continue;
+    const parsed = tryParseObject(cur);
+    if (!parsed) continue;
+    const next = { ...out };
+    if (typeof parsed[key] === 'string') next[key] = parsed[key];
+    // `title` 那一格里塞的是整条 `{"title":…,"diary":…}` 时，把正文也接回来
+    for (const other of DECODE_FIELDS) {
+      if (other === key) continue;
+      if (next[other] === undefined && typeof parsed[other] === 'string') next[other] = parsed[other];
+    }
+    out = next;
+  }
+  return out;
+}
+
+export { decodeValue };
+
 function getOne(store, key) {
   return openDb().then((db) => new Promise((resolve, reject) => {
     const t = db.transaction(store, 'readonly');
@@ -56,7 +108,7 @@ export async function listLatest(kind, { limit = 0, profileId = null } = {}) {
       threadId: h.threadId,
       revisionId: rev.revisionId,
       at: rev.at,
-      value: rev.value,
+      value: decodeValue(rev.value),
       refs: rev.refs || [],
       createdAt: h.createdAt,
     });

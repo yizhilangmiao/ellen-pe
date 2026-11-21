@@ -135,3 +135,59 @@
     #0a0b0c88 100%
   );
 }
+
+/* ============================================================
+ * 用户自定义背景（排期第 6 项）
+ *
+ * 类挂在 .ellen-app 上（不是 .el-chat-page）：data-skin / data-slot 也挂那儿，
+ * 三者同层，JS 只需管一个节点。选择器特异性与上面的 [data-slot] 那段相同
+ * （.ellen-app + .has-wall + [data-skin] + .el-chat-page = 0,4,0），
+ * 靠「写在文件末尾」压过时段三档 —— 用户选的图不该被早上/傍晚换掉。
+ *
+ * 不做的三件事，都写在这儿免得下一个人再加：
+ *   1) 不改 ::after 的暗角（那是给静态壁纸调的可读性保险）。用户图的亮度不可知，
+ *      统一按「压暗」处理：暗色主题原样不动，亮色主题单独提亮（见文件末尾）。
+ *   2) 不动 .el-msg-body 的底色 —— 气泡自己带 opaque 背景，压在图上也读得清。
+ *   3) 不加 background-attachment: fixed：移动端会和滚动条打架，且部分 WebView 直接忽略。
+ * ============================================================ */
+
+.ellen-app.has-wall[data-skin='zzz'] .el-chat-page {
+  /* 时段三档的变量整套让位；保留 --wp-b / --wp-s 名字是为了下面 ::before 的 filter 还有得算 */
+  --wp: var(--wall-image, none);
+  --wp-wide: var(--wall-image, none);
+  --wp-b: 1;
+  --wp-s: 1;
+  --wp-extra: 0;
+}
+
+.ellen-app.has-wall[data-skin='zzz'] .el-chat-page::before {
+  /* blur 会把边缘糊成透明，所以先往外扩一圈再放大，避免露出底色边 */
+  inset: calc(-1 * var(--wall-blur, 0px) - 8px);
+  transform: scale(1.04);
+  background-image: var(--wall-image, none);
+  background-size: var(--wall-fit, cover);
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+  filter: blur(var(--wall-blur, 0px)) brightness(1) saturate(1);
+}
+
+/* 横屏那条把 background-image 换成 --wp-wide —— 用户图没有宽屏版，覆盖回来 */
+@media (orientation: landscape) and (min-width: 560px) {
+  .ellen-app.has-wall[data-skin='zzz'] .el-chat-page::before {
+    background-image: var(--wall-image, none);
+  }
+}
+
+/* 亮色主题 + 用户图：把图压成「纸面」，否则深字压在暗图上直接读不出 */
+.ellen-app.has-wall[data-theme='light'][data-skin='zzz'] .el-chat-page::after,
+.ellen-app.has-wall[data-skin='zzz'][data-theme='light'] .el-chat-page::after {
+  background-color: rgba(255, 255, 255, 0.58);
+  background-image: linear-gradient(
+    180deg,
+    #ffffffd9 0%,
+    #ffffff9e 20%,
+    #ffffff8a 50%,
+    #ffffffb8 78%,
+    #fffffff2 100%
+  );
+}

@@ -23,6 +23,7 @@ import cn.ellen.companion2.plugin.EllenUpdatesPlugin
 import cn.ellen.companion2.plugin.EllenDocumentsPlugin
 import cn.ellen.companion2.plugin.EllenMediaPlugin
 import cn.ellen.companion2.plugin.EllenVolumePlugin
+import cn.ellen.companion2.proactive.EllenProactiveStore
 
 /**
  * 唯一 Activity。插件必须在 super.onCreate() 之前注册 —— Capacitor 8 会在 super.onCreate
@@ -59,5 +60,31 @@ class MainActivity : BridgeActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+    }
+
+    /**
+     * 前台/后台标记，给主动消息用。
+     *
+     * 用户正开着 App（多半就在聊天界面里）时不该收到「在吗」这种主动消息 ——
+     * 之前没有这个标记，闹钟到点就发，于是聊天聊到一半会插一条进来。
+     * 退到后台的那一刻顺手记个时间，Runner 靠它避开「刚聊完」的头几分钟。
+     */
+    override fun onResume() {
+        super.onResume()
+        try {
+            EllenProactiveStore.setForeground(this, true)
+        } catch (_: Exception) {
+            /* 存不进去也不该拖垮启动 */
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            EllenProactiveStore.setForeground(this, false)
+            EllenProactiveStore.noteUserLeft(this)
+        } catch (_: Exception) {
+            /* 同上 */
+        }
     }
 }

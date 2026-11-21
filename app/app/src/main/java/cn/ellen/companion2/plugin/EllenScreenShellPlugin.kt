@@ -25,8 +25,12 @@ class EllenScreenShellPlugin : Plugin() {
         activity.runOnUiThread {
             try {
                 val window = activity.window
+                // Android 15（targetSdk 35+）起 statusBarColor 被系统忽略，只剩
+                // decorView 自己的底色还认——所以两条都写：老系统吃 statusBarColor，
+                // 新系统靠 decorView 兜住那条黑边。
                 window.statusBarColor = background
                 window.navigationBarColor = background
+                window.decorView.setBackgroundColor(background)
 
                 val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                 // 浅底要深色图标（isAppearanceLightStatusBars = true）

@@ -19,9 +19,28 @@
   gap: calc(12 * var(--u));
 }
 
+/* 消息流最顶上的「往上翻，看更早的」：滑到顶时给一个看得见的落点，
+ * 翻到底了它就消失，不留一条永远在的空条。 */
+.el-chat-more {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: calc(4 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(999 * var(--u));
+  font-size: calc(11 * var(--u));
+  line-height: 1.2;
+  color: var(--el-text-dim);
+  opacity: 0.7;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+.el-chat-more[data-loading='1'] {
+  opacity: 1;
+}
+
 /* 空态：标题 + 提示 + 模型胶囊，垂直落在视觉中线偏上 */
-.el-chat-empty {
-  flex: 1 1 auto;
+.el-chat-empty {  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -95,6 +114,15 @@
   display: flex;
   flex-direction: column;
   max-width: 84%;
+  /* 手机版：长按是「开菜单」的手势，不是「选字」的手势。
+     WebView 默认会把长按文字接成原生取词（起 ActionMode 选词、回退时发
+     pointercancel），结果就是我们的 450ms 计时器被掐掉、屏幕上只剩系统的
+     「复制／全选」—— 同一个包在不同 ROM 上表现不一样，这就是"有些人按不出来"。
+     复制功能不依赖页面选区（走 clipboard + textarea 兜底），所以这里直接关掉选中。
+     -webkit-touch-callout 管的是 iOS 的呼出菜单，顺手一起关，省得以后又踩。 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .el-msg[data-role='user'] {
@@ -352,39 +380,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 「我的表情」页签：面板里换页而不是再开一层浮层，返回键留在原地 */
-.el-chat-panel-mine[hidden] { display: none; }
-.el-chat-panel-head {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  padding-bottom: calc(8 * var(--u));
-}
-.el-chat-panel-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
-  border-radius: calc(999 * var(--u));
-  color: var(--el-muted);
-}
-.el-chat-panel-back .el-icon svg {
-  width: calc(18 * var(--u));
-  height: calc(18 * var(--u));
-}
-.el-chat-panel-title {
-  font-size: calc(13.5 * var(--u));
-  color: var(--el-text);
-}
-.el-chat-panel-empty {
-  margin: 0;
-  padding: calc(18 * var(--u)) calc(10 * var(--u)) calc(20 * var(--u));
-  font-size: calc(12.5 * var(--u));
-  line-height: calc(19 * var(--u));
-  color: var(--el-muted);
-  text-align: center;
-}
 
 .ellen-app[data-theme='light'] .el-composer-field {
   background: #efedf0;
@@ -1397,3 +1392,31 @@
  * 磁贴样式沿用 .el-chat-panel-tile，这里不再需要专属规则。
  * 留一句说明是为了下次有人搜 .el-chat-call-btn 时知道它去哪了。
  */
+
+/* —— 「我」的头像（排期 5）———————————————————————————
+ * 用伪元素背景而不是插一个 <img>：.el-msg 是 flex column，真插一个节点
+ * 它就变成 flex 项，跟气泡抢对齐，改起来要动一堆既有规则。
+ * 伪元素是纯装饰：气泡只往右让出一块，其余布局一个字不改。
+ * 图片 URL 由 chat.js 塞进 --me-avatar（blob URL，写进 CSS 变量时带引号）。
+ */
+.el-msg[data-role='user'].has-me-avatar {
+  position: relative;
+  padding-right: calc(50 * var(--u));
+}
+
+.el-msg[data-role='user'].has-me-avatar::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(38 * var(--u));
+  height: calc(38 * var(--u));
+  border-radius: 50%;
+  background-image: var(--me-avatar, none);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  /* 亮色主题下白底头像会跟气泡糊在一起，加一圈极淡的边 */
+  box-shadow: 0 0 0 1px var(--el-line);
+  pointer-events: none;
+}

@@ -8,6 +8,19 @@
 import { s } from '../../../strings.zh.js';
 import { iconEl } from '../../icons.js';
 import { openMemoryEditor } from '../../memory-editor.js';
+import { openAnniversaryEditor, openDaySheet } from '../../anniversary-editor.js';
+import { attachLongPress } from '../../long-press.js';
+import {
+  listAll as listAnniversaries,
+  create as createAnniversary,
+  update as updateAnniversary,
+  remove as removeAnniversary,
+  markedDaysOfMonth,
+  sortByUpcoming,
+  normalizeValue,
+  describeDaysAway,
+  nextOccurrence,
+} from '../../../core/anniversary.js';
 import {
   createMemory,
   updateMemory,
@@ -48,10 +61,15 @@ function ymd(y, m, d) {
 
 /**
  * 手记日历（照旧包 `04-memory.png`：月份箭头 + 星期行 + 日格 + 最近一篇）。
- * 只有写过手记的日子是可点的，其余灰掉 —— 点空日子什么也不发生，别给假反馈。
+ * 有手记的日子点开那一篇；空日子点了给一句提示（老大 2026-11-21 定：不能点了没反应）；
+ * 长按任意一格开菜单（翻开 / 标成纪念日 / 改 / 取消这一标）。
+ * 有纪念日的格子上留一个点：每年重复的是实心点、只这一年的空心点。
  */
-function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
+function journalCalendar(rows, cursor, onOpen, onShiftMonth, opts = {}) {
   const days = byDay(rows);
+  const marked = opts.marked || new Map();
+  const y = cursor.getFullYear();
+  const m = cursor.getMonth();
   const box = document.createElement('div');
   box.className = 'el-journal-cal';
 
@@ -75,11 +93,11 @@ function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
   next.dataset.journalControl = 'next';
   next.textContent = '›';
   next.addEventListener('click', () => onShiftMonth(1));
-  // 不给翻到未来的月份：那边一定没有手记
+  // 往后翻允许到「今天所在月 + 12 个月」：纪念日都落在未来一年里，翻得过去才看得到。
+  // 再往后就没意义了 —— 那边没有手记，也没有哪一年的落点。
   const now = new Date();
-  const atLatestMonth =
-    cursor.getFullYear() === now.getFullYear() && cursor.getMonth() === now.getMonth();
-  next.disabled = atLatestMonth;
+  const horizon = new Date(now.getFullYear(), now.getMonth() + 12, 1);
+  next.disabled = new Date(y, m, 1).getTime() >= horizon.getTime();
 
   head.append(prev, label, next);
 
@@ -94,8 +112,6 @@ function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
 
   const grid = document.createElement('div');
   grid.className = 'el-journal-grid';
-  const y = cursor.getFullYear();
-  const m = cursor.getMonth();
   const firstDow = new Date(y, m, 1).getDay();
   const total = new Date(y, m + 1, 0).getDate();
   const todayKey = dayLabel(Date.now());
@@ -108,18 +124,37 @@ function journalCalendar(rows, cursor, onOpen, onShiftMonth) {
   for (let d = 1; d <= total; d += 1) {
     const key = ymd(y, m, d);
     const idx = days.get(key);
+    const annivRows = marked.get(key) || [];
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'el-journal-day-cell';
     cell.dataset.day = key;
+    // status 仍只讲「有没有手记」：老验收脚本按 filled/empty 判，不改它的语义
     cell.dataset.status = idx === undefined ? 'empty' : 'filled';
     cell.textContent = String(d);
     if (key === todayKey) cell.classList.add('is-today');
-    if (idx !== undefined) {
-      cell.classList.add('has-entry');
-      cell.addEventListener('click', () => onOpen(idx));
-    } else {
-      cell.disabled = true;
+    if (idx !== undefined) cell.classList.add('has-entry');
+    if (annivRows.length) {
+      const yearly = annivRows.some((a) => a.value.yearly);
+      cell.classList.add(yearly ? 'is-anniv' : 'is-anniv-once');
+      cell.dataset.anniv = '1';
+      cell.dataset.annivTitle = annivRows
+        .map((a) => a.value.title || s('memory.annivUntitled'))
+        .join('、');
+      cell.setAttribute('aria-label', `${key} ${cell.dataset.annivTitle}`);
+    }
+    // 空日子不再 disabled：这一天也能标成纪念日，点了至少给一句提示
+    cell.addEventListener('click', () => {
+      if (idx !== undefined) {
+        onOpen(idx);
+        return;
+      }
+      if (annivRows.length && typeof opts.onAnnivTap === 'function') opts.onAnnivTap(key, annivRows);
+      else if (typeof opts.onEmptyTap === 'function') opts.onEmptyTap(key);
+    });
+    if (typeof opts.onLongPress === 'function') {
+      cell.dataset.longPress = 'day';
+      attachLongPress(cell, () => opts.onLongPress(key));
     }
     grid.append(cell);
   }
@@ -509,7 +544,7 @@ export function createMemoryView() {
       const JOURNAL_PAGE = 60;
       // pending：切换页签时若上一次 load 还在跑，先记下来，等它落地后再补跑一次。
       // 否则 load() 开头的 loading 守卫会把这次点击整个吞掉（状态改了、界面不变）。
-      const state = { tab: 'daily', loading: false, pending: false, month: null, journalRows: null, journalShown: 0 };
+      const state = { tab: 'daily', loading: false, pending: false, month: null, journalRows: null, journalShown: 0, annivs: [] };
 
       function paintButtons() {
         for (const b of pageBtns) b.classList.toggle('is-active', b.dataset.memoryTab === state.tab);
@@ -531,28 +566,63 @@ export function createMemoryView() {
         return box;
       }
 
+      // 一句两秒就散的提示。点空格子、标完、取消标完都要有回应 ——
+      // 之前空日子点了什么也不发生，那等于让人以为手滑了。
+      let flashTimer = 0;
+      function flash(text) {
+        if (!text) return;
+        let box = document.querySelector('.el-memory-toast');
+        if (box) box.remove();
+        box = document.createElement('div');
+        box.className = 'el-memory-toast';
+        box.textContent = text;
+        (document.querySelector('.ellen-app') || document.body).append(box);
+        requestAnimationFrame(() => box.classList.add('is-open'));
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(() => {
+          box.classList.remove('is-open');
+          setTimeout(() => box.remove(), 220);
+        }, 2000);
+      }
+
       // 把「我们的回忆」的日常视图画出来：日历 + 最新一篇大卡 + 前 N 张卡 + 「再多看几篇」
       // 点「再多看几篇」只往末尾追加，不重建整棵树（重建会把滚动位置甩回顶部）。
       function paintDaily() {
         const rows = state.journalRows || [];
         list.replaceChildren();
+        const open = (i) => push('journal', { items: rows, index: i });
+        const onShift = (step) => {
+          state.month = new Date(state.month.getFullYear(), state.month.getMonth() + step, 1);
+          paintDaily();
+        };
+        // 第一次进来把日历翻到最新那篇所在的月份；一篇都没有就翻到今天这个月
+        // （纪念日挂在日历上，没有手记也得能看见、能标）。
+        if (!state.month) {
+          const newest = rows.length
+            ? (rows[0].value && rows[0].value.day) || dayLabel(rows[0].at)
+            : dayLabel(Date.now());
+          const d = new Date(`${newest}T00:00:00`);
+          state.month = new Date(d.getFullYear(), d.getMonth(), 1);
+        }
+        const marked = markedDaysOfMonth(state.annivs, state.month.getFullYear(), state.month.getMonth());
+        list.append(
+          journalCalendar(rows, state.month, open, onShift, {
+            marked,
+            onEmptyTap: () => flash(s('memory.calEmptyTap')),
+            onAnnivTap: (day, annivRows) => {
+              const v = (annivRows[0] || {}).value || {};
+              const next = nextOccurrence(v.day, v.yearly);
+              flash(`${v.title || s('memory.annivUntitled')} · ${describeDaysAway(next ? next.daysAway : 0)}`);
+            },
+            onLongPress: onDayLongPress,
+          })
+        );
+        // 纪念日单独一段，紧跟日历（老大 2026-11-21 定：不混进记忆、共同经历）
+        list.append(annivSection());
         if (!rows.length) {
           list.append(emptyBox(s('memory.empty'), s('memory.journalEmpty')));
           return;
         }
-        const open = (i) => push('journal', { items: rows, index: i });
-        // 第一次进来时把日历翻到最新那篇所在的月份
-        if (!state.month) {
-          const newest = rows[0].value && rows[0].value.day ? rows[0].value.day : dayLabel(rows[0].at);
-          const d = new Date(`${newest}T00:00:00`);
-          state.month = new Date(d.getFullYear(), d.getMonth(), 1);
-        }
-        list.append(
-          journalCalendar(rows, state.month, open, (step) => {
-            state.month = new Date(state.month.getFullYear(), state.month.getMonth() + step, 1);
-            paintDaily();
-          })
-        );
         list.append(latestJournal(rows[0], () => open(0)));
         const allHead = document.createElement('p');
         allHead.className = 'el-journal-all-head';
@@ -590,6 +660,115 @@ export function createMemoryView() {
 
         more.addEventListener('click', grow);
         grow();
+      }
+
+      /**
+       * 「纪念日」那一段：按「下一个先到」排，今天那一条高亮。
+       * 一次性且已经过去的日子排在最后（daysAway 为负），不隐藏 —— 它是发生过的事。
+       */
+      function annivSection() {
+        const box = document.createElement('div');
+        box.className = 'el-anniv-section';
+        const head = document.createElement('p');
+        head.className = 'el-anniv-head';
+        head.textContent = s('memory.annivSection');
+        box.append(head);
+        const rows = sortByUpcoming(state.annivs || []);
+        if (!rows.length) {
+          const empty = document.createElement('p');
+          empty.className = 'el-anniv-empty';
+          empty.textContent = s('memory.annivEmpty');
+          box.append(empty);
+          return box;
+        }
+        const wrap = document.createElement('div');
+        wrap.className = 'el-anniv-list';
+        for (const item of rows) wrap.append(annivCard(item));
+        box.append(wrap);
+        return box;
+      }
+
+      function annivCard(item) {
+        const { row, value, daysAway } = item;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'el-anniv-card';
+        card.dataset.annivDay = value.day;
+        if (daysAway === 0) card.classList.add('is-today');
+
+        const date = document.createElement('span');
+        date.className = 'el-anniv-date';
+        date.textContent = value.day.slice(5).replace('-', '/');
+
+        const main = document.createElement('span');
+        main.className = 'el-anniv-main';
+        const title = document.createElement('span');
+        title.className = 'el-anniv-title';
+        title.textContent = value.title || s('memory.annivUntitled');
+        main.append(title);
+        if (value.note) {
+          const note = document.createElement('span');
+          note.className = 'el-anniv-note';
+          note.textContent = value.note;
+          main.append(note);
+        }
+
+        const away = document.createElement('span');
+        away.className = 'el-anniv-away';
+        away.textContent = describeDaysAway(daysAway);
+
+        card.append(date, main, away);
+        card.addEventListener('click', async () => {
+          const res = await openAnniversaryEditor({
+            item: { headId: row.headId, value },
+            onSave: (patch) => updateAnniversary(row.headId, patch),
+            onDelete: () => removeAnniversary(row.headId),
+          });
+          if (res === 'deleted') flash(s('memory.calAnnivRemoved'));
+          if (res === 'saved' || res === 'deleted') load();
+        });
+        return card;
+      }
+
+      /**
+       * 长按日历某一格：先弹一杯菜单，拿到选择再开下一个面板。
+       * 两个面板都挂 .ellen-app，同时开会叠在一起、返回键也会互相抢层。
+       */
+      async function onDayLongPress(day) {
+        const idx = byDay(state.journalRows || []).get(day);
+        const hit = (state.annivs || []).find((r) => normalizeValue(r.value).day === day) || null;
+        const anniv = hit ? normalizeValue(hit.value) : null;
+        const choice = await openDaySheet({ day, hasEntry: idx !== undefined, anniv });
+        if (choice === 'entry' && idx !== undefined) {
+          push('journal', { items: state.journalRows, index: idx });
+          return;
+        }
+        if (choice === 'set') {
+          const res = await openAnniversaryEditor({
+            day,
+            onSave: (patch) => createAnniversary(patch),
+          });
+          if (res === 'saved') {
+            flash(s('memory.calAnnivSaved'));
+            load();
+          }
+          return;
+        }
+        if (choice === 'edit' && hit) {
+          const res = await openAnniversaryEditor({
+            item: { headId: hit.headId, value: normalizeValue(hit.value) },
+            onSave: (patch) => updateAnniversary(hit.headId, patch),
+            onDelete: () => removeAnniversary(hit.headId),
+          });
+          if (res === 'deleted') flash(s('memory.calAnnivRemoved'));
+          if (res === 'saved' || res === 'deleted') load();
+          return;
+        }
+        if (choice === 'clear' && hit) {
+          await removeAnniversary(hit.headId);
+          flash(s('memory.calAnnivRemoved'));
+          load();
+        }
       }
 
       /**
@@ -743,10 +922,14 @@ export function createMemoryView() {
             list.replaceChildren(emptyBox(s('memory.empty'), s('memory.starsHint')));
           } else if (state.tab === 'daily') {
             hint.textContent = '';
-            // limit:0 = 全量。日历要标出「哪天有手记」，必须有全部日期；
+            // limit:0 = 全量。日历要标出「哪天有手记」和「哪天是纪念日」，两者都要整份数据；
             // DOM 只渲染前 state.journalShown 张（见 paintDaily）。
-            const rows = await listLatest('journal', { limit: 0 });
+            const [rows, annivs] = await Promise.all([
+              listLatest('journal', { limit: 0 }),
+              listAnniversaries(),
+            ]);
             state.journalRows = rows;
+            state.annivs = annivs;
             state.journalShown = 0; // 由 paintDaily 里的 grow() 从 0 开始铺第一批
             paintDaily();
           } else {

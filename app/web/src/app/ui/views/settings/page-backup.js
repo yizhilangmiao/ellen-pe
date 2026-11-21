@@ -17,7 +17,7 @@ import { readPrefs as readVoicePrefs, writePrefs as writeVoicePrefs, speak as sp
 import { cloneVoice, clonedVoiceId } from '../../../core/voice-clone.js';
 import { parseManifest, extractSnapshot, rebuildHeads, importSnapshot, applyLorePack } from '../../../core/store/import.js';
 import { count as storeCount } from '../../../core/store/db.js';
-import { buildManifest } from '../../../core/store/export.js';
+import { exportBatches } from '../../../core/store/export.js';
 import { scanLegacy, importLegacy, importAllLegacy, pickLegacyFolder, scanPermission, requestAllFiles } from '../../../core/legacy.js';
 import { state as backupState, configure as configureBackup, chooseDirectory as chooseBackupDirectory, run as runBackup } from '../../../core/backup.js';
 import { RHYTHMS, pushMaterial, setEnabled, readState, takePending } from '../../../core/proactive.js';
@@ -129,8 +129,12 @@ export function createBackupPage({ state, onChange } = {}) {
         bkToggle.textContent = on ? s('settings.backupTurnOff') : s('settings.backupTurnOn');
         const groups = (bkState.groups || []).length;
         if (!bkNote.dataset.keep) {
+          // 大库会分成好几个包，显示整轮的字节数 + 包数，别让人看到「4 MB / 205 个」以为坏了
+          const bytes = bkState.lastTotalBytes || bkState.lastBytes || 0;
+          const parts = bkState.lastParts || 0;
+          const size = `${(bytes / 1048576).toFixed(2)} MB${parts > 1 ? ` · ${parts} ${s('settings.exportPartsUnit')}` : ''}`;
           const last = bkState.lastSuccessAt
-            ? `${s('settings.backupLast')} ${stampOf(bkState.lastSuccessAt)} · ${(bkState.lastBytes / 1048576).toFixed(2)} MB`
+            ? `${s('settings.backupLast')} ${stampOf(bkState.lastSuccessAt)} · ${size}`
             : s('settings.backupNever');
           bkNote.className = bkState.lastError ? 'el-settings-note is-error' : 'el-settings-note';
           bkNote.textContent = bkState.lastError || `${last} · ${s('settings.backupCount')} ${groups}`;
@@ -202,9 +206,12 @@ export function createBackupPage({ state, onChange } = {}) {
             bkNote.textContent = `${s('settings.backupSkipped')} ${res.skipped || ''}`;
           } else {
             const pruned = (res.pruned || []).length;
-            const mb = (((res.group && res.group.bytes) || 0) / 1048576).toFixed(2);
+            const parts = (res.groups || []).length || 1;
+            const bytes = ((res.stats && res.stats.manifestBytes) || 0);
+            const mb = (bytes / 1048576).toFixed(2);
+            const name = (res.group && res.group.name) || '';
             bkNote.className = 'el-settings-note';
-            bkNote.textContent = `${s('settings.backupDone')} ${(res.group && res.group.name) || ''} · ${mb} MB · ${res.ms} ms`
+            bkNote.textContent = `${s('settings.backupDone')} ${parts > 1 ? `${parts} ${s('settings.exportPartsUnit')}` : name} · ${mb} MB · ${res.ms} ms`
               + (pruned ? ` · ${s('settings.backupPruned')} ${pruned}` : '');
           }
         } catch (err) {
@@ -607,15 +614,28 @@ export function createBackupPage({ state, onChange } = {}) {
         exportBtn.disabled = true;
         say(s('settings.exportBusy'));
         try {
-          const built = await buildManifest();
-          const created = await call('EllenArchive', 'createExport', { manifestText: built.manifestText });
-          const saved = await call('EllenArchive', 'saveExport', { handle: created.handle });
-          if (!saved || saved.cancelled) {
-            say(s('settings.importCancelled'));
-            return;
+          // 分片：大库会拆成好几个包，每片单独存一次（原生 createExport 只用一个
+          // 固定缓存文件，必须严格串行：上一片存完再建下一片）。
+          const parts = [];
+          let records = 0;
+          let totalBytes = 0;
+          let total = 0;
+          for await (const batch of exportBatches()) {
+            total += 1;
+            records += batch.stats.records;
+            if (total > 1) say(`${s('settings.exportBusy')} ${total}`);
+            const created = await call('EllenArchive', 'createExport', { manifestText: batch.manifestText });
+            const saved = await call('EllenArchive', 'saveExport', { handle: created.handle });
+            if (!saved || saved.cancelled) {
+              say(s('settings.importCancelled'));
+              return;
+            }
+            totalBytes += saved.sizeBytes || 0;
+            parts.push(saved);
           }
-          const mb = (saved.sizeBytes / 1048576).toFixed(2);
-          say(`${s('settings.exportDone')} ${built.stats.records} 次改动 · ${mb} MB`);
+          const mb = (totalBytes / 1048576).toFixed(2);
+          const suffix = parts.length > 1 ? ` · ${parts.length} ${s('settings.exportPartsUnit')}` : '';
+          say(`${s('settings.exportDone')} ${records} 次改动 · ${mb} MB${suffix}`);
         } catch (err) {
           const msg = (err && (err.message || err.code)) || String(err);
           say(`导出失败：${msg}`, true);

@@ -10,7 +10,7 @@
 //
 // 撤回为什么不加 status='recalled'：老包读到未知的两天前写的枚举值会当成未知状态，
 // 列表里可能整条不渲染 —— 所以撤回只加一个布尔标记，文本原样保留。
-import { latestOf, appendRecord, currentThreadId, deviceId, recentRecords, reviseRecord } from './records.js';
+import { latestOf, appendRecord, currentThreadId, deviceId, recentRecords, recordsBefore, reviseRecord } from './records.js';
 import { getMeta, putMeta } from './records.js';
 import { STORE_HEADS, openDb } from './db.js';
 
@@ -286,6 +286,18 @@ export async function loadMessages(threadId = null, limit = 200) {
   const tid = threadId || (await currentThreadId());
   const revs = await recentRecords('message', tid, limit);
   // headId / value 一起带出去：从历史加载的消息后续也可能被改（继续生成、补标记）
+  const views = revs.map((r) => ({ ...toView(r), headId: r.id, value: r.value, threadId: tid }));
+  await markQuoteMissing(views);
+  return views;
+}
+
+/**
+ * 读比 beforeAt 更早的一页（升序）——「往上翻加载更早」用。
+ * beforeId 只用来切开同一毫秒的缝，避免同一条被翻两次。
+ */
+export async function loadMessagesBefore(threadId = null, beforeAt = 0, limit = 100, beforeId = '') {
+  const tid = threadId || (await currentThreadId());
+  const revs = await recordsBefore('message', tid, beforeAt, limit, beforeId);
   const views = revs.map((r) => ({ ...toView(r), headId: r.id, value: r.value, threadId: tid }));
   await markQuoteMissing(views);
   return views;

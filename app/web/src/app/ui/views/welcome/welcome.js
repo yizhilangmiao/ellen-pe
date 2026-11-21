@@ -271,8 +271,14 @@ export function createWelcomeView({ state, onFinished, onOpenBackup } = {}) {
       async function applyPing(opt) {
         const on = opt.id !== 'off';
         const cur = readAutonomyPrefs();
-        // 与设置页写同一份存储：这里选的间隔，设置页里看到的就是这个
-        writeAutonomyPrefs({ enabled: on, intervalH: opt.intervalH || cur.intervalH });
+        // 与设置页写同一份存储：这里选的间隔，设置页里看到的就是这个。
+        // 节奏 id 也要一起写：只写 intervalH 的话，设置页那三个按钮读不到「他选过哪档」，
+        // 进去还亮着「自然一些」，跟这里选的对不上。
+        writeAutonomyPrefs({
+          enabled: on,
+          intervalH: opt.intervalH || cur.intervalH,
+          rhythmId: on ? opt.id : cur.rhythmId,
+        });
         try {
           const profileId = (state && state.profileId) || '';
           await setEnabled(on, { profileId });

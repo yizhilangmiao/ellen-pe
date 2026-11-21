@@ -8,6 +8,10 @@
   用法：
     pwsh -File _tools/upload_release_http.ps1 -Apk "E:\...\_build\release\ellen-0.3.8-arm64-v8a.apk" -Version "0.3.8" -VersionCode 9 -Notes "一句话说明"
 
+  按 ABI 分开发时多传一个 -Abi（默认 arm64-v8a）：清单会写成
+  `apks: [{abi, url, sha256, sizeBytes}]`，同一个 versionCode 的其它 ABI 条目
+  自动从服务器上现有清单里保留下来。老 `apk` 字段照旧输出，老客户端还能读。
+
   前置：E:\AI-Tools\aliyun\rc.py 可用（云助手），PATH 上的 python 带 aliyun SDK。
 #>
 [CmdletBinding()]
@@ -16,6 +20,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Version,
   [Parameter(Mandatory = $true)][int]$VersionCode,
   [string]$Notes = "",
+  [string]$Abi = "arm64-v8a",
   [string]$SiteHost = "120.27.162.122",
   [int]$SitePort = 8080,
   [string]$RcPy = "E:\AI-Tools\aliyun\rc.py"
@@ -61,6 +66,25 @@ Write-Host "[3/4] 上传（注意后缀不能是 .apk，否则被 nginx 的 apk 
 if ($LASTEXITCODE -ne 0) { throw "上传失败 exit=$LASTEXITCODE" }
 
 Write-Host "[4/4] 改名 + 写清单 + 撤上传口"
+# 同一个 versionCode 分 ABI 传两次时，别把另一个架构的条目冲掉：
+# 先读服务器上现有清单，把「不同 abi」的条目接过来。取不到就只写自己这条 ——
+# 宁可清单里少一条，也不要拼出一个坏清单。
+$keep = @()
+try {
+  $oldText = (& curl.exe -s --max-time 10 "$base/latest.json" | Out-String)
+  if ($oldText -match '"versionCode"\s*:\s*(\d+)' -and [int]$Matches[1] -eq $VersionCode) {
+    $oldJson = $oldText | ConvertFrom-Json
+    if ($oldJson.apks) {
+      $keep = @($oldJson.apks | Where-Object { $_.abi -and $_.abi -ne $Abi })
+    }
+  }
+} catch {
+  Write-Host "    （读现有清单失败，只写本架构这一条）"
+}
+$entry = @{ abi = $Abi; sha256 = $sha; url = "$base/$apkName"; sizeBytes = $size }
+$apks = @($keep) + @($entry)
+Write-Host "    apks: $($apks | ForEach-Object { $_.abi } | Join-String -Separator ', ')"
+
 $json = @{
   schemaVersion = 1
   platform = "android"
@@ -71,11 +95,15 @@ $json = @{
   publishedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
   minSdkVersion = 24
   notes = $Notes
+  # 老字段：老客户端只认这一条，保留成「本次上传的这个 ABI」
   apk = @{
     sha256 = $sha
     url = "$base/$apkName"
     sizeBytes = $size
+    abi = $Abi
   }
+  # 新字段：按 ABI 列全，客户端按 primaryCpuAbi 挑
+  apks = $apks
 } | ConvertTo-Json -Depth 5
 
 $finish = @"
